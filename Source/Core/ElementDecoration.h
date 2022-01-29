@@ -54,7 +54,7 @@ public:
 	void InstanceDecorators();
 
 	/// Renders all appropriate decorators.
-	void RenderDecorators();
+	void RenderDecorators(RenderStage render_stage);
 
 	/// Mark decorators as dirty and force them to reset themselves.
 	void DirtyDecorators();

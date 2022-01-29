@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -26,66 +26,47 @@
  *
  */
 
+#ifndef RMLUI_CORE_DECORATORBLUR_H
+#define RMLUI_CORE_DECORATORBLUR_H
+
 #include "../../Include/RmlUi/Core/Decorator.h"
-#include "TextureDatabase.h"
-#include "../../Include/RmlUi/Core/PropertyDefinition.h"
-#include "../../Include/RmlUi/Core/Texture.h"
-#include <algorithm>
+#include "../../Include/RmlUi/Core/DecoratorInstancer.h"
+#include "../../Include/RmlUi/Core/Property.h"
 
 namespace Rml {
 
-Decorator::Decorator()
-{
-}
+class DecoratorBlur : public Decorator {
+public:
+	DecoratorBlur();
+	virtual ~DecoratorBlur();
 
-Decorator::~Decorator()
-{
-}
+	bool Initialise(float radius);
 
-void Decorator::RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const
-{
-	if (render_stage == RenderStage::Decoration)
-		RenderElement(element, element_data);
-}
+	DecoratorDataHandle GenerateElementData(Element* element) const override;
+	void ReleaseElementData(DecoratorDataHandle element_data) const override;
 
-int Decorator::AddTexture(const Texture& texture)
-{
-	if (!texture)
-		return -1;
+	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
 
-	if (!first_texture)
-		first_texture = texture;
+	void RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const override;
 
-	if (first_texture == texture)
-		return 0;
+private:
+	float radius = 0.f;
+};
 
-	auto it = std::find(additional_textures.begin(), additional_textures.end(), texture);
-	if (it != additional_textures.end())
-		return (int)(it - additional_textures.begin()) + 1;
+class DecoratorBlurInstancer : public DecoratorInstancer {
+public:
+	DecoratorBlurInstancer();
+	~DecoratorBlurInstancer();
 
-	additional_textures.push_back(texture);
-	return (int)additional_textures.size();
-}
+	SharedPtr<Decorator> InstanceDecorator(const String& name, const PropertyDictionary& properties,
+		const DecoratorInstancerInterface& instancer_interface) override;
 
-int Decorator::GetNumTextures() const
-{
-	int result = (first_texture ? 1 : 0);
-	result += (int)additional_textures.size();
-	return result;
-}
-
-// Returns one of the decorator's previously loaded textures.
-const Texture* Decorator::GetTexture(int index) const
-{
-	if (index == 0)
-		return &first_texture;
-	
-	index -= 1;
-	if (index < 0 || index >= (int)additional_textures.size())
-		return nullptr;
-
-	return &(additional_textures[index]);
-}
-
+private:
+	struct GradientPropertyIds {
+		PropertyId radius;
+	};
+	GradientPropertyIds ids;
+};
 
 } // namespace Rml
+#endif

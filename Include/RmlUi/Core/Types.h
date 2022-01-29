@@ -46,6 +46,9 @@ using std::size_t;
 // Unicode code point
 enum class Character : char32_t { Null, Replacement = 0xfffd };
 
+// TODO
+enum class RenderStage { Enter, BeforeDecoration, Decoration, AfterDecoration, Exit };
+
 }
 
 #include "Colour.h"

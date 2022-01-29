@@ -605,6 +605,7 @@ progress {
 	<p class="title" style="margin-top: 1.8em;">RmlUi 😍</p>
 	<p>Have fun fiddling about in this demo.</p>
 	<p>Press 'F8' to open up the debugger.</p>
+	<p style="decorator: blur(5px)">Press 'F8' to open up the debugger.</p>
 	<p class="title" style="margin-top: 1em;">🎉</p>
 </panel>
 <tab>Decorators</tab>

@@ -39,6 +39,9 @@ namespace Rml {
 
 class Context;
 
+// TODO: Move
+using CompiledEffectHandle = uintptr_t;
+
 /**
 	The abstract base class for application-specific rendering implementation. Your application must provide a concrete
 	implementation of this class and install it through Rml::SetRenderInterface() in order for anything to be rendered.
@@ -79,6 +82,15 @@ public:
 	/// Called by RmlUi when it wants to release application-compiled geometry.
 	/// @param[in] geometry The application-specific compiled geometry to release.
 	virtual void ReleaseCompiledGeometry(CompiledGeometryHandle geometry);
+
+	
+	/// Called by RmlUi when...
+	virtual CompiledEffectHandle CompileEffect(const String& name, const Dictionary& parameters);
+	/// Called by RmlUi when...
+	virtual void RenderEffect(CompiledEffectHandle effect, RenderStage stage, int iteration, Element* element);
+	/// Called by RmlUi when...
+	virtual void ReleaseCompiledEffect(CompiledEffectHandle effect);
+
 
 	/// Called by RmlUi when it wants to enable or disable scissoring to clip content.
 	/// @param[in] enable True if scissoring is to enabled, false if it is to be disabled.
