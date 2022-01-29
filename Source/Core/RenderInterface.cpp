@@ -59,8 +59,16 @@ void RenderInterface::RenderCompiledGeometry(CompiledGeometryHandle /*geometry*/
 
 // Called by RmlUi when it wants to release application-compiled geometry.
 void RenderInterface::ReleaseCompiledGeometry(CompiledGeometryHandle /*geometry*/)
+{}
+
+CompiledEffectHandle RenderInterface::CompileEffect(const String& /*name*/, const Dictionary& /*parameters*/)
 {
+	return CompiledEffectHandle(0);
 }
+
+void RenderInterface::RenderEffect(CompiledEffectHandle /*effect*/, RenderStage /*stage*/, int /*iteration*/, Element* /*element*/) {}
+
+void RenderInterface::ReleaseCompiledEffect(CompiledEffectHandle /*effect*/) {}
 
 // Called by RmlUi when a texture is required by the library.
 bool RenderInterface::LoadTexture(TextureHandle& /*texture_handle*/, Vector2i& /*texture_dimensions*/, const String& /*source*/)

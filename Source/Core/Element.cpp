@@ -209,6 +209,8 @@ void Element::Render()
 
 	UpdateTransformState();
 
+	meta->decoration.RenderDecorators(RenderStage::Enter);
+
 	// Render all elements in our local stacking context that have a z-index beneath our local index of 0.
 	size_t i = 0;
 	for (; i < stacking_context.size() && stacking_context[i]->z_index < 0; ++i)
@@ -220,19 +222,23 @@ void Element::Render()
 	// Set up the clipping region for this element.
 	if (ElementUtilities::SetClippingRegion(this))
 	{
+		meta->decoration.RenderDecorators(RenderStage::BeforeDecoration);
 		meta->background_border.Render(this);
-		meta->decoration.RenderDecorators();
+		meta->decoration.RenderDecorators(RenderStage::Decoration);
 
 		{
 			RMLUI_ZoneScopedNC("OnRender", 0x228B22);
 
 			OnRender();
 		}
+		meta->decoration.RenderDecorators(RenderStage::AfterDecoration);
 	}
 
 	// Render the rest of the elements in the stacking context.
 	for (; i < stacking_context.size(); ++i)
 		stacking_context[i]->Render();
+
+	meta->decoration.RenderDecorators(RenderStage::Exit);
 }
 
 // Clones this element, returning a new, unparented element.
