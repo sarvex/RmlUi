@@ -33,6 +33,7 @@
 #include "../../Include/RmlUi/Core/Transform.h"
 #include "../../Include/RmlUi/Core/TransformPrimitive.h"
 #include "../../Include/RmlUi/Core/PropertyDictionary.h"
+#include "../../Include/RmlUi/Core/Variant.h"
 #include "TransformUtilities.h"
 
 namespace Rml {
@@ -149,7 +150,31 @@ bool TypeConverter<FontEffectsPtr, String>::Convert(const FontEffectsPtr& src, S
 	return true;
 }
 
+bool TypeConverter<VariantList, VariantList>::Convert(const VariantList& src, VariantList& dest)
+{
+	dest = src;
+	return true;
+}
 
+bool TypeConverter<VariantList, String>::Convert(const VariantList& src, String& dest)
+{
+	dest.reserve(dest.size() + 2 + 5 * src.size());
+	String tmp;
 
+	dest += '[';
+	for (size_t i = 0; i < src.size(); i++)
+	{
+		tmp.clear();
+		if (!src[i].GetInto(tmp))
+			return false;
+
+		dest += tmp;
+		if (i < src.size() - 1)
+			dest += ", ";
+	}
+	dest += ']';
+
+	return true;
+}
 
 } // namespace Rml

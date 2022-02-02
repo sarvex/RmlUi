@@ -116,6 +116,16 @@ template<> class TypeConverter< FontEffectsPtr, String > {
 public:
 	RMLUICORE_API static bool Convert(const FontEffectsPtr& src, String& dest);
 };
+template <>
+class TypeConverter<VariantList, VariantList> {
+public:
+	RMLUICORE_API static bool Convert(const VariantList& src, VariantList& dest);
+};
+template <>
+class TypeConverter<VariantList, String> {
+public:
+	RMLUICORE_API static bool Convert(const VariantList& src, String& dest);
+};
 
 } // namespace Rml
 

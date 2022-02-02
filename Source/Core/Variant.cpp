@@ -43,6 +43,7 @@ Variant::Variant() : type(NONE)
 	static_assert(sizeof(AnimationList) <= LOCAL_DATA_SIZE, "Local data too small for AnimationList");
 	static_assert(sizeof(DecoratorsPtr) <= LOCAL_DATA_SIZE, "Local data too small for DecoratorsPtr");
 	static_assert(sizeof(FontEffectsPtr) <= LOCAL_DATA_SIZE, "Local data too small for FontEffectsPtr");
+	static_assert(sizeof(VariantList) <= LOCAL_DATA_SIZE, "Local data too small for VariantList");
 }
 
 Variant::Variant(const Variant& copy) : type(NONE)
@@ -105,6 +106,12 @@ void Variant::Clear()
 			font_effects->~shared_ptr();
 		}
 		break;
+		case VARIANTLIST:
+		{
+			VariantList* variant_list = (VariantList*)data;
+			variant_list->~VariantList();
+		}
+		break;
 		default:
 		break;
 	}
@@ -147,6 +154,10 @@ void Variant::Set(const Variant& copy)
 		Set(*(FontEffectsPtr*)copy.data);
 		break;
 
+	case VARIANTLIST:
+		Set(*(VariantList*)copy.data);
+		break;
+
 	default:
 		memcpy(data, copy.data, LOCAL_DATA_SIZE);
 		type = copy.type;
@@ -181,6 +192,10 @@ void Variant::Set(Variant&& other)
 
 	case FONTEFFECTSPTR:
 		Set(std::move(*(FontEffectsPtr*)other.data));
+		break;
+
+	case VARIANTLIST:
+		Set(std::move(*(VariantList*)other.data));
 		break;
 
 	default:
@@ -442,6 +457,30 @@ void Variant::Set(FontEffectsPtr&& value)
 		new(data) FontEffectsPtr(std::move(value));
 	}
 }
+void Variant::Set(const VariantList& value)
+{
+	if (type == VARIANTLIST)
+	{
+		*(VariantList*)data = value;
+	}
+	else
+	{
+		type = VARIANTLIST;
+		new (data) VariantList(value);
+	}
+}
+void Variant::Set(VariantList&& value)
+{
+	if (type == VARIANTLIST)
+	{
+		(*(VariantList*)data) = std::move(value);
+	}
+	else
+	{
+		type = VARIANTLIST;
+		new (data) VariantList(std::move(value));
+	}
+}
 
 Variant& Variant::operator=(const Variant& copy)
 {
@@ -512,6 +551,8 @@ bool Variant::operator==(const Variant & other) const
 		return DEFAULT_VARIANT_COMPARE(DecoratorsPtr);
 	case FONTEFFECTSPTR:
 		return DEFAULT_VARIANT_COMPARE(FontEffectsPtr);
+	case VARIANTLIST:
+		return DEFAULT_VARIANT_COMPARE(VariantList);
 	case NONE:
 		return true;
 		break;
