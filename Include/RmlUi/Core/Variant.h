@@ -73,6 +73,7 @@ public:
 		ANIMATIONLIST = 'A',
 		DECORATORSPTR = 'D',
 		FONTEFFECTSPTR = 'F',
+		VARIANTLIST = 'L',
 		VOIDPTR = '*',
 	};
 
@@ -154,6 +155,8 @@ private:
 	void Set(DecoratorsPtr&& value);
 	void Set(const FontEffectsPtr& value);
 	void Set(FontEffectsPtr&& value);
+	void Set(const VariantList& value);
+	void Set(VariantList&& value);
 	
 	static constexpr size_t LOCAL_DATA_SIZE = (sizeof(TransitionList) > sizeof(String) ? sizeof(TransitionList) : sizeof(String));
 

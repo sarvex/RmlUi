@@ -140,6 +140,11 @@ bool Variant::GetInto(T& value) const
 	case FONTEFFECTSPTR:
 		return TypeConverter< FontEffectsPtr, T >::Convert(*(FontEffectsPtr*)data, value);
 		break;
+
+	case VARIANTLIST:
+		return TypeConverter<VariantList, T>::Convert(*(VariantList*)data, value);
+		break;
+
 	case NONE:
 		break;
 	}
