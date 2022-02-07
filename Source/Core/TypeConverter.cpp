@@ -150,6 +150,38 @@ bool TypeConverter<FontEffectsPtr, String>::Convert(const FontEffectsPtr& src, S
 	return true;
 }
 
+bool TypeConverter<ColorStopList, ColorStopList>::Convert(const ColorStopList& src, ColorStopList& dest)
+{
+	dest = src;
+	return true;
+}
+
+bool TypeConverter<ColorStopList, String>::Convert(const ColorStopList& src, String& dest)
+{
+	dest.clear();
+	for (size_t i = 0; i < src.size(); i++)
+	{
+		const ColorStop& stop = src[i];
+		dest += ToString(stop.color);
+
+		switch (stop.position)
+		{
+		case ColorStop::Position::Auto:
+			break;
+		case ColorStop::Position::Length:
+			dest += " " + ToString(stop.position_value) + "px";
+			break;
+		case ColorStop::Position::Number:
+			dest += " " + ToString(stop.position_value);
+			break;
+		}
+
+		if (i < src.size() - 1)
+			dest += ", ";
+	}
+	return true;
+}
+
 bool TypeConverter<VariantList, VariantList>::Convert(const VariantList& src, VariantList& dest)
 {
 	dest = src;

@@ -128,6 +128,23 @@ struct FontEffects {
 	String value;
 };
 
+// TODO, move
+struct ColorStop {
+	enum class Position { Auto, Number, Length };
+	Colourb color;
+	Position position;
+	float position_value;
+};
+inline bool operator==(const ColorStop& a, const ColorStop& b)
+{
+	return a.color == b.color && a.position == b.position && a.position_value == b.position_value;
+}
+inline bool operator!=(const ColorStop& a, const ColorStop& b)
+{
+	return !(a == b);
+}
+using ColorStopList = Vector<ColorStop>;
+
 // Additional smart pointers
 using TransformPtr = SharedPtr< Transform >;
 using DecoratorsPtr = SharedPtr<const DecoratorDeclarationList>;

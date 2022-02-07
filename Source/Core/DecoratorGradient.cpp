@@ -34,6 +34,7 @@
 #include "../../Include/RmlUi/Core/GeometryUtilities.h"
 #include "../../Include/RmlUi/Core/Math.h"
 #include "../../Include/RmlUi/Core/PropertyDefinition.h"
+#include "ComputeProperty.h"
 
 /*
 Gradient decorator usage in CSS:
@@ -127,7 +128,6 @@ void DecoratorGradient::RenderElement(Element* element, DecoratorDataHandle elem
 
 DecoratorGradientInstancer::DecoratorGradientInstancer()
 {
-	// register properties for the decorator
 	ids.direction = RegisterProperty("direction", "horizontal").AddParser("keyword", "horizontal, vertical").GetId();
 	ids.start = RegisterProperty("start-color", "#ffffff").AddParser("color").GetId();
 	ids.stop = RegisterProperty("stop-color", "#ffffff").AddParser("color").GetId();
@@ -138,20 +138,107 @@ DecoratorGradientInstancer::~DecoratorGradientInstancer()
 {
 }
 
-SharedPtr<Decorator> DecoratorGradientInstancer::InstanceDecorator(const String & RMLUI_UNUSED_PARAMETER(name), const PropertyDictionary& properties_,
+SharedPtr<Decorator> DecoratorGradientInstancer::InstanceDecorator(const String& name, const PropertyDictionary& properties_,
 	const DecoratorInstancerInterface& RMLUI_UNUSED_PARAMETER(interface_))
 {
-	RMLUI_UNUSED(name);
 	RMLUI_UNUSED(interface_);
 
-	DecoratorGradient::Direction dir = (DecoratorGradient::Direction)properties_.GetProperty(ids.direction)->Get< int >();
+	if (name == "gradient")
+		gradient_type = GradientType::Straight;
+	else if (name == "linear-gradient")
+		gradient_type = GradientType::Linear;
+	else if (name == "radial-gradient")
+		gradient_type = GradientType::Radial;
+	else
+		return nullptr;
+
+	DecoratorGradient::Direction dir = (DecoratorGradient::Direction)properties_.GetProperty(ids.direction)->Get<int>();
 	Colourb start = properties_.GetProperty(ids.start)->Get<Colourb>();
 	Colourb stop = properties_.GetProperty(ids.stop)->Get<Colourb>();
 
 	auto decorator = MakeShared<DecoratorGradient>();
-	if (decorator->Initialise(dir, start, stop)) {
+	if (decorator->Initialise(dir, start, stop))
+	{
 		return decorator;
 	}
+
+	return nullptr;
+}
+
+DecoratorLinearGradient::DecoratorLinearGradient() {}
+
+DecoratorLinearGradient::~DecoratorLinearGradient() {}
+
+bool DecoratorLinearGradient::Initialise(float in_angle, const ColorStopList& in_color_stops)
+{
+	angle = in_angle;
+	color_stops = in_color_stops;
+	return !color_stops.empty();
+}
+
+DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* element) const
+{
+	RenderInterface* render_interface = element->GetRenderInterface();
+	if (!render_interface)
+		return INVALID_DECORATORDATAHANDLE;
+
+	CompiledEffectHandle handle =
+		render_interface->CompileEffect("linear-gradient", Dictionary{{"angle", Variant(angle)}, {"color_stop_list", Variant(color_stops)}});
+
+	return DecoratorDataHandle(handle);
+}
+
+void DecoratorLinearGradient::ReleaseElementData(DecoratorDataHandle handle) const
+{
+	// TODO: Get the render interface from element
+	// RenderInterface* render_interface = element->GetRenderInterface();
+	RenderInterface* render_interface = ::Rml::GetRenderInterface();
+	if (!render_interface)
+		return;
+	render_interface->ReleaseCompiledEffect(CompiledEffectHandle(handle));
+}
+
+void DecoratorLinearGradient::RenderElement(Element* /*element*/, DecoratorDataHandle /*element_data*/) const
+{
+	RMLUI_ERROR;
+}
+
+void DecoratorLinearGradient::RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const
+{
+	RenderInterface* render_interface = element->GetRenderInterface();
+	if (!render_interface)
+		return;
+
+	render_interface->RenderEffect(CompiledEffectHandle(element_data), render_stage, 0, element);
+}
+
+DecoratorLinearGradientInstancer::DecoratorLinearGradientInstancer()
+{
+	ids.angle = RegisterProperty("angle", "0deg").AddParser("angle").GetId();
+	ids.color_stop_list = RegisterProperty("color-stops", "").AddParser("color_stop_list").GetId();
+
+	RegisterShorthand("decorator", "angle?, color-stops#", ShorthandType::RecursiveCommaSeparated);
+}
+
+DecoratorLinearGradientInstancer::~DecoratorLinearGradientInstancer() {}
+
+SharedPtr<Decorator> DecoratorLinearGradientInstancer::InstanceDecorator(const String& /*name*/, const PropertyDictionary& properties_,
+	const DecoratorInstancerInterface& /*interface_*/)
+{
+	const Property* p_angle = properties_.GetProperty(ids.angle);
+	if (!p_angle || !(p_angle->unit & Property::ANGLE))
+		return nullptr;
+	const Property* p_color_stop_list = properties_.GetProperty(ids.color_stop_list);
+	if (!p_color_stop_list || p_color_stop_list->unit != Property::COLORSTOPLIST)
+		return nullptr;
+
+	const float angle = ComputeAngle(*p_angle);
+
+	const ColorStopList& color_stop_list = p_color_stop_list->value.GetReference<ColorStopList>();
+
+	auto decorator = MakeShared<DecoratorLinearGradient>();
+	if (decorator->Initialise(angle, std::move(color_stop_list)))
+		return decorator;
 
 	return nullptr;
 }

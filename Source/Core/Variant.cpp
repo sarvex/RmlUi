@@ -44,6 +44,7 @@ Variant::Variant() : type(NONE)
 	static_assert(sizeof(DecoratorsPtr) <= LOCAL_DATA_SIZE, "Local data too small for DecoratorsPtr");
 	static_assert(sizeof(FontEffectsPtr) <= LOCAL_DATA_SIZE, "Local data too small for FontEffectsPtr");
 	static_assert(sizeof(VariantList) <= LOCAL_DATA_SIZE, "Local data too small for VariantList");
+	static_assert(sizeof(ColorStopList) <= LOCAL_DATA_SIZE, "Local data too small for ColorStopList");
 }
 
 Variant::Variant(const Variant& copy) : type(NONE)
@@ -154,6 +155,10 @@ void Variant::Set(const Variant& copy)
 		Set(*(FontEffectsPtr*)copy.data);
 		break;
 
+	case COLORSTOPLIST:
+		Set(*(ColorStopList*)copy.data);
+		break;
+
 	case VARIANTLIST:
 		Set(*(VariantList*)copy.data);
 		break;
@@ -192,6 +197,10 @@ void Variant::Set(Variant&& other)
 
 	case FONTEFFECTSPTR:
 		Set(std::move(*(FontEffectsPtr*)other.data));
+		break;
+
+	case COLORSTOPLIST:
+		Set(std::move(*(ColorStopList*)other.data));
 		break;
 
 	case VARIANTLIST:
@@ -457,6 +466,30 @@ void Variant::Set(FontEffectsPtr&& value)
 		new(data) FontEffectsPtr(std::move(value));
 	}
 }
+void Variant::Set(const ColorStopList& value)
+{
+	if (type == COLORSTOPLIST)
+	{
+		*(ColorStopList*)data = value;
+	}
+	else
+	{
+		type = COLORSTOPLIST;
+		new (data) ColorStopList(value);
+	}
+}
+void Variant::Set(ColorStopList&& value)
+{
+	if (type == COLORSTOPLIST)
+	{
+		(*(ColorStopList*)data) = std::move(value);
+	}
+	else
+	{
+		type = COLORSTOPLIST;
+		new (data) ColorStopList(std::move(value));
+	}
+}
 void Variant::Set(const VariantList& value)
 {
 	if (type == VARIANTLIST)
@@ -551,6 +584,8 @@ bool Variant::operator==(const Variant & other) const
 		return DEFAULT_VARIANT_COMPARE(DecoratorsPtr);
 	case FONTEFFECTSPTR:
 		return DEFAULT_VARIANT_COMPARE(FontEffectsPtr);
+	case COLORSTOPLIST:
+		return DEFAULT_VARIANT_COMPARE(ColorStopList);
 	case VARIANTLIST:
 		return DEFAULT_VARIANT_COMPARE(VariantList);
 	case NONE:

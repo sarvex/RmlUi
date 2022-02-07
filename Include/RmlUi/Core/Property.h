@@ -93,6 +93,7 @@ public:
 		DECORATOR = 1 << 23,        // decorator; fetch as < DecoratorsPtr >
 		FONTEFFECT = 1 << 24,       // font-effect; fetch as < FontEffectsPtr >
 		RATIO = 1 << 25,            // ratio defined as x/y; fetch as < Vector2f >
+		COLORSTOPLIST = 1 << 26,    // color stop list; fetch as < ColorStopList >
 
 		LENGTH = PX | DP | PPI_UNIT | EM | REM | VW | VH | X,
 		LENGTH_PERCENT = LENGTH | PERCENT,
