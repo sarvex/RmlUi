@@ -166,6 +166,7 @@ struct DefaultInstancers {
 	DecoratorNinePatchInstancer decorator_ninepatch;
 	DecoratorGradientInstancer decorator_gradient;
 	DecoratorBlurInstancer decorator_blur;
+	DecoratorLinearGradientInstancer decorator_linear_gradient;
 
 	// Font effects
 	FontEffectBlurInstancer font_effect_blur;
@@ -260,6 +261,7 @@ bool Factory::Initialise()
 	RegisterDecoratorInstancer("ninepatch", &default_instancers->decorator_ninepatch);
 	RegisterDecoratorInstancer("gradient", &default_instancers->decorator_gradient);
 	RegisterDecoratorInstancer("blur", &default_instancers->decorator_blur);
+	RegisterDecoratorInstancer("linear-gradient", &default_instancers->decorator_linear_gradient);
 
 	// Font effect instancers
 	RegisterFontEffectInstancer("blur", &default_instancers->font_effect_blur);

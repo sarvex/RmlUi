@@ -142,11 +142,17 @@ ShorthandId PropertySpecification::RegisterShorthand(const String& shorthand_nam
 	{
 		ShorthandItem item;
 		bool optional = false;
+		bool repeats = false;
 		String name = raw_name;
 
 		if (!raw_name.empty() && raw_name.back() == '?')
 		{
 			optional = true;
+			name.pop_back();
+		}
+		if (!raw_name.empty() && raw_name.back() == '#')
+		{
+			repeats = true;
 			name.pop_back();
 		}
 
@@ -155,7 +161,7 @@ ShorthandId PropertySpecification::RegisterShorthand(const String& shorthand_nam
 		{
 			// We have a valid property
 			if (const PropertyDefinition* property = GetProperty(property_id))
-				item = ShorthandItem(property_id, property, optional);
+				item = ShorthandItem(property_id, property, optional, repeats);
 		}
 		else
 		{
@@ -166,7 +172,7 @@ ShorthandId PropertySpecification::RegisterShorthand(const String& shorthand_nam
 			if (shorthand_id != ShorthandId::Invalid && (type == ShorthandType::RecursiveRepeat || type == ShorthandType::RecursiveCommaSeparated))
 			{
 				if (const ShorthandDefinition * shorthand = GetShorthand(shorthand_id))
-					item = ShorthandItem(shorthand_id, shorthand, optional);
+					item = ShorthandItem(shorthand_id, shorthand, optional, repeats);
 			}
 		}
 
@@ -355,6 +361,9 @@ bool PropertySpecification::ParseShorthandDeclaration(PropertyDictionary& dictio
 	}
 	else if (shorthand_definition->type == ShorthandType::RecursiveCommaSeparated)
 	{
+		if (property_values.size() > 0 && property_values[0] == "10deg,")
+			int x = 0;
+
 		StringList subvalues;
 		StringUtilities::ExpandString(subvalues, property_value);
 
@@ -370,20 +379,34 @@ bool PropertySpecification::ParseShorthandDeclaration(PropertyDictionary& dictio
 		}
 
 		size_t subvalue_i = 0;
+		String temp_subvalue; 
 		for (size_t i = 0; i < shorthand_definition->items.size() && subvalue_i < subvalues.size(); i++)
 		{
 			bool result = false;
 
+			const String* subvalue = &subvalues[subvalue_i];
+
 			const ShorthandItem& item = shorthand_definition->items[i];
+			if (item.repeats)
+			{
+				subvalues.erase(subvalues.begin(), subvalues.begin() + subvalue_i);
+				temp_subvalue.clear();
+				StringUtilities::JoinString(temp_subvalue, subvalues);
+				subvalue = &temp_subvalue;
+			}
+
 			if (item.type == ShorthandItemType::Property)
-				result = ParsePropertyDeclaration(dictionary, item.property_id, subvalues[subvalue_i]);
+				result = ParsePropertyDeclaration(dictionary, item.property_id, *subvalue);
 			else if (item.type == ShorthandItemType::Shorthand)
-				result = ParseShorthandDeclaration(dictionary, item.shorthand_id, subvalues[subvalue_i]);
+				result = ParseShorthandDeclaration(dictionary, item.shorthand_id, *subvalue);
 
 			if (result)
 				subvalue_i += 1;
-			else if (!item.optional)
+			else if (item.repeats || !item.optional)
 				return false;
+			
+			if (item.repeats)
+				break;
 		}
 	}
 	else

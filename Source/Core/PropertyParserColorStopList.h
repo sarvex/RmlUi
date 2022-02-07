@@ -26,50 +26,34 @@
  *
  */
 
-#ifndef RMLUI_CORE_PROPERTYSHORTHANDDEFINITION_H
-#define RMLUI_CORE_PROPERTYSHORTHANDDEFINITION_H
+#ifndef RMLUI_CORE_PROPERTYPARSERCOLORSTOPLIST_H
+#define RMLUI_CORE_PROPERTYPARSERCOLORSTOPLIST_H
 
-#include "../../Include/RmlUi/Core/ID.h"
+#include "../../Include/RmlUi/Core/PropertyParser.h"
+#include "../../Include/RmlUi/Core/Types.h"
 
 namespace Rml {
 
-enum class ShorthandType;
-class PropertyDefinition;
-struct ShorthandDefinition;
+/**
+	A property parser that parses gradients.
+ */
 
-enum class ShorthandItemType { Invalid, Property, Shorthand };
-
-// Each entry in a shorthand points either to another shorthand or a property
-struct ShorthandItem {
-	ShorthandItem() : type(ShorthandItemType::Invalid), property_id(PropertyId::Invalid), property_definition(nullptr), optional(false) {}
-	ShorthandItem(PropertyId id, const PropertyDefinition* definition, bool optional, bool repeats) :
-		type(ShorthandItemType::Property), property_id(id), property_definition(definition), optional(optional), repeats(repeats)
-	{}
-	ShorthandItem(ShorthandId id, const ShorthandDefinition* definition, bool optional, bool repeats) :
-		type(ShorthandItemType::Shorthand), shorthand_id(id), shorthand_definition(definition), optional(optional), repeats(repeats)
-	{}
-
-	ShorthandItemType type;
-	bool optional;
-	bool repeats;
-	union {
-		PropertyId property_id;
-		ShorthandId shorthand_id;
-	};
-	union {
-		const PropertyDefinition* property_definition;
-		const ShorthandDefinition* shorthand_definition;
-	};
-};
-
-// A list of shorthands or properties
-using ShorthandItemList = Vector< ShorthandItem >;
-
-struct ShorthandDefinition
+class PropertyParserColorStopList : public PropertyParser
 {
-	ShorthandId id;
-	ShorthandItemList items; 
-	ShorthandType type;
+public:
+	PropertyParserColorStopList(PropertyParser* parser_color, PropertyParser* parser_number_length_percent);
+	virtual ~PropertyParserColorStopList();
+
+	/// Called to parse a RCSS colour declaration.
+	/// @param[out] property The property to set the parsed value on.
+	/// @param[in] value The raw value defined for this property.
+	/// @param[in] parameters The parameters defined for this property; not used for this parser.
+	/// @return True if the value was parsed successfully, false otherwise.
+	bool ParseValue(Property& property, const String& value, const ParameterMap& parameters) const override;
+
+private:
+	PropertyParser* parser_color;
+	PropertyParser* parser_number_length_percent;
 };
 
 } // namespace Rml

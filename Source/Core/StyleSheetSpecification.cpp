@@ -32,6 +32,7 @@
 #include "PropertyParserNumber.h"
 #include "PropertyParserAnimation.h"
 #include "PropertyParserRatio.h"
+#include "PropertyParserColorStopList.h"
 #include "PropertyParserColour.h"
 #include "PropertyParserDecorator.h"
 #include "PropertyParserFontEffect.h"
@@ -46,7 +47,7 @@ namespace Rml {
 static StyleSheetSpecification* instance = nullptr;
 
 
-struct DefaultStyleSheetParsers {
+struct DefaultStyleSheetParsers : NonCopyMoveable {
 	PropertyParserNumber number = PropertyParserNumber(Property::NUMBER);
 	PropertyParserNumber length = PropertyParserNumber(Property::LENGTH, Property::PX);
 	PropertyParserNumber length_percent = PropertyParserNumber(Property::LENGTH_PERCENT, Property::PX);
@@ -57,6 +58,7 @@ struct DefaultStyleSheetParsers {
 	PropertyParserAnimation animation = PropertyParserAnimation(PropertyParserAnimation::ANIMATION_PARSER);
 	PropertyParserAnimation transition = PropertyParserAnimation(PropertyParserAnimation::TRANSITION_PARSER);
 	PropertyParserColour color = PropertyParserColour();
+	PropertyParserColorStopList color_stop_list = PropertyParserColorStopList(&color, &number_length_percent);
 	PropertyParserDecorator decorator = PropertyParserDecorator();
 	PropertyParserFontEffect font_effect = PropertyParserFontEffect();
 	PropertyParserTransform transform = PropertyParserTransform();
@@ -253,6 +255,7 @@ void StyleSheetSpecification::RegisterDefaultParsers()
 	RegisterParser("animation", &default_parsers->animation);
 	RegisterParser("transition", &default_parsers->transition);
 	RegisterParser("color", &default_parsers->color);
+	RegisterParser("color_stop_list", &default_parsers->color_stop_list);
 	RegisterParser("decorator", &default_parsers->decorator);
 	RegisterParser("font_effect", &default_parsers->font_effect);
 	RegisterParser("transform", &default_parsers->transform);

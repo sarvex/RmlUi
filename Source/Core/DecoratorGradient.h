@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -35,8 +35,9 @@
 
 namespace Rml {
 
-class DecoratorGradient : public Decorator
-{
+enum class GradientType { Straight, Linear, Radial };
+
+class DecoratorGradient : public Decorator {
 public:
 	enum class Direction { Horizontal = 0, Vertical = 1 };
 
@@ -55,22 +56,55 @@ private:
 	Colourb start, stop;
 };
 
-
-
-class DecoratorGradientInstancer : public DecoratorInstancer
-{
+class DecoratorGradientInstancer : public DecoratorInstancer {
 public:
 	DecoratorGradientInstancer();
 	~DecoratorGradientInstancer();
 
-	SharedPtr<Decorator> InstanceDecorator(const String& name, const PropertyDictionary& properties, const DecoratorInstancerInterface& instancer_interface) override;
+	SharedPtr<Decorator> InstanceDecorator(const String& name, const PropertyDictionary& properties,
+		const DecoratorInstancerInterface& instancer_interface) override;
 
 private:
 	struct GradientPropertyIds {
 		PropertyId direction, start, stop;
 	};
 	GradientPropertyIds ids;
+	GradientType gradient_type;
+};
 
+class DecoratorLinearGradient : public Decorator {
+public:
+	DecoratorLinearGradient();
+	virtual ~DecoratorLinearGradient();
+
+	bool Initialise(float angle, const ColorStopList& color_stops);
+
+	DecoratorDataHandle GenerateElementData(Element* element) const override;
+	void ReleaseElementData(DecoratorDataHandle element_data) const override;
+
+	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
+
+	void RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const override;
+
+private:
+	float angle;
+	ColorStopList color_stops;
+};
+
+class DecoratorLinearGradientInstancer : public DecoratorInstancer {
+public:
+	DecoratorLinearGradientInstancer();
+	~DecoratorLinearGradientInstancer();
+
+	SharedPtr<Decorator> InstanceDecorator(const String& name, const PropertyDictionary& properties,
+		const DecoratorInstancerInterface& instancer_interface) override;
+
+private:
+	struct GradientPropertyIds {
+		PropertyId angle;
+		PropertyId color_stop_list;
+	};
+	GradientPropertyIds ids;
 };
 
 } // namespace Rml

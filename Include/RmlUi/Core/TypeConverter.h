@@ -117,6 +117,16 @@ public:
 	RMLUICORE_API static bool Convert(const FontEffectsPtr& src, String& dest);
 };
 template <>
+class TypeConverter<ColorStopList, ColorStopList> {
+public:
+	RMLUICORE_API static bool Convert(const ColorStopList& src, ColorStopList& dest);
+};
+template <>
+class TypeConverter<ColorStopList, String> {
+public:
+	RMLUICORE_API static bool Convert(const ColorStopList& src, String& dest);
+};
+template <>
 class TypeConverter<VariantList, VariantList> {
 public:
 	RMLUICORE_API static bool Convert(const VariantList& src, VariantList& dest);

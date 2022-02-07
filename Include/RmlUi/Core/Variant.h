@@ -73,6 +73,7 @@ public:
 		ANIMATIONLIST = 'A',
 		DECORATORSPTR = 'D',
 		FONTEFFECTSPTR = 'F',
+		COLORSTOPLIST = 'C',
 		VARIANTLIST = 'L',
 		VOIDPTR = '*',
 	};
@@ -155,6 +156,8 @@ private:
 	void Set(DecoratorsPtr&& value);
 	void Set(const FontEffectsPtr& value);
 	void Set(FontEffectsPtr&& value);
+	void Set(const ColorStopList& value);
+	void Set(ColorStopList&& value);
 	void Set(const VariantList& value);
 	void Set(VariantList&& value);
 	

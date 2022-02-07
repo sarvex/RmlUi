@@ -482,6 +482,17 @@ int main(int /*argc*/, char** /*argv*/)
 	demo_window->GetDocument()->AddEventListener(Rml::EventId::Keyup, demo_window.get());
 	demo_window->GetDocument()->AddEventListener(Rml::EventId::Animationend, demo_window.get());
 
+	Rml::Variant variant = Rml::Variant(Rml::VariantList{Rml::Variant(5.3f), Rml::Variant(2), Rml::Variant("Invader?"),
+		Rml::Variant(Rml::VariantList{
+			Rml::Variant("Hello kitty"),
+			Rml::Variant(Rml::Colourb(5, 2, 150)),
+			Rml::Variant(Rml::Colourb(150, 2, 10)),
+			Rml::Variant(Rml::Colourb(20, 230, 33)),
+			Rml::Variant(99),
+		})});
+
+	Rml::Log::Message(Rml::Log::LT_INFO, "Variant: %s", variant.Get<Rml::String>().c_str());
+
 	Shell::EventLoop(GameLoop);
 
 	demo_window->Shutdown();
