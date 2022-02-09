@@ -63,6 +63,7 @@
 #include "DecoratorNinePatch.h"
 #include "DecoratorGradient.h"
 #include "DecoratorBlur.h"
+#include "DecoratorDropShadow.h"
 #include "ElementHandle.h"
 #include "EventInstancerDefault.h"
 #include "FontEffectBlur.h"
@@ -166,6 +167,7 @@ struct DefaultInstancers {
 	DecoratorNinePatchInstancer decorator_ninepatch;
 	DecoratorGradientInstancer decorator_gradient;
 	DecoratorBlurInstancer decorator_blur;
+	DecoratorDropShadowInstancer decorator_drop_shadow;
 	DecoratorLinearGradientInstancer decorator_linear_gradient;
 
 	// Font effects
@@ -261,6 +263,7 @@ bool Factory::Initialise()
 	RegisterDecoratorInstancer("ninepatch", &default_instancers->decorator_ninepatch);
 	RegisterDecoratorInstancer("gradient", &default_instancers->decorator_gradient);
 	RegisterDecoratorInstancer("blur", &default_instancers->decorator_blur);
+	RegisterDecoratorInstancer("drop-shadow", &default_instancers->decorator_drop_shadow);
 	RegisterDecoratorInstancer("linear-gradient", &default_instancers->decorator_linear_gradient);
 
 	// Font effect instancers
