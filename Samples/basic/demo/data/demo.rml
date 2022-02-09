@@ -602,6 +602,14 @@ progress {
 	border: 2px #f00;
 	margin: -100px auto 0;
 }
+#dropshadow {
+	decorator: drop-shadow(#f339 10px 20px 5px);
+	background: #ccc6;
+	width: 500px;
+	height: 150px;
+	border: 2px #0f0;
+	margin: 10px 0 0 50%;
+}
 </style>
 </head>
 
@@ -612,6 +620,7 @@ progress {
 <panel id="welcome">
 	<p class="title" style="margin-top: 1.8em;">RmlUi 😍</p>
 	<div id="gradient"/>
+	<div id="dropshadow"/>
 	<p>Have fun fiddling about in this demo.</p>
 	<p>Press 'F8' to open up the debugger.</p>
 	<p style="decorator: blur(5px)">Press 'F8' to open up the debugger.</p>
