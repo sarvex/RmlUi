@@ -72,6 +72,9 @@ void DecoratorBlur::RenderElement(Element* /*element*/, DecoratorDataHandle /*el
 
 void DecoratorBlur::RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const
 {
+	if (render_stage != RenderStage::Enter && render_stage != RenderStage::Exit && render_stage != RenderStage::BeforeDecoration)
+		return;
+
 	RenderInterface* render_interface = element->GetRenderInterface();
 	if (!render_interface)
 		return;

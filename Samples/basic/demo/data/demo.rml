@@ -595,20 +595,24 @@ progress {
 	height: 5dp;
 }
 
+.box {
+	width: 400px;
+	height: 110px;
+	border: 2px #0f0;
+	margin: 10px auto;
+	background: #c99a;
+	padding: 20px;
+	font-size: 1.8em;
+}
+
 #gradient {
 	decorator: linear-gradient(10deg, #c33, #3c3 30%, #33c);
-	width: 500px;
-	height: 150px;
-	border: 2px #f00;
-	margin: -100px auto 0;
 }
 #dropshadow {
 	decorator: drop-shadow(#f339 10px 20px 5px);
-	background: #ccc6;
-	width: 500px;
-	height: 150px;
-	border: 2px #0f0;
-	margin: 10px 0 0 50%;
+}
+#boxshadow {
+	box-shadow: #fc39 40px 30px 5px 20px;
 }
 </style>
 </head>
@@ -619,8 +623,9 @@ progress {
 <tab>Welcome</tab>
 <panel id="welcome">
 	<p class="title" style="margin-top: 1.8em;">RmlUi 😍</p>
-	<div id="gradient"/>
-	<div id="dropshadow"/>
+	<div class="box" id="gradient"/>
+	<div class="box" id="dropshadow"/>
+	<div class="box" id="boxshadow">Helluw!</div>
 	<p>Have fun fiddling about in this demo.</p>
 	<p>Press 'F8' to open up the debugger.</p>
 	<p style="decorator: blur(5px)">Press 'F8' to open up the debugger.</p>

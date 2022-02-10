@@ -86,15 +86,15 @@ public:
 	/// @param[in] clear_buffers True to also clear the vertex and index buffers, false to leave intact.
 	void Release(bool clear_buffers = false);
 
+	// Returns the host context's render interface.
+	RenderInterface* GetRenderInterface();
+
 	/// Returns true if there is geometry to be rendered.
 	explicit operator bool() const;
 
 private:
 	// Move members from another geometry.
 	void MoveFrom(Geometry& other);
-
-	// Returns the host context's render interface.
-	RenderInterface* GetRenderInterface();
 
 	Context* host_context = nullptr;
 	Element* host_element = nullptr;

@@ -37,6 +37,7 @@ namespace Rml {
 class ElementBackgroundBorder {
 public:
 	ElementBackgroundBorder(Element* element);
+	~ElementBackgroundBorder();
 
 	void Render(Element* element);
 
@@ -50,6 +51,12 @@ private:
 	bool border_dirty = false;
 
 	Geometry geometry;
+
+	struct ShadowGeometry {
+		CompiledEffectHandle shadow_texture;
+	};
+	using ShadowGeometryList = Vector<ShadowGeometry>;
+	ShadowGeometryList shadow_boxes;
 };
 
 } // namespace Rml

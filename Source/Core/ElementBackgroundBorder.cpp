@@ -35,8 +35,16 @@
 namespace Rml {
 
 
-ElementBackgroundBorder::ElementBackgroundBorder(Element* element) : geometry(element)
-{}
+ElementBackgroundBorder::ElementBackgroundBorder(Element* element) : geometry(element) {}
+
+ElementBackgroundBorder::~ElementBackgroundBorder()
+{
+	if (Rml::RenderInterface* render_interface = geometry.GetRenderInterface())
+	{
+		for (const ShadowGeometry& shadow : shadow_boxes)
+			render_interface->ReleaseCompiledEffect(shadow.shadow_texture);
+	}
+}
 
 void ElementBackgroundBorder::Render(Element * element)
 {
@@ -46,6 +54,21 @@ void ElementBackgroundBorder::Render(Element * element)
 
 		background_dirty = false;
 		border_dirty = false;
+	}
+
+	if (!shadow_boxes.empty())
+	{
+		RenderInterface* render_interface = element->GetRenderInterface();
+		if (!render_interface)
+		{
+			RMLUI_ERROR;
+			return;
+		}
+
+		for (const ShadowGeometry& shadow : shadow_boxes)
+		{
+			render_interface->RenderEffect(shadow.shadow_texture, RenderStage::Decoration, 0, element);
+		}
 	}
 
 	if (geometry)
@@ -73,7 +96,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		computed.border_bottom_color(),
 		computed.border_left_color(),
 	};
-	
+
 	// Apply opacity
 	const float opacity = computed.opacity();
 	background_color.alpha = (byte)(opacity * (float)background_color.alpha);
@@ -98,6 +121,55 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 	}
 
 	geometry.Release();
+
+	shadow_boxes.clear();
+
+	if (const Property* p_box_shadow = element->GetLocalProperty(PropertyId::BoxShadow))
+	{
+		RMLUI_ASSERT(p_box_shadow->value.GetType() == Variant::SHADOWLIST);
+		const ShadowList& shadow_list = p_box_shadow->value.GetReference<ShadowList>();
+
+		RenderInterface* render_interface = element->GetRenderInterface();
+		if (!render_interface)
+		{
+			RMLUI_ERROR;
+			return;
+		}
+
+		shadow_boxes.reserve(shadow_list.size());
+
+		for (const Shadow& shadow : shadow_list)
+		{
+			//CompiledEffectHandle texture = render_interface->CompileEffect("generate-texture",
+			//	Dictionary{{"size", Variant(Vector2f(element->GetClientWidth(), element->GetClientHeight()))}});
+
+			CompiledEffectHandle rtt = render_interface->CompileEffect("render-to-texture", Dictionary{});
+			CompiledEffectHandle blur = render_interface->CompileEffect("blur", Dictionary{{"radius", Variant(shadow.blur_radius)}});
+
+			render_interface->RenderEffect(rtt, RenderStage::Enter, 0, element);
+
+			Geometry shadow_geometry;
+
+			// Render the shadow box
+			for (int i = 0; i < element->GetNumBoxes(); i++)
+			{
+				Vector2f offset;
+				const Box& box = element->GetBox(i, offset);
+
+				// TODO: Expand box with border widths and 'shadow.spread_distance'. Re-use main geometry when we can.
+				GeometryUtilities::GenerateBackgroundBorder(&shadow_geometry, box, offset, radii, shadow.color, nullptr);
+			}
+
+			shadow_geometry.Render(shadow.offset + element->GetAbsoluteOffset(Box::BORDER));
+
+			render_interface->RenderEffect(blur, RenderStage::Decoration, 0, element);
+			render_interface->RenderEffect(rtt, RenderStage::Exit, 0, element);
+
+			render_interface->ReleaseCompiledEffect(CompiledEffectHandle(blur));
+
+			shadow_boxes.push_back(ShadowGeometry{rtt});
+		}
+	}
 }
 
 } // namespace Rml
