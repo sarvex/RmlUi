@@ -107,6 +107,12 @@ void Variant::Clear()
 			font_effects->~shared_ptr();
 		}
 		break;
+		case COLORSTOPLIST:
+		{
+			ColorStopList* value = (ColorStopList*)data;
+			value->~ColorStopList();
+		}
+		break;
 		case VARIANTLIST:
 		{
 			VariantList* variant_list = (VariantList*)data;
