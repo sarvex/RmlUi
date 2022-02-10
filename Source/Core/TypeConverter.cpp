@@ -182,6 +182,31 @@ bool TypeConverter<ColorStopList, String>::Convert(const ColorStopList& src, Str
 	return true;
 }
 
+bool TypeConverter<ShadowList, ShadowList>::Convert(const ShadowList& src, ShadowList& dest)
+{
+	dest = src;
+	return true;
+}
+
+bool TypeConverter<ShadowList, String>::Convert(const ShadowList& src, String& dest)
+{
+	dest.clear();
+	String temp;
+	for (size_t i = 0; i < src.size(); i++)
+	{
+		const Shadow& shadow = src[i];
+		FormatString(temp, 512, " %.3f %.3f %.3f %.3f", shadow.offset.x, shadow.offset.y, shadow.blur_radius, shadow.spread_distance);
+		if (shadow.inset)
+			temp += " inset";
+
+		dest += ToString(shadow.color) + temp;
+
+		if (i < src.size() - 1)
+			dest += ", ";
+	}
+	return true;
+}
+
 bool TypeConverter<VariantList, VariantList>::Convert(const VariantList& src, VariantList& dest)
 {
 	dest = src;

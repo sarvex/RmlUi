@@ -145,6 +145,25 @@ inline bool operator!=(const ColorStop& a, const ColorStop& b)
 }
 using ColorStopList = Vector<ColorStop>;
 
+// TODO, move
+struct Shadow {
+	Colourb color;
+	Vector2f offset;
+	float blur_radius = 0;
+	float spread_distance = 0;
+	bool inset = false;
+};
+using ShadowList = Vector<Shadow>;
+inline bool operator==(const Shadow& a, const Shadow& b)
+{
+	return a.color == b.color && a.offset == b.offset && a.blur_radius == b.blur_radius && a.spread_distance == b.spread_distance &&
+		a.inset == b.inset;
+}
+inline bool operator!=(const Shadow& a, const Shadow& b)
+{
+	return !(a == b);
+}
+
 // Additional smart pointers
 using TransformPtr = SharedPtr< Transform >;
 using DecoratorsPtr = SharedPtr<const DecoratorDeclarationList>;

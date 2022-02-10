@@ -37,6 +37,7 @@
 #include "PropertyParserDecorator.h"
 #include "PropertyParserFontEffect.h"
 #include "PropertyParserKeyword.h"
+#include "PropertyParserShadow.h"
 #include "PropertyParserString.h"
 #include "PropertyParserTransform.h"
 #include "PropertyShorthandDefinition.h"
@@ -65,6 +66,7 @@ struct DefaultStyleSheetParsers : NonCopyMoveable {
 	PropertyParserTransform transform = PropertyParserTransform();
 	PropertyParserRatio ratio = PropertyParserRatio();
 	PropertyParserNumber resolution = PropertyParserNumber(Property::X);
+	PropertyParserShadow shadow = PropertyParserShadow(&color, &length);
 };
 
 StyleSheetSpecification::StyleSheetSpecification() : 
@@ -263,6 +265,7 @@ void StyleSheetSpecification::RegisterDefaultParsers()
 	RegisterParser("transform", &default_parsers->transform);
 	RegisterParser("ratio", &default_parsers->ratio);
 	RegisterParser("resolution", &default_parsers->resolution);
+	RegisterParser("shadow", &default_parsers->shadow);
 }
 
 
@@ -423,6 +426,8 @@ void StyleSheetSpecification::RegisterDefaultProperties()
 
 	RegisterProperty(PropertyId::Decorator, "decorator", "", false, false).AddParser("decorator");
 	RegisterProperty(PropertyId::FontEffect, "font-effect", "", true, false).AddParser("font_effect");
+
+	RegisterProperty(PropertyId::BoxShadow, "box-shadow", "none", false, false).AddParser("shadow");
 
 	// Rare properties (not added to computed values)
 	RegisterProperty(PropertyId::FillImage, "fill-image", "", false, false).AddParser("string");

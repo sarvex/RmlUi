@@ -145,6 +145,10 @@ bool Variant::GetInto(T& value) const
 		return TypeConverter<ColorStopList, T>::Convert(*(ColorStopList*)data, value);
 		break;
 
+	case SHADOWLIST:
+		return TypeConverter<ShadowList, T>::Convert(*(ShadowList*)data, value);
+		break;
+
 	case VARIANTLIST:
 		return TypeConverter<VariantList, T>::Convert(*(VariantList*)data, value);
 		break;

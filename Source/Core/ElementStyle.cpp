@@ -896,6 +896,7 @@ PropertyIdSet ElementStyle::ComputeValues(Style::ComputedValues& values, const S
 		// Unhandled properties. Must be manually retrieved with 'GetProperty()'.
 		case PropertyId::FillImage:
 		case PropertyId::CaretColor:
+		case PropertyId::BoxShadow:
 			break;
 		// Invalid properties
 		case PropertyId::Invalid:

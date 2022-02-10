@@ -74,6 +74,7 @@ public:
 		DECORATORSPTR = 'D',
 		FONTEFFECTSPTR = 'F',
 		COLORSTOPLIST = 'C',
+		SHADOWLIST = 'S',
 		VARIANTLIST = 'L',
 		VOIDPTR = '*',
 	};
@@ -158,6 +159,8 @@ private:
 	void Set(FontEffectsPtr&& value);
 	void Set(const ColorStopList& value);
 	void Set(ColorStopList&& value);
+	void Set(const ShadowList& value);
+	void Set(ShadowList&& value);
 	void Set(const VariantList& value);
 	void Set(VariantList&& value);
 	

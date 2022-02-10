@@ -45,6 +45,7 @@ Variant::Variant() : type(NONE)
 	static_assert(sizeof(FontEffectsPtr) <= LOCAL_DATA_SIZE, "Local data too small for FontEffectsPtr");
 	static_assert(sizeof(VariantList) <= LOCAL_DATA_SIZE, "Local data too small for VariantList");
 	static_assert(sizeof(ColorStopList) <= LOCAL_DATA_SIZE, "Local data too small for ColorStopList");
+	static_assert(sizeof(ShadowList) <= LOCAL_DATA_SIZE, "Local data too small for ShadowList");
 }
 
 Variant::Variant(const Variant& copy) : type(NONE)
@@ -113,6 +114,12 @@ void Variant::Clear()
 			value->~ColorStopList();
 		}
 		break;
+		case SHADOWLIST:
+		{
+			ShadowList* value = (ShadowList*)data;
+			value->~ShadowList();
+		}
+		break;
 		case VARIANTLIST:
 		{
 			VariantList* variant_list = (VariantList*)data;
@@ -165,6 +172,10 @@ void Variant::Set(const Variant& copy)
 		Set(*(ColorStopList*)copy.data);
 		break;
 
+	case SHADOWLIST:
+		Set(*(ShadowList*)copy.data);
+		break;
+
 	case VARIANTLIST:
 		Set(*(VariantList*)copy.data);
 		break;
@@ -207,6 +218,10 @@ void Variant::Set(Variant&& other)
 
 	case COLORSTOPLIST:
 		Set(std::move(*(ColorStopList*)other.data));
+		break;
+
+	case SHADOWLIST:
+		Set(std::move(*(ShadowList*)other.data));
 		break;
 
 	case VARIANTLIST:
@@ -496,6 +511,30 @@ void Variant::Set(ColorStopList&& value)
 		new (data) ColorStopList(std::move(value));
 	}
 }
+void Variant::Set(const ShadowList& value)
+{
+	if (type == SHADOWLIST)
+	{
+		*(ShadowList*)data = value;
+	}
+	else
+	{
+		type = SHADOWLIST;
+		new (data) ShadowList(value);
+	}
+}
+void Variant::Set(ShadowList&& value)
+{
+	if (type == SHADOWLIST)
+	{
+		(*(ShadowList*)data) = std::move(value);
+	}
+	else
+	{
+		type = SHADOWLIST;
+		new (data) ShadowList(std::move(value));
+	}
+}
 void Variant::Set(const VariantList& value)
 {
 	if (type == VARIANTLIST)
@@ -592,6 +631,8 @@ bool Variant::operator==(const Variant & other) const
 		return DEFAULT_VARIANT_COMPARE(FontEffectsPtr);
 	case COLORSTOPLIST:
 		return DEFAULT_VARIANT_COMPARE(ColorStopList);
+	case SHADOWLIST:
+		return DEFAULT_VARIANT_COMPARE(ShadowList);
 	case VARIANTLIST:
 		return DEFAULT_VARIANT_COMPARE(VariantList);
 	case NONE:
