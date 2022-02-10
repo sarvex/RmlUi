@@ -64,6 +64,7 @@
 #include "DecoratorGradient.h"
 #include "DecoratorBlur.h"
 #include "DecoratorDropShadow.h"
+#include "DecoratorBasicFilter.h"
 #include "ElementHandle.h"
 #include "EventInstancerDefault.h"
 #include "FontEffectBlur.h"
@@ -169,6 +170,7 @@ struct DefaultInstancers {
 	DecoratorBlurInstancer decorator_blur;
 	DecoratorDropShadowInstancer decorator_drop_shadow;
 	DecoratorLinearGradientInstancer decorator_linear_gradient;
+	DecoratorBasicFilterInstancer decorator_basic_filter;
 
 	// Font effects
 	FontEffectBlurInstancer font_effect_blur;
@@ -265,6 +267,15 @@ bool Factory::Initialise()
 	RegisterDecoratorInstancer("blur", &default_instancers->decorator_blur);
 	RegisterDecoratorInstancer("drop-shadow", &default_instancers->decorator_drop_shadow);
 	RegisterDecoratorInstancer("linear-gradient", &default_instancers->decorator_linear_gradient);
+	
+	// Basic filters
+	RegisterDecoratorInstancer("brightness", &default_instancers->decorator_basic_filter);
+	RegisterDecoratorInstancer("contrast", &default_instancers->decorator_basic_filter);
+	RegisterDecoratorInstancer("grayscale", &default_instancers->decorator_basic_filter);
+	RegisterDecoratorInstancer("invert", &default_instancers->decorator_basic_filter);
+	RegisterDecoratorInstancer("opacity", &default_instancers->decorator_basic_filter);
+	RegisterDecoratorInstancer("saturate", &default_instancers->decorator_basic_filter);
+	RegisterDecoratorInstancer("sepia", &default_instancers->decorator_basic_filter);
 
 	// Font effect instancers
 	RegisterFontEffectInstancer("blur", &default_instancers->font_effect_blur);

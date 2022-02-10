@@ -10,6 +10,7 @@ set(Core_HDR_FILES
     ${PROJECT_SOURCE_DIR}/Source/Core/DataModel.h
     ${PROJECT_SOURCE_DIR}/Source/Core/DataView.h
     ${PROJECT_SOURCE_DIR}/Source/Core/DataViewDefault.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorBasicFilter.h
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorBlur.h
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorDropShadow.h
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorGradient.h
@@ -260,6 +261,7 @@ set(Core_SRC_FILES
     ${PROJECT_SOURCE_DIR}/Source/Core/DataView.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/DataViewDefault.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Decorator.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorBasicFilter.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorBlur.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorDropShadow.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorGradient.cpp
