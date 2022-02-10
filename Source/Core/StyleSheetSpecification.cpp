@@ -51,6 +51,7 @@ struct DefaultStyleSheetParsers : NonCopyMoveable {
 	PropertyParserNumber number = PropertyParserNumber(Property::NUMBER);
 	PropertyParserNumber length = PropertyParserNumber(Property::LENGTH, Property::PX);
 	PropertyParserNumber length_percent = PropertyParserNumber(Property::LENGTH_PERCENT, Property::PX);
+	PropertyParserNumber number_percent = PropertyParserNumber(Property::NUMBER | Property::PERCENT);
 	PropertyParserNumber number_length_percent = PropertyParserNumber(Property::NUMBER_LENGTH_PERCENT, Property::PX);
 	PropertyParserNumber angle = PropertyParserNumber(Property::ANGLE, Property::RAD);
 	PropertyParserKeyword keyword = PropertyParserKeyword();
@@ -248,6 +249,7 @@ void StyleSheetSpecification::RegisterDefaultParsers()
 	RegisterParser("number", &default_parsers->number);
 	RegisterParser("length", &default_parsers->length);
 	RegisterParser("length_percent", &default_parsers->length_percent);
+	RegisterParser("number_percent", &default_parsers->number_percent);
 	RegisterParser("number_length_percent", &default_parsers->number_length_percent);
 	RegisterParser("angle", &default_parsers->angle);
 	RegisterParser("keyword", &default_parsers->keyword);
