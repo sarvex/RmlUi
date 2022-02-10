@@ -127,6 +127,16 @@ public:
 	RMLUICORE_API static bool Convert(const ColorStopList& src, String& dest);
 };
 template <>
+class TypeConverter<ShadowList, ShadowList> {
+public:
+	RMLUICORE_API static bool Convert(const ShadowList& src, ShadowList& dest);
+};
+template <>
+class TypeConverter<ShadowList, String> {
+public:
+	RMLUICORE_API static bool Convert(const ShadowList& src, String& dest);
+};
+template <>
 class TypeConverter<VariantList, VariantList> {
 public:
 	RMLUICORE_API static bool Convert(const VariantList& src, VariantList& dest);

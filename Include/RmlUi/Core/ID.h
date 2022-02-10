@@ -158,6 +158,7 @@ enum class PropertyId : uint8_t
 
 	Decorator,
 	FontEffect,
+	BoxShadow,
 
 	FillImage,
 

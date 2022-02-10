@@ -94,6 +94,7 @@ public:
 		FONTEFFECT = 1 << 24,       // font-effect; fetch as < FontEffectsPtr >
 		RATIO = 1 << 25,            // ratio defined as x/y; fetch as < Vector2f >
 		COLORSTOPLIST = 1 << 26,    // color stop list; fetch as < ColorStopList >
+		SHADOWLIST = 1 << 27,       // shadow list; fetch as < ShadowList >
 
 		LENGTH = PX | DP | PPI_UNIT | EM | REM | VW | VH | X,
 		LENGTH_PERCENT = LENGTH | PERCENT,
