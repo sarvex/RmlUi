@@ -878,6 +878,9 @@ PropertyIdSet ElementStyle::ComputeValues(Style::ComputedValues& values, const S
 		case PropertyId::FlexBasis:
 			values.flex_basis(ComputeLengthPercentageAuto(p, font_size, document_font_size, dp_ratio, vp_dimensions));
 			break;
+		case PropertyId::BoxShadow:
+			values.has_box_shadow(p->value.GetType() == Variant::SHADOWLIST && !p->value.GetReference<ShadowList>().empty());
+			break;
 
 		// Fetched from element's properties.
 		case PropertyId::Cursor:
@@ -896,7 +899,6 @@ PropertyIdSet ElementStyle::ComputeValues(Style::ComputedValues& values, const S
 		// Unhandled properties. Must be manually retrieved with 'GetProperty()'.
 		case PropertyId::FillImage:
 		case PropertyId::CaretColor:
-		case PropertyId::BoxShadow:
 			break;
 		// Invalid properties
 		case PropertyId::Invalid:

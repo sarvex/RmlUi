@@ -41,6 +41,7 @@ class Context;
 
 // TODO: Move
 using CompiledEffectHandle = uintptr_t;
+enum class StencilCommand { Clear, Write, WriteDisable, TestEqual, TestDisable };
 
 /**
 	The abstract base class for application-specific rendering implementation. Your application must provide a concrete
@@ -101,6 +102,8 @@ public:
 	/// @param[in] width The width of the scissored region. All pixels to the right of (x + width) should be clipped.
 	/// @param[in] height The height of the scissored region. All pixels to below (y + height) should be clipped.
 	virtual void SetScissorRegion(int x, int y, int width, int height) = 0;
+	/// Called by RmlUi when it wants to setup the stencil buffer.
+	virtual void StencilCommand(StencilCommand command, int value = 0, int mask = 0xff) {}
 
 	/// Called by RmlUi when a texture is required by the library.
 	/// @param[out] texture_handle The handle to write the texture handle for the loaded texture to.
