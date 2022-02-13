@@ -1828,7 +1828,8 @@ void Element::OnPropertyChange(const PropertyIdSet& changed_properties)
     if (border_radius_changed ||
 		changed_properties.Contains(PropertyId::BackgroundColor) ||
 		changed_properties.Contains(PropertyId::Opacity) ||
-		changed_properties.Contains(PropertyId::ImageColor))
+		changed_properties.Contains(PropertyId::ImageColor) ||
+		changed_properties.Contains(PropertyId::BoxShadow))
 	{
 		meta->background_border.DirtyBackground();
     }
@@ -2834,6 +2835,9 @@ void Element::UpdateTransformState()
 	// A change in perspective or transform will require an update to children transforms as well.
 	if (perspective_or_transform_changed)
 	{
+		if (computed.has_box_shadow())
+			meta->background_border.DirtyBackground();
+
 		for (size_t i = 0; i < children.size(); i++)
 			children[i]->DirtyTransformState(false, true);
 	}

@@ -153,7 +153,7 @@ namespace Style {
 
 			flex_basis_type(LengthPercentageAuto::Auto), row_gap_type(LengthPercentage::Length), column_gap_type(LengthPercentage::Length),
 
-			vertical_align_type(VerticalAlign::Baseline), drag(Drag::None), tab_index(TabIndex::None)
+			vertical_align_type(VerticalAlign::Baseline), drag(Drag::None), tab_index(TabIndex::None), has_box_shadow(false)
 		{}
 
 		LengthPercentage::Type min_width_type : 1, max_width_type : 1;
@@ -168,6 +168,7 @@ namespace Style {
 		VerticalAlign::Type vertical_align_type : 4;
 		Drag drag : 3;
 		TabIndex tab_index : 1;
+		bool has_box_shadow : 1;
 
 		Clip clip;
 
@@ -286,6 +287,7 @@ namespace Style {
 		LengthPercentage  row_gap()                    const { return LengthPercentage(rare.row_gap_type, rare.row_gap); }
 		LengthPercentage  column_gap()                 const { return LengthPercentage(rare.column_gap_type, rare.column_gap); }
 		float             scrollbar_margin()           const { return rare.scrollbar_margin; }
+		bool              has_box_shadow()             const { return rare.has_box_shadow; }
 		
 		// -- Assignment --
 		// Common
@@ -362,6 +364,7 @@ namespace Style {
 		void tab_index                 (TabIndex value)          { rare.tab_index                  = value; }
 		void image_color               (Colourb value)           { rare.image_color                = value; }
 		void scrollbar_margin          (float value)             { rare.scrollbar_margin           = value; }
+		void has_box_shadow            (bool value)              { rare.has_box_shadow             = value; }
 
 		// clang-format on
 

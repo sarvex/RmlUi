@@ -52,11 +52,7 @@ private:
 
 	Geometry geometry;
 
-	struct ShadowGeometry {
-		CompiledEffectHandle shadow_texture;
-	};
-	using ShadowGeometryList = Vector<ShadowGeometry>;
-	ShadowGeometryList shadow_boxes;
+	CompiledEffectHandle shadow_texture = 0;
 };
 
 } // namespace Rml

@@ -39,10 +39,10 @@ ElementBackgroundBorder::ElementBackgroundBorder(Element* element) : geometry(el
 
 ElementBackgroundBorder::~ElementBackgroundBorder()
 {
-	if (Rml::RenderInterface* render_interface = geometry.GetRenderInterface())
+	if (shadow_texture)
 	{
-		for (const ShadowGeometry& shadow : shadow_boxes)
-			render_interface->ReleaseCompiledEffect(shadow.shadow_texture);
+		if (Rml::RenderInterface* render_interface = geometry.GetRenderInterface())
+			render_interface->ReleaseCompiledEffect(shadow_texture);
 	}
 }
 
@@ -56,7 +56,7 @@ void ElementBackgroundBorder::Render(Element * element)
 		border_dirty = false;
 	}
 
-	if (!shadow_boxes.empty())
+	if (shadow_texture)
 	{
 		RenderInterface* render_interface = element->GetRenderInterface();
 		if (!render_interface)
@@ -65,14 +65,12 @@ void ElementBackgroundBorder::Render(Element * element)
 			return;
 		}
 
-		for (const ShadowGeometry& shadow : shadow_boxes)
-		{
-			render_interface->RenderEffect(shadow.shadow_texture, RenderStage::Decoration, 0, element);
-		}
+		render_interface->RenderEffect(shadow_texture, RenderStage::Decoration, 0, element);
 	}
-
-	if (geometry)
+	else if (geometry)
+	{
 		geometry.Render(element->GetAbsoluteOffset(Box::BORDER));
+	}
 }
 
 void ElementBackgroundBorder::DirtyBackground()
@@ -122,7 +120,11 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 
 	geometry.Release();
 
-	shadow_boxes.clear();
+	if (shadow_texture)
+	{
+		if (RenderInterface* render_interface = element->GetRenderInterface())
+			render_interface->ReleaseCompiledEffect(shadow_texture);
+	}
 
 	if (const Property* p_box_shadow = element->GetLocalProperty(PropertyId::BoxShadow))
 	{
@@ -136,39 +138,130 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			return;
 		}
 
-		shadow_boxes.reserve(shadow_list.size());
+		const Vector2f element_offset = element->GetAbsoluteOffset(Box::BORDER);
 
-		for (const Shadow& shadow : shadow_list)
+		static const Colourb opaque_colors[4];
+		static const Colourb transparent_color(0, 0, 0, 0);
+
+		Geometry geometry_border, geometry_padding;
+
+		for (int i = 0; i < element->GetNumBoxes(); i++)
 		{
-			//CompiledEffectHandle texture = render_interface->CompileEffect("generate-texture",
-			//	Dictionary{{"size", Variant(Vector2f(element->GetClientWidth(), element->GetClientHeight()))}});
+			Vector2f offset;
+			const Box& box = element->GetBox(i, offset);
+			GeometryUtilities::GenerateBackgroundBorder(&geometry_padding, box, offset, radii, opaque_colors[0], nullptr);
+			GeometryUtilities::GenerateBackgroundBorder(&geometry_border, box, offset, radii, transparent_color, opaque_colors);
+		}
 
-			CompiledEffectHandle rtt = render_interface->CompileEffect("render-to-texture", Dictionary{});
-			CompiledEffectHandle blur = render_interface->CompileEffect("blur", Dictionary{{"radius", Variant(shadow.blur_radius)}});
+		render_interface->EnableScissorRegion(false);
 
-			render_interface->RenderEffect(rtt, RenderStage::Enter, 0, element);
+		shadow_texture = render_interface->CompileEffect("render-to-texture", Dictionary{});
+		render_interface->RenderEffect(shadow_texture, RenderStage::Enter, 0, element);
+
+		constexpr int mask_padding = 0b001;
+		constexpr int mask_border = 0b010;
+		constexpr int mask_inset = 0b100;
+
+		// TODO: Make the render texture position-independent.
+		render_interface->StencilCommand(StencilCommand::Clear, 0);
+		render_interface->StencilCommand(StencilCommand::Write, mask_padding);
+		geometry_padding.Render(element_offset);
+		render_interface->StencilCommand(StencilCommand::Write, mask_border);
+		geometry_border.Render(element_offset);
+		render_interface->StencilCommand(StencilCommand::WriteDisable);
+
+		geometry.Render(element_offset);
+
+		for (int shadow_index = (int)shadow_list.size() - 1; shadow_index >= 0; shadow_index--)
+		{
+			const Shadow& shadow = shadow_list[shadow_index];
+
+			const bool inset = shadow.inset;
+			const Colourb shadow_colors[4] = {
+				shadow.color,
+				shadow.color,
+				shadow.color,
+				shadow.color
+			};
+			
+			Vector4f spread_radii = radii;
+			for (int i = 0; i < 4; i++)
+			{
+				float& radius = spread_radii[i];
+				float spread_factor = (inset ? -1.f : 1.f);
+				if (radius < shadow.spread_distance)
+				{
+					const float ratio_minus_one = (radius / shadow.spread_distance) - 1.f;
+					spread_factor *= 1.f + ratio_minus_one * ratio_minus_one * ratio_minus_one;
+				}
+				radius = Math::Max(radius + spread_factor * shadow.spread_distance, 0.f);
+			}
 
 			Geometry shadow_geometry;
 
-			// Render the shadow box
+			// Generate the shadow box
 			for (int i = 0; i < element->GetNumBoxes(); i++)
 			{
 				Vector2f offset;
-				const Box& box = element->GetBox(i, offset);
+				Box box = element->GetBox(i, offset);
+				const float signed_spread_distance = (inset ? -shadow.spread_distance : shadow.spread_distance);
+				offset -= Vector2f(signed_spread_distance);
 
-				// TODO: Expand box with border widths and 'shadow.spread_distance'. Re-use main geometry when we can.
-				GeometryUtilities::GenerateBackgroundBorder(&shadow_geometry, box, offset, radii, shadow.color, nullptr);
+				for (int j = 0; j < (int)Box::NUM_EDGES; j++)
+				{
+					Box::Edge edge = (Box::Edge)j;
+					const float new_size = box.GetEdge(Box::PADDING, edge) + signed_spread_distance;
+					box.SetEdge(Box::PADDING, edge, new_size);
+				}
+
+				GeometryUtilities::GenerateBackgroundBorder(&shadow_geometry, box, offset, spread_radii, shadow.color, inset ? nullptr : shadow_colors);
 			}
 
-			shadow_geometry.Render(shadow.offset + element->GetAbsoluteOffset(Box::BORDER));
+			CompiledEffectHandle rtt = render_interface->CompileEffect("render-to-texture", Dictionary{});
+			CompiledEffectHandle blur = render_interface->CompileEffect("blur", Dictionary{{"radius", Variant(shadow.blur_radius)}});
+			CompiledEffectHandle fullscreen_color = render_interface->CompileEffect("color", Dictionary{{"color", Variant(shadow.color)}});
 
-			render_interface->RenderEffect(blur, RenderStage::Decoration, 0, element);
-			render_interface->RenderEffect(rtt, RenderStage::Exit, 0, element);
+			render_interface->RenderEffect(rtt, RenderStage::Enter, 0, element);
 
-			render_interface->ReleaseCompiledEffect(CompiledEffectHandle(blur));
+			if (inset)
+			{
+				render_interface->StencilCommand(StencilCommand::Write, mask_inset, mask_inset);
+				shadow_geometry.Render(shadow.offset + element_offset);
+				render_interface->StencilCommand(StencilCommand::WriteDisable);
 
-			shadow_boxes.push_back(ShadowGeometry{rtt});
+				render_interface->StencilCommand(StencilCommand::TestEqual, 0, mask_inset);
+				render_interface->RenderEffect(fullscreen_color, RenderStage::Decoration, 0, element);
+
+				render_interface->StencilCommand(StencilCommand::Clear, 0, mask_inset);
+
+				render_interface->StencilCommand(StencilCommand::TestEqual, mask_padding, mask_padding);
+				render_interface->RenderEffect(blur, RenderStage::Decoration, 0, element);
+
+				render_interface->RenderEffect(rtt, RenderStage::Exit, 0, element);
+				render_interface->RenderEffect(rtt, RenderStage::Decoration, 0, element);
+			}
+			else
+			{
+				shadow_geometry.Render(shadow.offset + element_offset);
+
+				render_interface->StencilCommand(StencilCommand::TestEqual, 0);
+				render_interface->RenderEffect(blur, RenderStage::Decoration, 0, element);
+				render_interface->RenderEffect(rtt, RenderStage::Exit, 0, element);
+
+				render_interface->StencilCommand(StencilCommand::TestEqual, 0);
+				render_interface->RenderEffect(rtt, RenderStage::Decoration, 0, element);
+			}
+
+			render_interface->StencilCommand(StencilCommand::TestDisable, 0);
+
+			render_interface->ReleaseCompiledEffect(fullscreen_color);
+			render_interface->ReleaseCompiledEffect(blur);
+			render_interface->ReleaseCompiledEffect(rtt);
 		}
+
+		render_interface->RenderEffect(shadow_texture, RenderStage::Exit, 0, element);
+
+		ElementUtilities::SetClippingRegion(element);
 	}
 }
 
