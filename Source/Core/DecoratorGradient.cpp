@@ -50,13 +50,9 @@ namespace Rml {
 
 //=======================================================
 
-DecoratorGradient::DecoratorGradient()
-{
-}
+DecoratorGradient::DecoratorGradient() {}
 
-DecoratorGradient::~DecoratorGradient()
-{
-}
+DecoratorGradient::~DecoratorGradient() {}
 
 bool DecoratorGradient::Initialise(const Direction dir_, const Colourb start_, const Colourb stop_)
 {
@@ -134,9 +130,7 @@ DecoratorGradientInstancer::DecoratorGradientInstancer()
 	RegisterShorthand("decorator", "direction, start-color, stop-color", ShorthandType::FallThrough);
 }
 
-DecoratorGradientInstancer::~DecoratorGradientInstancer()
-{
-}
+DecoratorGradientInstancer::~DecoratorGradientInstancer() {}
 
 SharedPtr<Decorator> DecoratorGradientInstancer::InstanceDecorator(const String& name, const PropertyDictionary& properties_,
 	const DecoratorInstancerInterface& RMLUI_UNUSED_PARAMETER(interface_))
@@ -176,14 +170,125 @@ bool DecoratorLinearGradient::Initialise(float in_angle, const ColorStopList& in
 	return !color_stops.empty();
 }
 
+// Returns the point along the input line ('line_point', 'line_vector') closest to the input 'point'.
+static Vector2f IntersectionPointToLineNormal(const Vector2f point, const Vector2f line_point, const Vector2f line_vector)
+{
+	const Vector2f delta = line_point - point;
+	return line_point - delta.DotProduct(line_vector) * line_vector;
+}
+
+struct GradientPoints {
+	Vector2f p0, p1;
+	float length;
+};
+// Find the starting and ending points for the gradient line with the given angle and dimensions.
+static GradientPoints CalculateGradientPoints(float angle, Vector2f dim)
+{
+	enum { TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT, TOP_LEFT, COUNT };
+	const Vector2f corners[COUNT] = {Vector2f(dim.x, 0), dim, Vector2f(0, dim.y), Vector2f(0, 0)};
+	const Vector2f center = 0.5f * dim;
+
+	using uint = unsigned int;
+	const uint quadrant = uint(Math::NormaliseAnglePositive(angle) * (4.f / (2.f * Math::RMLUI_PI))) % 4u;
+	const uint quadrant_opposite = (quadrant + 2u) % 4u;
+
+	const Vector2f line_vector = Vector2f(Math::Sin(angle), -Math::Cos(angle));
+	const Vector2f starting_point = IntersectionPointToLineNormal(corners[quadrant_opposite], center, line_vector);
+	const Vector2f ending_point = IntersectionPointToLineNormal(corners[quadrant], center, line_vector);
+
+	const float distance = Math::AbsoluteValue(dim.x * line_vector.x) + Math::AbsoluteValue(-dim.y * line_vector.y);
+
+	return {starting_point, ending_point, distance};
+};
+
 DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* element) const
 {
 	RenderInterface* render_interface = element->GetRenderInterface();
 	if (!render_interface)
 		return INVALID_DECORATORDATAHANDLE;
 
-	CompiledEffectHandle handle =
-		render_interface->CompileEffect("linear-gradient", Dictionary{{"angle", Variant(angle)}, {"color_stop_list", Variant(color_stops)}});
+	RMLUI_ASSERT(!color_stops.empty());
+
+	const Vector2f dimensions = element->GetBox().GetSize(Box::PADDING);
+	GradientPoints gradient_points = CalculateGradientPoints(angle, dimensions);
+	const float length = gradient_points.length;
+
+	using StopPosition = ColorStop::Position;
+	ColorStopList stops = color_stops;
+	const int num_stops = (int)stops.size();
+
+	// Resolve all lengths to numbers.
+	for (ColorStop& stop : stops)
+	{
+		if (stop.position == StopPosition::Length)
+		{
+			stop.position_value = stop.position_value / length;
+			stop.position = StopPosition::Number;
+		}
+	}
+
+	// Resolve auto positions of the first and last color stops.
+	auto resolve_edge_stop = [](ColorStop& stop, float auto_to_number) {
+		if (stop.position == StopPosition::Auto)
+			stop.position_value = auto_to_number;
+		stop.position = StopPosition::Number;
+	};
+	resolve_edge_stop(stops[0], 0.f);
+	resolve_edge_stop(stops[num_stops - 1], 1.f);
+
+	// Ensures that color stop positions are strictly increasing, and have at least 1px spacing to avoid aliasing.
+	auto nudge_stop = [prev_position = stops[0].position_value, pixel = 1.f / length](ColorStop& stop, bool update_prev = true) mutable {
+		stop.position_value = Math::Max(stop.position_value, prev_position + pixel);
+		if (update_prev)
+			prev_position = stop.position_value;
+	};
+	int auto_begin_i = -1;
+
+	// Evenly space stops with sequential auto indices, and nudge stop positions to ensure strictly increasing positions.
+	for (int i = 1; i < num_stops; i++)
+	{
+		ColorStop& stop = stops[i];
+		if (stop.position == StopPosition::Auto)
+		{
+			if (auto_begin_i < 0)
+				auto_begin_i = i;
+		}
+		else if (auto_begin_i < 0)
+		{
+			// The stop has a definite position and there are no previous autos to handle, just ensure it is properly spaced.
+			nudge_stop(stop);
+		}
+		else
+		{
+			// Space out all the previous auto stops, indices [auto_begin_i, i).
+			nudge_stop(stop, false);
+			const int num_auto_stops = i - auto_begin_i;
+			const float t0 = stops[auto_begin_i - 1].position_value;
+			const float t1 = stop.position_value;
+
+			for (int j = 0; j < num_auto_stops; j++)
+			{
+				const float fraction_along_t0_t1 = float(j + 1) / float(num_auto_stops + 1);
+				stops[j + auto_begin_i].position_value = t0 + (t1 - t0) * fraction_along_t0_t1;
+				stops[j + auto_begin_i].position = StopPosition::Number;
+				nudge_stop(stops[j + auto_begin_i]);
+			}
+
+			nudge_stop(stop);
+			auto_begin_i = -1;
+		}
+	}
+
+#ifdef RMLUI_DEBUG
+	for (const ColorStop& stop : stops)
+	{
+		RMLUI_ASSERT(stop.position == StopPosition::Number);
+	}
+#endif
+
+	CompiledEffectHandle handle = render_interface->CompileEffect("linear-gradient",
+		Dictionary{{"angle", Variant(angle)}, {"p0", Variant(gradient_points.p0)}, {"p1", Variant(gradient_points.p1)},
+			{"length", Variant(gradient_points.length)}, {"color_stop_list", Variant(std::move(stops))}});
 
 	return DecoratorDataHandle(handle);
 }
@@ -214,7 +319,7 @@ void DecoratorLinearGradient::RenderElement(Element* element, DecoratorDataHandl
 
 DecoratorLinearGradientInstancer::DecoratorLinearGradientInstancer()
 {
-	ids.angle = RegisterProperty("angle", "0deg").AddParser("angle").GetId();
+	ids.angle = RegisterProperty("angle", "180deg").AddParser("angle").GetId();
 	ids.color_stop_list = RegisterProperty("color-stops", "").AddParser("color_stop_list").GetId();
 
 	RegisterShorthand("decorator", "angle?, color-stops#", ShorthandType::RecursiveCommaSeparated);

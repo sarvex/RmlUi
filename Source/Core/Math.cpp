@@ -134,6 +134,14 @@ RMLUICORE_API float NormaliseAngle(float angle)
 	return fmodf(angle, RMLUI_PI * 2.0f);
 }
 
+RMLUICORE_API float NormaliseAnglePositive(float angle)
+{
+	float result = NormaliseAngle(angle);
+	if (result < 0.f)
+		result += RMLUI_PI * 2.0f;
+	return result;
+}
+
 // Calculates the square root of a value.
 RMLUICORE_API float SquareRoot(float value)
 {
