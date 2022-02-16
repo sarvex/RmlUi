@@ -134,7 +134,7 @@ void ElementInfo::RenderHoverElement()
 {
 	if (hover_element)
 	{
-		ElementUtilities::ApplyTransform(*hover_element);
+		ElementUtilities::ApplyTransform(hover_element);
 		for (int i = 0; i < hover_element->GetNumBoxes(); i++)
 		{
 			// Render the content area.
@@ -156,7 +156,7 @@ void ElementInfo::RenderSourceElement()
 {
 	if (source_element && show_source_element)
 	{
-		ElementUtilities::ApplyTransform(*source_element);
+		ElementUtilities::ApplyTransform(source_element);
 
 		for (int i = 0; i < source_element->GetNumBoxes(); i++)
 		{

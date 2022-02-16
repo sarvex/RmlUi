@@ -331,9 +331,10 @@ bool ElementUtilities::PositionElement(Element* element, Vector2f offset, Positi
 	return true;
 }
 
-bool ElementUtilities::ApplyTransform(Element &element)
+bool ElementUtilities::ApplyTransform(Element* element, RenderInterface* render_interface)
 {
-	RenderInterface *render_interface = element.GetRenderInterface();
+	if (!render_interface && element)
+		render_interface = element->GetRenderInterface();
 	if (!render_interface)
 		return false;
 
@@ -345,15 +346,18 @@ bool ElementUtilities::ApplyTransform(Element &element)
 
 	auto it = previous_matrix.find(render_interface);
 	if (it == previous_matrix.end())
-		it = previous_matrix.emplace(render_interface, PreviousMatrix{ nullptr, Matrix4f::Identity() }).first;
+		it = previous_matrix.emplace(render_interface, PreviousMatrix{nullptr, Matrix4f::Identity()}).first;
 
 	RMLUI_ASSERT(it != previous_matrix.end());
 
 	const Matrix4f*& old_transform = it->second.pointer;
 	const Matrix4f* new_transform = nullptr;
 
-	if (const TransformState* state = element.GetTransformState())
-		new_transform = state->GetTransform();
+	if (element)
+	{
+		if (const TransformState* state = element->GetTransformState())
+			new_transform = state->GetTransform();
+	}
 
 	// Only changed transforms are submitted.
 	if (old_transform != new_transform)
@@ -361,11 +365,11 @@ bool ElementUtilities::ApplyTransform(Element &element)
 		Matrix4f& old_transform_value = it->second.value;
 
 		// Do a deep comparison as well to avoid submitting a new transform which is equal.
-		if(!old_transform || !new_transform || (old_transform_value != *new_transform))
+		if (!old_transform || !new_transform || (old_transform_value != *new_transform))
 		{
 			render_interface->SetTransform(new_transform);
 
-			if(new_transform)
+			if (new_transform)
 				old_transform_value = *new_transform;
 		}
 

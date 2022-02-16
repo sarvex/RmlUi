@@ -217,7 +217,7 @@ void Element::Render()
 		stacking_context[i]->Render();
 
 	// Apply our transform
-	ElementUtilities::ApplyTransform(*this);
+	ElementUtilities::ApplyTransform(this);
 
 	// Set up the clipping region for this element.
 	if (ElementUtilities::SetClippingRegion(this))

@@ -182,7 +182,7 @@ void DebuggerPlugin::Render()
 				element_stack.pop();
 				if (element->IsVisible())
 				{
-					ElementUtilities::ApplyTransform(*element);
+					ElementUtilities::ApplyTransform(element);
 					for (int j = 0; j < element->GetNumBoxes(); ++j)
 					{
 						Vector2f box_offset;
