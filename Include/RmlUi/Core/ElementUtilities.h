@@ -125,9 +125,10 @@ public:
 
 	/// Applies an element's accumulated transform matrix, determined from its and ancestor's `perspective' and `transform' properties.
 	/// Note: All calls to RenderInterface::SetTransform must go through here.
-	/// @param[in] element		The element whose transform to apply.
-	/// @return true if a render interface is available to set the transform.
-	static bool ApplyTransform(Element& element);
+	/// @param[in] element The element whose transform to apply, or nullptr for identity transform.
+	/// @param[in] render_interface The target render interface, or nullptr to fetch from element.
+	/// @return True if a render interface is available to set the transform.
+	static bool ApplyTransform(Element* element, RenderInterface* render_interface = nullptr);
 
 	/// Creates data views and data controllers if a data model applies to the element.
 	/// Attributes such as 'data-' are used to create the views and controllers.
