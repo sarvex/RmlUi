@@ -98,6 +98,10 @@ public:
 	/// @param[in] context The context of the element; if this is not supplied, it will be derived from the element.
 	/// @return The visibility of the given element within its clipping region.
 	static bool SetClippingRegion(Element* element, Context* context = nullptr);
+	/// Sets the clipping region to the given element, optionally offseting and expanding the region.
+	/// @return The visibility of the given element within its clipping region.
+	static bool ForceClippingRegion(Element* element, Box::Area area = Box::PADDING, Vector2f relative_offset = Vector2f(0),
+		Vector2f expand_size = Vector2f(0));
 	/// Applies the clip region from the render interface to the renderer
 	/// @param[in] context The context to read the clip region from
 	/// @param[in] render_interface The render interface to update.

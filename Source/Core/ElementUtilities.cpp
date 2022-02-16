@@ -278,6 +278,24 @@ bool ElementUtilities::SetClippingRegion(Element* element, Context* context)
 	return true;
 }
 
+bool ElementUtilities::ForceClippingRegion(Element* element, Box::Area area, Vector2f relative_offset, Vector2f expand_size)
+{
+	RMLUI_ASSERT(element);
+	RenderInterface* render_interface = element->GetRenderInterface();
+	if (!render_interface)
+		return false;
+
+	Vector2f element_origin_f = element->GetAbsoluteOffset(area) + relative_offset;
+	Vector2f element_dimensions_f = element->GetBox().GetSize(area) + expand_size;
+	Math::SnapToPixelGrid(element_origin_f, element_dimensions_f);
+	const Vector2i element_origin(element_origin_f);
+	const Vector2i element_dimensions(element_dimensions_f);
+
+	render_interface->EnableScissorRegion(true);
+	render_interface->SetScissorRegion(element_origin.x, element_origin.y, element_dimensions.x, element_dimensions.y);
+	return true;
+}
+
 void ElementUtilities::ApplyActiveClipRegion(Context* context, RenderInterface* render_interface)
 {
 	if (render_interface == nullptr)
