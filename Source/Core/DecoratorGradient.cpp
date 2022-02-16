@@ -48,8 +48,6 @@ stop-color: #00ff00;
 
 namespace Rml {
 
-//=======================================================
-
 DecoratorGradient::DecoratorGradient() {}
 
 DecoratorGradient::~DecoratorGradient() {}
@@ -120,8 +118,6 @@ void DecoratorGradient::RenderElement(Element* element, DecoratorDataHandle elem
 	data->Render(element->GetAbsoluteOffset(Box::BORDER));
 }
 
-//=======================================================
-
 DecoratorGradientInstancer::DecoratorGradientInstancer()
 {
 	ids.direction = RegisterProperty("direction", "horizontal").AddParser("keyword", "horizontal, vertical").GetId();
@@ -133,19 +129,8 @@ DecoratorGradientInstancer::DecoratorGradientInstancer()
 DecoratorGradientInstancer::~DecoratorGradientInstancer() {}
 
 SharedPtr<Decorator> DecoratorGradientInstancer::InstanceDecorator(const String& name, const PropertyDictionary& properties_,
-	const DecoratorInstancerInterface& RMLUI_UNUSED_PARAMETER(interface_))
+	const DecoratorInstancerInterface& /*interface*/)
 {
-	RMLUI_UNUSED(interface_);
-
-	if (name == "gradient")
-		gradient_type = GradientType::Straight;
-	else if (name == "linear-gradient")
-		gradient_type = GradientType::Linear;
-	else if (name == "radial-gradient")
-		gradient_type = GradientType::Radial;
-	else
-		return nullptr;
-
 	DecoratorGradient::Direction dir = (DecoratorGradient::Direction)properties_.GetProperty(ids.direction)->Get<int>();
 	Colourb start = properties_.GetProperty(ids.start)->Get<Colourb>();
 	Colourb stop = properties_.GetProperty(ids.stop)->Get<Colourb>();
@@ -342,7 +327,7 @@ SharedPtr<Decorator> DecoratorLinearGradientInstancer::InstanceDecorator(const S
 	const ColorStopList& color_stop_list = p_color_stop_list->value.GetReference<ColorStopList>();
 
 	auto decorator = MakeShared<DecoratorLinearGradient>();
-	if (decorator->Initialise(angle, std::move(color_stop_list)))
+	if (decorator->Initialise(angle, color_stop_list))
 		return decorator;
 
 	return nullptr;

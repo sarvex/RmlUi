@@ -35,8 +35,6 @@
 
 namespace Rml {
 
-enum class GradientType { Straight, Linear, Radial };
-
 class DecoratorGradient : public Decorator {
 public:
 	enum class Direction { Horizontal = 0, Vertical = 1 };
@@ -69,7 +67,6 @@ private:
 		PropertyId direction, start, stop;
 	};
 	GradientPropertyIds ids;
-	GradientType gradient_type;
 };
 
 class DecoratorLinearGradient : public Decorator {
