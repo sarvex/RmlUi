@@ -61,12 +61,22 @@ void RenderInterface::RenderCompiledGeometry(CompiledGeometryHandle /*geometry*/
 void RenderInterface::ReleaseCompiledGeometry(CompiledGeometryHandle /*geometry*/)
 {}
 
+TextureHandle RenderInterface::ExecuteRenderCommand(RenderCommand command, Vector2f offset, Vector2f dimensions)
+{
+	return ::Rml::TextureHandle();
+}
+
 CompiledEffectHandle RenderInterface::CompileEffect(const String& /*name*/, const Dictionary& /*parameters*/)
 {
 	return CompiledEffectHandle(0);
 }
 
-void RenderInterface::RenderEffect(CompiledEffectHandle /*effect*/, RenderStage /*stage*/, int /*iteration*/, Element* /*element*/) {}
+/// Called by RmlUi when...
+
+::Rml::TextureHandle RenderInterface::RenderEffect(CompiledEffectHandle effect, RenderSource source, RenderTarget target)
+{
+	return TextureHandle{};
+}
 
 void RenderInterface::ReleaseCompiledEffect(CompiledEffectHandle /*effect*/) {}
 

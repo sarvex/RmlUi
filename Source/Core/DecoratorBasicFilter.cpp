@@ -77,7 +77,17 @@ void DecoratorBasicFilter::RenderElement(Element* element, DecoratorDataHandle e
 	if (!render_interface)
 		return;
 
-	render_interface->RenderEffect(CompiledEffectHandle(element_data), render_stage, 0, element);
+	if (render_stage == RenderStage::Enter)
+	{
+		render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
+	}
+	else if (render_stage == RenderStage::Exit)
+	{
+		const Vector2f offset;
+		const Vector2f dimensions;
+		render_interface->RenderEffect(CompiledEffectHandle(element_data), RenderSource::Stack, RenderTarget::StackBelow);
+		render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
+	}
 }
 
 DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer()
