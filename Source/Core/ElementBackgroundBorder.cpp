@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -34,19 +34,21 @@
 
 namespace Rml {
 
-
 ElementBackgroundBorder::ElementBackgroundBorder(Element* element) : geometry(element) {}
 
 ElementBackgroundBorder::~ElementBackgroundBorder()
 {
-	if (shadow_texture)
+	if (shadow_texture || shadow_geometry)
 	{
 		if (Rml::RenderInterface* render_interface = geometry.GetRenderInterface())
-			render_interface->ReleaseCompiledEffect(shadow_texture);
+		{
+			render_interface->ReleaseCompiledGeometry(shadow_geometry);
+			render_interface->ReleaseTexture(shadow_texture);
+		}
 	}
 }
 
-void ElementBackgroundBorder::Render(Element * element)
+void ElementBackgroundBorder::Render(Element* element)
 {
 	if (background_dirty || border_dirty)
 	{
@@ -56,7 +58,7 @@ void ElementBackgroundBorder::Render(Element * element)
 		border_dirty = false;
 	}
 
-	if (shadow_texture)
+	if (shadow_geometry)
 	{
 		RenderInterface* render_interface = element->GetRenderInterface();
 		if (!render_interface)
@@ -65,7 +67,13 @@ void ElementBackgroundBorder::Render(Element * element)
 			return;
 		}
 
-		render_interface->RenderEffect(shadow_texture, RenderStage::Decoration, 0, element);
+		// TODO: Render texture
+		// render_interface->RenderEffect(shadow_texture, RenderStage::Decoration, 0, element);
+		render_interface->EnableScissorRegion(false);
+		// ElementUtilities::ApplyTransform(*element->GetContext()->GetRootElement());
+		render_interface->RenderCompiledGeometry(shadow_geometry, element->GetAbsoluteOffset(Box::BORDER));
+		// ElementUtilities::ApplyTransform(*element);
+		ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
 	}
 	else if (geometry)
 	{
@@ -120,10 +128,13 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 
 	geometry.Release();
 
-	if (shadow_texture)
+	if (shadow_texture || shadow_geometry)
 	{
 		if (RenderInterface* render_interface = element->GetRenderInterface())
-			render_interface->ReleaseCompiledEffect(shadow_texture);
+		{
+			render_interface->ReleaseCompiledGeometry(shadow_geometry);
+			render_interface->ReleaseTexture(shadow_texture);
+		}
 	}
 
 	if (const Property* p_box_shadow = element->GetLocalProperty(PropertyId::BoxShadow))
@@ -138,52 +149,71 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			return;
 		}
 
-		const Vector2f element_offset = element->GetAbsoluteOffset(Box::BORDER);
-
-		static const Colourb opaque_colors[4];
-		static const Colourb transparent_color(0, 0, 0, 0);
-
 		Geometry geometry_border, geometry_padding;
+		Vector2f element_offset_in_texture;
+		Vector2f texture_dimensions;
 
-		for (int i = 0; i < element->GetNumBoxes(); i++)
 		{
-			Vector2f offset;
-			const Box& box = element->GetBox(i, offset);
-			GeometryUtilities::GenerateBackgroundBorder(&geometry_padding, box, offset, radii, opaque_colors[0], nullptr);
-			GeometryUtilities::GenerateBackgroundBorder(&geometry_border, box, offset, radii, transparent_color, opaque_colors);
+			Vector2f extend_top_left;
+			Vector2f extend_bottom_right;
+
+			for (const Shadow& shadow : shadow_list)
+			{
+				if (!shadow.inset)
+				{
+					const float extend = shadow.blur_radius + shadow.spread_distance;
+					extend_top_left = Math::Max(extend_top_left, Vector2f(extend) - shadow.offset);
+					extend_bottom_right = Math::Max(extend_bottom_right, Vector2f(extend) + shadow.offset);
+				}
+			}
+
+			Vector2f offset_min;
+			Vector2f offset_max;
+
+			// Generate border and padding geometry, and extend the texture to encompass any additional boxes.
+			for (int i = 0; i < element->GetNumBoxes(); i++)
+			{
+				static const Colourb opaque_colors[4];
+				static const Colourb transparent_color(0, 0, 0, 0);
+				Vector2f offset;
+				const Box& box = element->GetBox(i, offset);
+				GeometryUtilities::GenerateBackgroundBorder(&geometry_padding, box, offset, radii, opaque_colors[0], nullptr);
+				GeometryUtilities::GenerateBackgroundBorder(&geometry_border, box, offset, radii, transparent_color, opaque_colors);
+				offset_min = Math::Min(offset_min, offset);
+				offset_max = Math::Max(offset_max, offset);
+			}
+
+			auto RoundUp = [](Vector2f v) { return Vector2f(Math::RoundUpFloat(v.x), Math::RoundUpFloat(v.y)); };
+
+			element_offset_in_texture = RoundUp(extend_top_left - offset_min);
+			texture_dimensions = RoundUp(element_offset_in_texture + element->GetBox().GetSize(Box::BORDER) + extend_bottom_right + offset_max);
 		}
 
-		render_interface->EnableScissorRegion(false);
-
-		shadow_texture = render_interface->CompileEffect("render-to-texture", Dictionary{});
-		render_interface->RenderEffect(shadow_texture, RenderStage::Enter, 0, element);
+		ElementUtilities::ApplyTransform(nullptr, render_interface);
+		render_interface->EnableScissorRegion(true);
+		render_interface->SetScissorRegion(0, 0, (int)texture_dimensions.x, (int)texture_dimensions.y);
+		render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
 
 		constexpr int mask_padding = 0b001;
 		constexpr int mask_border = 0b010;
 		constexpr int mask_inset = 0b100;
 
-		// TODO: Make the render texture position-independent.
 		render_interface->StencilCommand(StencilCommand::Clear, 0);
 		render_interface->StencilCommand(StencilCommand::Write, mask_padding);
-		geometry_padding.Render(element_offset);
+		geometry_padding.Render(element_offset_in_texture);
 		render_interface->StencilCommand(StencilCommand::Write, mask_border);
-		geometry_border.Render(element_offset);
+		geometry_border.Render(element_offset_in_texture);
 		render_interface->StencilCommand(StencilCommand::WriteDisable);
 
-		geometry.Render(element_offset);
+		geometry.Render(element_offset_in_texture);
 
 		for (int shadow_index = (int)shadow_list.size() - 1; shadow_index >= 0; shadow_index--)
 		{
 			const Shadow& shadow = shadow_list[shadow_index];
 
 			const bool inset = shadow.inset;
-			const Colourb shadow_colors[4] = {
-				shadow.color,
-				shadow.color,
-				shadow.color,
-				shadow.color
-			};
-			
+			const Colourb shadow_colors[4] = {shadow.color, shadow.color, shadow.color, shadow.color};
+
 			Vector4f spread_radii = radii;
 			for (int i = 0; i < 4; i++)
 			{
@@ -214,53 +244,72 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 					box.SetEdge(Box::PADDING, edge, new_size);
 				}
 
-				GeometryUtilities::GenerateBackgroundBorder(&shadow_geometry, box, offset, spread_radii, shadow.color, inset ? nullptr : shadow_colors);
+				GeometryUtilities::GenerateBackgroundBorder(&shadow_geometry, box, offset, spread_radii, shadow.color,
+					inset ? nullptr : shadow_colors);
 			}
 
-			CompiledEffectHandle rtt = render_interface->CompileEffect("render-to-texture", Dictionary{});
-			CompiledEffectHandle blur = render_interface->CompileEffect("blur", Dictionary{{"radius", Variant(shadow.blur_radius)}});
+			const bool has_blur = (shadow.blur_radius > 0.5f) || true;
 			CompiledEffectHandle fullscreen_color = render_interface->CompileEffect("color", Dictionary{{"color", Variant(shadow.color)}});
+			CompiledEffectHandle blur = {};
+			if (has_blur)
+				blur = render_interface->CompileEffect("blur", Dictionary{{"radius", Variant(shadow.blur_radius)}});
 
-			render_interface->RenderEffect(rtt, RenderStage::Enter, 0, element);
+
+			render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
+
+			render_interface->EnableScissorRegion(false);
 
 			if (inset)
 			{
 				render_interface->StencilCommand(StencilCommand::Write, mask_inset, mask_inset);
-				shadow_geometry.Render(shadow.offset + element_offset);
+				shadow_geometry.Render(shadow.offset + element_offset_in_texture);
 				render_interface->StencilCommand(StencilCommand::WriteDisable);
 
 				render_interface->StencilCommand(StencilCommand::TestEqual, 0, mask_inset);
-				render_interface->RenderEffect(fullscreen_color, RenderStage::Decoration, 0, element);
+				render_interface->RenderEffect(fullscreen_color, RenderSource::Stack, RenderTarget::Stack);
 
 				render_interface->StencilCommand(StencilCommand::Clear, 0, mask_inset);
 
-				render_interface->StencilCommand(StencilCommand::TestEqual, mask_padding, mask_padding);
-				render_interface->RenderEffect(blur, RenderStage::Decoration, 0, element);
-
-				render_interface->RenderEffect(rtt, RenderStage::Exit, 0, element);
-				render_interface->RenderEffect(rtt, RenderStage::Decoration, 0, element);
+				if (has_blur)
+				{
+					render_interface->EnableScissorRegion(false); // TODO: Scissoring
+					render_interface->StencilCommand(StencilCommand::TestEqual, mask_padding, mask_padding);
+					render_interface->RenderEffect(blur, RenderSource::Stack, RenderTarget::StackBelow);
+					//render_interface->EnableScissorRegion(true);
+				}
 			}
 			else
 			{
-				shadow_geometry.Render(shadow.offset + element_offset);
+				shadow_geometry.Render(shadow.offset + element_offset_in_texture);
 
-				render_interface->StencilCommand(StencilCommand::TestEqual, 0);
-				render_interface->RenderEffect(blur, RenderStage::Decoration, 0, element);
-				render_interface->RenderEffect(rtt, RenderStage::Exit, 0, element);
-
-				render_interface->StencilCommand(StencilCommand::TestEqual, 0);
-				render_interface->RenderEffect(rtt, RenderStage::Decoration, 0, element);
+				if (has_blur)
+				{
+					render_interface->StencilCommand(StencilCommand::TestEqual, 0);
+					render_interface->RenderEffect(blur, RenderSource::Stack, RenderTarget::StackBelow);
+				}
 			}
 
+			render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
 			render_interface->StencilCommand(StencilCommand::TestDisable, 0);
 
+			if (has_blur)
+				render_interface->ReleaseCompiledEffect(blur);
 			render_interface->ReleaseCompiledEffect(fullscreen_color);
-			render_interface->ReleaseCompiledEffect(blur);
-			render_interface->ReleaseCompiledEffect(rtt);
 		}
 
-		render_interface->RenderEffect(shadow_texture, RenderStage::Exit, 0, element);
+		render_interface->EnableScissorRegion(false);
 
+		shadow_texture = render_interface->ExecuteRenderCommand(RenderCommand::StackToTexture, Vector2f(), texture_dimensions);
+
+		render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
+
+		Colourb color_white = Colourb(255, 255, 255, 255);
+		Vertex vertices[4];
+		int indices[6];
+		GeometryUtilities::GenerateQuad(vertices, indices, -element_offset_in_texture, texture_dimensions, color_white);
+		shadow_geometry = render_interface->CompileGeometry(vertices, 4, indices, 6, shadow_texture);
+
+		ElementUtilities::ApplyTransform(element, render_interface);
 		ElementUtilities::SetClippingRegion(element);
 	}
 }

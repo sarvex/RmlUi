@@ -52,7 +52,8 @@ private:
 
 	Geometry geometry;
 
-	CompiledEffectHandle shadow_texture = 0;
+	TextureHandle shadow_texture = 0;
+	CompiledGeometryHandle shadow_geometry = 0;
 };
 
 } // namespace Rml

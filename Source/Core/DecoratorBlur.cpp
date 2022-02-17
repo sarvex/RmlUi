@@ -50,7 +50,7 @@ DecoratorDataHandle DecoratorBlur::GenerateElementData(Element* element) const
 	if (!render_interface)
 		return INVALID_DECORATORDATAHANDLE;
 
-	CompiledEffectHandle handle = render_interface->CompileEffect("blur", Dictionary{{String("radius"), Variant(radius)}});
+	CompiledEffectHandle handle = render_interface->CompileEffect("blur", Dictionary{{"radius", Variant(radius)}});
 
 	return DecoratorDataHandle(handle);
 }
@@ -79,7 +79,35 @@ void DecoratorBlur::RenderElement(Element* element, DecoratorDataHandle element_
 	if (!render_interface)
 		return;
 
-	render_interface->RenderEffect(CompiledEffectHandle(element_data), render_stage, 0, element);
+	constexpr bool is_backdrop = false; // TODO
+
+	if (is_backdrop)
+	{
+		if (render_stage == RenderStage::BeforeDecoration)
+		{
+			ElementUtilities::ForceClippingRegion(element, Box::BORDER, Vector2f(-radius), Vector2f(2.f * radius));
+
+			render_interface->RenderEffect(CompiledEffectHandle(element_data), RenderSource::Stack, RenderTarget::Stack);
+
+			Rml::ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
+		}
+	}
+	else
+	{
+		if (render_stage == RenderStage::Enter)
+		{
+			render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
+		}
+		else if (render_stage == RenderStage::Exit)
+		{
+			ElementUtilities::ForceClippingRegion(element, Box::BORDER, Vector2f(-radius), Vector2f(2.f * radius));
+
+			render_interface->RenderEffect(CompiledEffectHandle(element_data), RenderSource::Stack, RenderTarget::StackBelow);
+			render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
+
+			Rml::ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
+		}
+	}
 }
 
 DecoratorBlurInstancer::DecoratorBlurInstancer()

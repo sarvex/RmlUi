@@ -51,7 +51,7 @@ public:
 
 private:
 	Colourb color;
-	Vector2f offset;
+	Vector2f offset, clip_offset, clip_expand_size;
 	float sigma = 0;
 };
 

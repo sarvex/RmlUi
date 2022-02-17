@@ -43,6 +43,10 @@ class Context;
 using CompiledEffectHandle = uintptr_t;
 enum class StencilCommand { Clear, Write, WriteDisable, TestEqual, TestDisable };
 
+enum class RenderCommand { None, StackPush, StackPop, StackToTexture, StackToFilter, FilterToStack };
+enum class RenderTarget { None, Stack, StackBelow, Texture }; // TODO: Remove and replace with render commands
+enum class RenderSource { None, Stack, Filter }; // TODO: Can we remove this, always assume filter?
+
 /**
 	The abstract base class for application-specific rendering implementation. Your application must provide a concrete
 	implementation of this class and install it through Rml::SetRenderInterface() in order for anything to be rendered.
@@ -85,10 +89,11 @@ public:
 	virtual void ReleaseCompiledGeometry(CompiledGeometryHandle geometry);
 
 	
+	virtual TextureHandle ExecuteRenderCommand(RenderCommand command, Vector2f offset = Vector2f(), Vector2f dimensions = Vector2f());
 	/// Called by RmlUi when...
 	virtual CompiledEffectHandle CompileEffect(const String& name, const Dictionary& parameters);
 	/// Called by RmlUi when...
-	virtual void RenderEffect(CompiledEffectHandle effect, RenderStage stage, int iteration, Element* element);
+	virtual TextureHandle RenderEffect(CompiledEffectHandle effect, RenderSource source, RenderTarget target);
 	/// Called by RmlUi when...
 	virtual void ReleaseCompiledEffect(CompiledEffectHandle effect);
 
