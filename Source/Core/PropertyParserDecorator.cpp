@@ -41,7 +41,7 @@ PropertyParserDecorator::PropertyParserDecorator()
 PropertyParserDecorator::~PropertyParserDecorator()
 {}
 
-bool PropertyParserDecorator::ParseValue(Property& property, const String& decorator_string_value, const ParameterMap& /*parameters*/) const
+bool PropertyParserDecorator::ParseValue(Property& property, const String& decorator_string_value, const ParameterMap& parameters) const
 {
 	// Decorators are declared as
 	//   decorator: <decorator-value>[, <decorator-value> ...];
@@ -71,6 +71,10 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 	// Get or instance each decorator in the comma-separated string list
 	for (const String& decorator_string : decorator_string_list)
 	{
+		const DecoratorClasses decorator_class =
+			(parameters.size() == 1 ? (parameters.begin()->first == "filter" ? DecoratorClasses::Filter : DecoratorClasses::BackdropFilter)
+									: DecoratorClasses::Background);
+
 		const size_t shorthand_open = decorator_string.find('(');
 		const size_t shorthand_close = decorator_string.rfind(')');
 		const bool invalid_parenthesis = (shorthand_open == String::npos || shorthand_close == String::npos || shorthand_open >= shorthand_close);
@@ -90,6 +94,12 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 			if (!instancer)
 			{
 				Log::Message(Log::LT_WARNING, "Decorator type '%s' not found.", type.c_str());
+				return false;
+			}
+
+			if ((instancer->GetDecoratorClasses() & decorator_class) == DecoratorClasses::Invalid)
+			{
+				Log::Message(Log::LT_WARNING, "Decorator type '%s' used in unsupported property.", type.c_str());
 				return false;
 			}
 

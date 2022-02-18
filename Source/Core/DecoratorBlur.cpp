@@ -110,7 +110,7 @@ void DecoratorBlur::RenderElement(Element* element, DecoratorDataHandle element_
 	}
 }
 
-DecoratorBlurInstancer::DecoratorBlurInstancer()
+DecoratorBlurInstancer::DecoratorBlurInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)
 {
 	// register properties for the decorator
 	ids.radius = RegisterProperty("radius", "0px").AddParser("length").GetId();

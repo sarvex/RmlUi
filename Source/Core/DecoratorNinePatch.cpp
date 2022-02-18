@@ -185,7 +185,7 @@ void DecoratorNinePatch::RenderElement(Element* element, DecoratorDataHandle ele
 
 
 
-DecoratorNinePatchInstancer::DecoratorNinePatchInstancer()
+DecoratorNinePatchInstancer::DecoratorNinePatchInstancer() : DecoratorInstancer(DecoratorClasses::Background)
 {
 	sprite_outer_id = RegisterProperty("outer", "").AddParser("string").GetId();
 	sprite_inner_id = RegisterProperty("inner", "").AddParser("string").GetId();

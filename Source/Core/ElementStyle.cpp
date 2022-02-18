@@ -869,17 +869,24 @@ PropertyIdSet ElementStyle::ComputeValues(Style::ComputedValues& values, const S
 			values.transform_origin_z(ComputeLength(p, font_size, document_font_size, dp_ratio, vp_dimensions));
 			break;
 
+		case PropertyId::FlexBasis:
+			values.flex_basis(ComputeLengthPercentageAuto(p, font_size, document_font_size, dp_ratio, vp_dimensions));
+			break;
+
 		case PropertyId::Decorator:
 			values.has_decorator(p->unit == Property::DECORATOR);
 			break;
 		case PropertyId::FontEffect:
 			values.has_font_effect((p->unit == Property::FONTEFFECT));
 			break;
-		case PropertyId::FlexBasis:
-			values.flex_basis(ComputeLengthPercentageAuto(p, font_size, document_font_size, dp_ratio, vp_dimensions));
+		case PropertyId::Filter:
+			values.has_filter(p->unit == Property::DECORATOR);
+			break;
+		case PropertyId::BackdropFilter:
+			values.has_backdrop_filter(p->unit == Property::DECORATOR);
 			break;
 		case PropertyId::BoxShadow:
-			values.has_box_shadow(p->value.GetType() == Variant::SHADOWLIST && !p->value.GetReference<ShadowList>().empty());
+			values.has_box_shadow(p->unit == Property::SHADOWLIST);
 			break;
 
 		// Fetched from element's properties.
@@ -896,6 +903,7 @@ PropertyIdSet ElementStyle::ComputeValues(Style::ComputedValues& values, const S
 		case PropertyId::FlexWrap:
 		case PropertyId::JustifyContent:
 			break;
+
 		// Unhandled properties. Must be manually retrieved with 'GetProperty()'.
 		case PropertyId::FillImage:
 		case PropertyId::CaretColor:

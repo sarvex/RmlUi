@@ -56,53 +56,68 @@ void ElementDecoration::InstanceDecorators()
 }
 
 // Releases existing decorators and loads all decorators required by the element's definition.
-bool ElementDecoration::ReloadDecorators()
+void ElementDecoration::ReloadDecorators()
 {
 	RMLUI_ZoneScopedC(0xB22222);
 	ReleaseDecorators();
 
-	if (!element->GetComputedValues().has_decorator())
-		return true;
+	num_backgrounds = 0;
+	num_filters = 0;
+	num_backdrop_filters = 0;
 
-	const Property* property = element->GetLocalProperty(PropertyId::Decorator);
-	if (!property || property->unit != Property::DECORATOR)
-		return false;
+	const ComputedValues& computed = element->GetComputedValues();
 
-	DecoratorsPtr decorators_ptr = property->Get<DecoratorsPtr>();
-	if (!decorators_ptr)
-		return false;
+	if (!computed.has_decorator() && !computed.has_filter() && !computed.has_backdrop_filter())
+		return;
 
-	const StyleSheet* style_sheet = element->GetStyleSheet();
-	if (!style_sheet)
-		return false;
-
-	PropertySource document_source("", 0, "");
-	const PropertySource* source = property->source.get();
-
-	if (!source)
+	for (const PropertyId id : {PropertyId::Decorator, PropertyId::Filter, PropertyId::BackdropFilter})
 	{
-		if (ElementDocument* document = element->GetOwnerDocument())
+		const Property* property = element->GetLocalProperty(id);
+		if (!property || property->unit != Property::DECORATOR)
+			continue;
+
+		DecoratorsPtr decorators_ptr = property->Get<DecoratorsPtr>();
+		if (!decorators_ptr)
+			continue;
+
+		const StyleSheet* style_sheet = element->GetStyleSheet();
+		if (!style_sheet)
+			return;
+
+		PropertySource document_source("", 0, "");
+		const PropertySource* source = property->source.get();
+
+		if (!source)
 		{
-			document_source.path = document->GetSourceURL();
-			source = &document_source;
+			if (ElementDocument* document = element->GetOwnerDocument())
+			{
+				document_source.path = document->GetSourceURL();
+				source = &document_source;
+			}
+		}
+
+		const auto& decorator_list = style_sheet->InstanceDecorators(*decorators_ptr, source);
+
+		const int list_size = (int)decorator_list.size();
+		if (id == PropertyId::Decorator)
+			num_backgrounds = list_size;
+		else if (id == PropertyId::Filter)
+			num_filters = list_size;
+		else if (id == PropertyId::BackdropFilter)
+			num_backdrop_filters = list_size;
+
+		for (const SharedPtr<const Decorator>& decorator : decorator_list)
+		{
+			if (decorator)
+			{
+				DecoratorHandle decorator_handle;
+				decorator_handle.decorator_data = 0;
+				decorator_handle.decorator = decorator;
+
+				decorators.push_back(std::move(decorator_handle));
+			}
 		}
 	}
-
-	const auto& decorator_list = style_sheet->InstanceDecorators(*decorators_ptr, source);
-
-	for (const SharedPtr<const Decorator>& decorator : decorator_list)
-	{
-		if (decorator)
-		{
-			DecoratorHandle decorator_handle;
-			decorator_handle.decorator_data = 0;
-			decorator_handle.decorator = decorator;
-
-			decorators.push_back(std::move(decorator_handle));
-		}
-	}
-
-	return true;
 }
 
 // Loads a single decorator and adds it to the list of loaded decorators for this element.
@@ -140,12 +155,77 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 	InstanceDecorators();
 	ReloadDecoratorsData();
 
-	// Render the decorators attached to this element in its current state.
-	// Render from back to front for correct render order.
-	for (int i = (int)decorators.size() - 1; i >= 0; i--)
+	if (!num_backgrounds || !num_filters || !num_backdrop_filters)
+		return;
+
+	if (num_backgrounds > 0)
 	{
-		DecoratorHandle& decorator = decorators[i];
-		decorator.decorator->RenderElement(element, decorator.decorator_data, render_stage);
+		if (render_stage == RenderStage::Decoration)
+		{
+			// Render the decorators attached to this element in its current state.
+			// Render from back to front for correct render order.
+			for (int i = num_backgrounds - 1; i >= 0; i--)
+			{
+				DecoratorHandle& decorator = decorators[i];
+				decorator.decorator->RenderElement(element, decorator.decorator_data, render_stage);
+			}
+		}
+	}
+
+	RenderInterface* render_interface = element->GetRenderInterface();
+	if (!render_interface)
+		return;
+
+	if (num_filters > 0)
+	{
+		if (render_stage == RenderStage::Enter)
+		{
+			render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
+		}
+		else if (render_stage == RenderStage::Exit)
+		{
+			render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter);
+
+			// TODO: clipping w/extents (or let decorators do it for us?)
+			//ElementUtilities::ForceClippingRegion(element, Box::BORDER, Vector2f(-radius), Vector2f(2.f * radius));
+
+			const int i0 = num_backgrounds;
+			for (int i = i0 + num_filters - 1; i >= i0; i--)
+			{
+				DecoratorHandle& decorator = decorators[i];
+				decorator.decorator->RenderElement(element, decorator.decorator_data, render_stage);
+			}
+
+			//render_interface->RenderEffect(CompiledEffectHandle(element_data), RenderSource::Stack, RenderTarget::StackBelow);
+
+			render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
+			render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
+
+			//Rml::ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
+		}
+	}
+
+	if (num_backdrop_filters > 0)
+	{
+		if (render_stage == RenderStage::BeforeDecoration)
+		{
+			render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter);
+			//ElementUtilities::ForceClippingRegion(element, Box::BORDER, Vector2f(-radius), Vector2f(2.f * radius));
+
+			const int i0 = num_backgrounds + num_filters;
+			for (int i = i0 + num_backdrop_filters - 1; i >= i0; i--)
+			{
+				DecoratorHandle& decorator = decorators[i];
+				decorator.decorator->RenderElement(element, decorator.decorator_data, render_stage);
+			}
+
+
+			//render_interface->RenderEffect(CompiledEffectHandle(element_data), RenderSource::Stack, RenderTarget::Stack);
+
+			render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
+
+			//Rml::ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
+		}
 	}
 }
 

@@ -605,11 +605,14 @@ progress {
 	font-size: 1.8em;
 }
 
+.basic_blur {
+	filter: blur(5px);
+}
 #gradient {
 	decorator: linear-gradient(10deg, #c33, #3c3 30%, #33c);
 }
 #dropshadow {
-	decorator: drop-shadow(#f339 10px 20px 5px);
+	filter: drop-shadow(#f339 10px 20px 5px);
 }
 #boxshadow {
 	box-shadow: #fc39 40px 30px 5px 20px;
@@ -628,7 +631,7 @@ progress {
 	<div class="box" id="boxshadow">Helluw!</div>
 	<p>Have fun fiddling about in this demo.</p>
 	<p>Press 'F8' to open up the debugger.</p>
-	<p style="decorator: blur(5px)">Press 'F8' to open up the debugger.</p>
+	<p class="basic_blur">Press 'F8' to open up the debugger.</p>
 	<p class="title" style="margin-top: 1em;">🎉</p>
 </panel>
 <tab>Decorators</tab>

@@ -90,7 +90,7 @@ void DecoratorBasicFilter::RenderElement(Element* element, DecoratorDataHandle e
 	}
 }
 
-DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer()
+DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)
 {
 	ids.value = RegisterProperty("value", "1").AddParser("number_percent").GetId();
 	RegisterShorthand("decorator", "value", ShorthandType::FallThrough);

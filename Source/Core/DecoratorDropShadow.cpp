@@ -113,7 +113,7 @@ void DecoratorDropShadow::RenderElement(Element* element, DecoratorDataHandle el
 	}
 }
 
-DecoratorDropShadowInstancer::DecoratorDropShadowInstancer()
+DecoratorDropShadowInstancer::DecoratorDropShadowInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)
 {
 	ids.color = RegisterProperty("color", "black").AddParser("color").GetId();
 	ids.offset_x = RegisterProperty("offset-x", "0px").AddParser("length").GetId();

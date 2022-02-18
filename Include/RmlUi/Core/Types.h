@@ -163,6 +163,20 @@ inline bool operator!=(const Shadow& a, const Shadow& b)
 {
 	return !(a == b);
 }
+enum class DecoratorClasses {
+	Invalid = 0,
+	Background = 1,
+	Filter = 2,
+	BackdropFilter = 4,
+};
+inline DecoratorClasses operator|(DecoratorClasses a, DecoratorClasses b)
+{
+	return DecoratorClasses(int(a) | int(b));
+}
+inline DecoratorClasses operator&(DecoratorClasses a, DecoratorClasses b)
+{
+	return DecoratorClasses(int(a) & int(b));
+}
 
 // Additional smart pointers
 using TransformPtr = SharedPtr< Transform >;

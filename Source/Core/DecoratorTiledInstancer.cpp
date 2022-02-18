@@ -32,7 +32,7 @@
 
 namespace Rml {
 
-DecoratorTiledInstancer::DecoratorTiledInstancer(size_t num_tiles)
+DecoratorTiledInstancer::DecoratorTiledInstancer(size_t num_tiles) : DecoratorInstancer(DecoratorClasses::Background)
 {
 	tile_property_ids.reserve(num_tiles);
 }

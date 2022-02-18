@@ -63,7 +63,7 @@ public:
 
 private:
 	// Releases existing decorators and loads all decorators required by the element's definition.
-	bool ReloadDecorators();
+	void ReloadDecorators();
 	// Releases existing element data of decorators, and regenerates it.
 	void ReloadDecoratorsData();
 	// Releases all existing decorators and frees their data.
@@ -82,6 +82,9 @@ private:
 
 	// The list of every decorator used by this element in every class.
 	DecoratorHandleList decorators;
+	int num_backgrounds = 0;
+	int num_filters = 0;
+	int num_backdrop_filters = 0;
 
 	// If set, a full reload is necessary.
 	bool decorators_dirty = false;
