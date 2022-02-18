@@ -153,7 +153,9 @@ namespace Style {
 
 			flex_basis_type(LengthPercentageAuto::Auto), row_gap_type(LengthPercentage::Length), column_gap_type(LengthPercentage::Length),
 
-			vertical_align_type(VerticalAlign::Baseline), drag(Drag::None), tab_index(TabIndex::None), has_box_shadow(false)
+			vertical_align_type(VerticalAlign::Baseline), drag(Drag::None), tab_index(TabIndex::None),
+			
+			has_box_shadow(false), has_filter(false), has_backdrop_filter(false)
 		{}
 
 		LengthPercentage::Type min_width_type : 1, max_width_type : 1;
@@ -168,7 +170,10 @@ namespace Style {
 		VerticalAlign::Type vertical_align_type : 4;
 		Drag drag : 3;
 		TabIndex tab_index : 1;
+
 		bool has_box_shadow : 1;
+		bool has_filter : 1;
+		bool has_backdrop_filter : 1;
 
 		Clip clip;
 
@@ -288,6 +293,8 @@ namespace Style {
 		LengthPercentage  column_gap()                 const { return LengthPercentage(rare.column_gap_type, rare.column_gap); }
 		float             scrollbar_margin()           const { return rare.scrollbar_margin; }
 		bool              has_box_shadow()             const { return rare.has_box_shadow; }
+		bool              has_filter()                 const { return rare.has_filter; }
+		bool              has_backdrop_filter()        const { return rare.has_backdrop_filter; }
 		
 		// -- Assignment --
 		// Common
@@ -365,6 +372,8 @@ namespace Style {
 		void image_color               (Colourb value)           { rare.image_color                = value; }
 		void scrollbar_margin          (float value)             { rare.scrollbar_margin           = value; }
 		void has_box_shadow            (bool value)              { rare.has_box_shadow             = value; }
+		void has_filter                (bool value)              { rare.has_filter                 = value; }
+		void has_backdrop_filter       (bool value)              { rare.has_backdrop_filter        = value; }
 
 		// clang-format on
 

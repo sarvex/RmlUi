@@ -426,6 +426,9 @@ void StyleSheetSpecification::RegisterDefaultProperties()
 
 	RegisterProperty(PropertyId::Decorator, "decorator", "", false, false).AddParser("decorator");
 	RegisterProperty(PropertyId::FontEffect, "font-effect", "", true, false).AddParser("font_effect");
+	
+	RegisterProperty(PropertyId::Filter, "filter", "", false, false).AddParser("decorator", "filter");
+	RegisterProperty(PropertyId::BackdropFilter, "backdrop-filter", "", false, false).AddParser("decorator", "backdrop-filter");
 
 	RegisterProperty(PropertyId::BoxShadow, "box-shadow", "none", false, false).AddParser("shadow");
 

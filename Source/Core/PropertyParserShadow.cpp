@@ -41,8 +41,8 @@ bool PropertyParserShadow::ParseValue(Property& property, const String& value, c
 {
 	if (value.empty() || value == "none")
 	{
-		property.unit = Property::SHADOWLIST;
-		property.value = Variant(ShadowList());
+		property.value = Variant();
+		property.unit = Property::UNKNOWN;
 		return true;
 	}
 

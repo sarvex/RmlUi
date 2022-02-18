@@ -1855,6 +1855,12 @@ void Element::OnPropertyChange(const PropertyIdSet& changed_properties)
 		meta->decoration.DirtyDecorators();
 	}
 
+	if (changed_properties.Contains(PropertyId::Filter) || changed_properties.Contains(PropertyId::BackdropFilter))
+	{
+		meta->decoration.DirtyDecorators();
+		bool should_force_local_stacking_context = (meta->computed_values.has_filter() || meta->computed_values.has_backdrop_filter()); // TODO
+	}
+
 	// Dirty the decoration data when its visual looks may have changed.
 	if (border_radius_changed ||
 		changed_properties.Contains(PropertyId::Opacity) ||
