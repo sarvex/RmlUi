@@ -308,6 +308,66 @@ void ElementUtilities::ApplyActiveClipRegion(Context* context, RenderInterface* 
 	}
 }
 
+bool ElementUtilities::GetElementRegionInWindowSpace(Vector2f& out_offset, Vector2f& out_size, Element* element, Box::Area area,
+	Vector2f expand_top_left, Vector2f expand_bottom_right)
+{
+	RMLUI_ASSERT(element);
+	const Vector2f element_origin = element->GetAbsoluteOffset(area);
+	const Vector2f element_size = element->GetBox().GetSize(area);
+
+	const TransformState* transform_state = element->GetTransformState();
+	const Matrix4f* transform = (transform_state ? transform_state->GetTransform() : nullptr);
+
+	// Early exit in the common case of no transform.
+	if (!transform)
+	{
+		out_offset = element_origin - expand_top_left;
+		out_size = element_size + expand_top_left + expand_bottom_right;
+		Math::ExpandToPixelGrid(out_offset, out_size);
+		return true;
+	}
+
+	Context* context = element->GetContext();
+	if (!context)
+		return false;
+
+	RenderInterface* render_interface = context->GetRenderInterface();
+	if (!render_interface)
+		return false;
+
+	constexpr int num_corners = 4;
+	Vector2f corners[num_corners] = {element_origin, element_origin + Vector2f(element_size.x, 0), element_origin + element_size,
+		element_origin + Vector2f(0, element_size.y)};
+
+	// Transform and project corners to window coordinates.
+	const Vector2f window_size = Vector2f(context->GetDimensions());
+	const Matrix4f project = Matrix4f::ProjectOrtho(0.f, window_size.x, 0.f, window_size.y, -1.f, 1.f);
+	const Matrix4f project_transform = project * (*transform);
+
+	for (int i = 0; i < num_corners; i++)
+	{
+		const Vector4f pos_transformed = project_transform * Vector4f(corners[i].x, corners[i].y, 0, 1);
+		const Vector2f pos_ndc = Vector2f(pos_transformed.x, pos_transformed.y) / pos_transformed.w;
+		const Vector2f pos_viewport = 0.5f * window_size * (pos_ndc + Vector2f(1));
+		corners[i] = pos_viewport;
+	}
+
+	// Find the rectangle covering the projected corners.
+	Vector2f pos_min = corners[0];
+	Vector2f pos_max = corners[0];
+	for (int i = 1; i < num_corners; i++)
+	{
+		pos_min = Math::Min(pos_min, corners[i]);
+		pos_max = Math::Max(pos_max, corners[i]);
+	}
+
+	out_offset = pos_min - expand_top_left;
+	out_size = pos_max + expand_bottom_right - out_offset;
+	Math::ExpandToPixelGrid(out_offset, out_size);
+
+	return true;
+}
+
 // Formats the contents of an element.
 void ElementUtilities::FormatElement(Element* element, Vector2f containing_block)
 {
