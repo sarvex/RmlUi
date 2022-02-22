@@ -65,49 +65,19 @@ void DecoratorBlur::ReleaseElementData(DecoratorDataHandle handle) const
 	render_interface->ReleaseCompiledEffect(CompiledEffectHandle(handle));
 }
 
-void DecoratorBlur::RenderElement(Element* /*element*/, DecoratorDataHandle /*element_data*/) const
+void DecoratorBlur::RenderElement(Element* element, DecoratorDataHandle element_data) const
 {
-	RMLUI_ERROR;
-}
-
-void DecoratorBlur::RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const
-{
-	if (render_stage != RenderStage::Enter && render_stage != RenderStage::Exit && render_stage != RenderStage::BeforeDecoration)
-		return;
-
 	RenderInterface* render_interface = element->GetRenderInterface();
 	if (!render_interface)
 		return;
 
-	constexpr bool is_backdrop = false; // TODO
+	render_interface->RenderEffect(CompiledEffectHandle(element_data));
+}
 
-	if (is_backdrop)
-	{
-		if (render_stage == RenderStage::BeforeDecoration)
-		{
-			ElementUtilities::ForceClippingRegion(element, Box::BORDER, Vector2f(-radius), Vector2f(2.f * radius));
-
-			render_interface->RenderEffect(CompiledEffectHandle(element_data), RenderSource::Stack, RenderTarget::Stack);
-
-			Rml::ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
-		}
-	}
-	else
-	{
-		if (render_stage == RenderStage::Enter)
-		{
-			render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
-		}
-		else if (render_stage == RenderStage::Exit)
-		{
-			ElementUtilities::ForceClippingRegion(element, Box::BORDER, Vector2f(-radius), Vector2f(2.f * radius));
-
-			render_interface->RenderEffect(CompiledEffectHandle(element_data), RenderSource::Stack, RenderTarget::StackBelow);
-			render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
-
-			Rml::ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
-		}
-	}
+void DecoratorBlur::GetClipExtension(Vector2f& top_left, Vector2f& bottom_right) const
+{
+	top_left = Vector2f(radius);
+	bottom_right = Vector2f(radius);
 }
 
 DecoratorBlurInstancer::DecoratorBlurInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)

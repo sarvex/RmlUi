@@ -128,7 +128,7 @@ DecoratorGradientInstancer::DecoratorGradientInstancer() : DecoratorInstancer(De
 
 DecoratorGradientInstancer::~DecoratorGradientInstancer() {}
 
-SharedPtr<Decorator> DecoratorGradientInstancer::InstanceDecorator(const String& name, const PropertyDictionary& properties_,
+SharedPtr<Decorator> DecoratorGradientInstancer::InstanceDecorator(const String& /*name*/, const PropertyDictionary& properties_,
 	const DecoratorInstancerInterface& /*interface*/)
 {
 	DecoratorGradient::Direction dir = (DecoratorGradient::Direction)properties_.GetProperty(ids.direction)->Get<int>();
@@ -271,11 +271,18 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 	}
 #endif
 
-	CompiledEffectHandle handle = render_interface->CompileEffect("linear-gradient",
+	ElementData* element_data = new ElementData{};
+
+	element_data->effect = render_interface->CompileEffect("linear-gradient",
 		Dictionary{{"angle", Variant(angle)}, {"p0", Variant(gradient_points.p0)}, {"p1", Variant(gradient_points.p1)},
 			{"length", Variant(gradient_points.length)}, {"color_stop_list", Variant(std::move(stops))}});
 
-	return DecoratorDataHandle(handle);
+	Vertex vertices[4];
+	int indices[6];
+	GeometryUtilities::GenerateQuad(vertices, indices, Vector2f(), dimensions, Colourb(255), Vector2f(), dimensions);
+	element_data->geometry = render_interface->CompileGeometry(vertices, 4, indices, 6, TextureHandle{});
+
+	return reinterpret_cast<DecoratorDataHandle>(element_data);
 }
 
 void DecoratorLinearGradient::ReleaseElementData(DecoratorDataHandle handle) const
@@ -285,24 +292,21 @@ void DecoratorLinearGradient::ReleaseElementData(DecoratorDataHandle handle) con
 	RenderInterface* render_interface = ::Rml::GetRenderInterface();
 	if (!render_interface)
 		return;
-	render_interface->ReleaseCompiledEffect(CompiledEffectHandle(handle));
+
+	ElementData* element_data = reinterpret_cast<ElementData*>(handle);
+	render_interface->ReleaseCompiledGeometry(element_data->geometry);
+	render_interface->ReleaseCompiledEffect(element_data->effect);
+	delete element_data;
 }
 
-void DecoratorLinearGradient::RenderElement(Element* /*element*/, DecoratorDataHandle /*element_data*/) const
-{
-	RMLUI_ERROR;
-}
-
-void DecoratorLinearGradient::RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const
+void DecoratorLinearGradient::RenderElement(Element* element, DecoratorDataHandle handle) const
 {
 	RenderInterface* render_interface = element->GetRenderInterface();
 	if (!render_interface)
 		return;
 
-	if (render_stage == RenderStage::Decoration)
-	{
-		render_interface->RenderEffect(CompiledEffectHandle(element_data), RenderSource::Stack, RenderTarget::Stack);
-	}
+	ElementData* element_data = reinterpret_cast<ElementData*>(handle);
+	render_interface->RenderEffect(element_data->effect, element_data->geometry, element->GetAbsoluteOffset(Box::PADDING));
 }
 
 DecoratorLinearGradientInstancer::DecoratorLinearGradientInstancer() : DecoratorInstancer(DecoratorClasses::Background)

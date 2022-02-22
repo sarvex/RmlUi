@@ -47,11 +47,11 @@ public:
 
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
 
-	void RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const override;
+	void GetClipExtension(Vector2f& top_left, Vector2f& bottom_right) const override;
 
 private:
 	Colourb color;
-	Vector2f offset, clip_offset, clip_expand_size;
+	Vector2f offset, expand_top_left, expand_bottom_right;
 	float sigma = 0;
 };
 

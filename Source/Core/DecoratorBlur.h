@@ -47,7 +47,7 @@ public:
 
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
 
-	void RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const override;
+	void GetClipExtension(Vector2f& top_left, Vector2f& bottom_right) const override;
 
 private:
 	float radius = 0.f;

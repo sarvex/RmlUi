@@ -266,7 +266,8 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 				render_interface->StencilCommand(StencilCommand::WriteDisable);
 
 				render_interface->StencilCommand(StencilCommand::TestEqual, 0, mask_inset);
-				render_interface->RenderEffect(fullscreen_color, RenderSource::Stack, RenderTarget::Stack);
+				//(render_interface->RenderEffect(fullscreen_color, RenderSource::Stack, RenderTarget::Stack);
+				render_interface->RenderEffect(fullscreen_color);
 
 				render_interface->StencilCommand(StencilCommand::Clear, 0, mask_inset);
 
@@ -274,7 +275,8 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 				{
 					render_interface->EnableScissorRegion(false); // TODO: Scissoring
 					render_interface->StencilCommand(StencilCommand::TestEqual, mask_padding, mask_padding);
-					render_interface->RenderEffect(blur, RenderSource::Stack, RenderTarget::StackBelow);
+					//render_interface->RenderEffect(blur, RenderSource::Stack, RenderTarget::StackBelow);
+					render_interface->RenderEffect(blur);
 					//render_interface->EnableScissorRegion(true);
 				}
 			}
@@ -285,7 +287,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 				if (has_blur)
 				{
 					render_interface->StencilCommand(StencilCommand::TestEqual, 0);
-					render_interface->RenderEffect(blur, RenderSource::Stack, RenderTarget::StackBelow);
+					render_interface->RenderEffect(blur);
 				}
 			}
 

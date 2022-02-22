@@ -47,8 +47,6 @@ public:
 
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
 
-	void RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const override;
-
 private:
 	String name;
 	float value = 0.f;

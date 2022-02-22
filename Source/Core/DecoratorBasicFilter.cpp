@@ -66,28 +66,13 @@ void DecoratorBasicFilter::ReleaseElementData(DecoratorDataHandle handle) const
 	render_interface->ReleaseCompiledEffect(CompiledEffectHandle(handle));
 }
 
-void DecoratorBasicFilter::RenderElement(Element* /*element*/, DecoratorDataHandle /*element_data*/) const
-{
-	RMLUI_ERROR;
-}
-
-void DecoratorBasicFilter::RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const
+void DecoratorBasicFilter::RenderElement(Element* element, DecoratorDataHandle element_data) const
 {
 	RenderInterface* render_interface = element->GetRenderInterface();
 	if (!render_interface)
 		return;
 
-	if (render_stage == RenderStage::Enter)
-	{
-		render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
-	}
-	else if (render_stage == RenderStage::Exit)
-	{
-		const Vector2f offset;
-		const Vector2f dimensions;
-		render_interface->RenderEffect(CompiledEffectHandle(element_data), RenderSource::Stack, RenderTarget::StackBelow);
-		render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
-	}
+	render_interface->RenderEffect(CompiledEffectHandle(element_data));
 }
 
 DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)
