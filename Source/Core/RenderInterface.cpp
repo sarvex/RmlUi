@@ -61,7 +61,7 @@ void RenderInterface::RenderCompiledGeometry(CompiledGeometryHandle /*geometry*/
 void RenderInterface::ReleaseCompiledGeometry(CompiledGeometryHandle /*geometry*/)
 {}
 
-TextureHandle RenderInterface::ExecuteRenderCommand(RenderCommand command, Vector2f offset, Vector2f dimensions)
+TextureHandle RenderInterface::ExecuteRenderCommand(RenderCommand /*command*/, Vector2f /*offset*/, Vector2f /*dimensions*/)
 {
 	return TextureHandle();
 }
@@ -71,12 +71,17 @@ CompiledEffectHandle RenderInterface::CompileEffect(const String& /*name*/, cons
 	return CompiledEffectHandle(0);
 }
 
-TextureHandle RenderInterface::RenderEffect(CompiledEffectHandle effect, RenderSource source, RenderTarget target)
+TextureHandle RenderInterface::RenderEffect(CompiledEffectHandle /*effect*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/)
 {
 	return TextureHandle{};
 }
 
 void RenderInterface::ReleaseCompiledEffect(CompiledEffectHandle /*effect*/) {}
+
+
+/// Called by RmlUi when it wants to setup the stencil buffer.
+
+void RenderInterface::StencilCommand(::Rml::StencilCommand /*command*/, int /*value*/, int /*mask*/) {}
 
 // Called by RmlUi when a texture is required by the library.
 bool RenderInterface::LoadTexture(TextureHandle& /*texture_handle*/, Vector2i& /*texture_dimensions*/, const String& /*source*/)

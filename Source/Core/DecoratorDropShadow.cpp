@@ -46,8 +46,8 @@ bool DecoratorDropShadow::Initialise(Colourb in_color, Vector2f in_offset, float
 
 	// Position and expand the clipping region to cover both the native element *and* its offset shadow w/blur.
 	const float blur_radius = 2.f * sigma;
-	clip_offset = Math::Min(offset, Vector2f(0.f)) - Vector2f(blur_radius);
-	clip_expand_size = Math::Max(offset, Vector2f(0.f)) - clip_offset + Vector2f(2.f * blur_radius);
+	expand_top_left = Math::Max(-offset, Vector2f(0.f)) + Vector2f(blur_radius);
+	expand_bottom_right = Math::Max(offset, Vector2f(0.f)) + Vector2f(blur_radius);
 
 	return sigma >= 0.f;
 }
@@ -74,43 +74,19 @@ void DecoratorDropShadow::ReleaseElementData(DecoratorDataHandle handle) const
 	render_interface->ReleaseCompiledEffect(CompiledEffectHandle(handle));
 }
 
-void DecoratorDropShadow::RenderElement(Element* /*element*/, DecoratorDataHandle /*element_data*/) const
-{
-	RMLUI_ERROR;
-}
-
-void DecoratorDropShadow::RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const
+void DecoratorDropShadow::RenderElement(Element* element, DecoratorDataHandle element_data) const
 {
 	RenderInterface* render_interface = element->GetRenderInterface();
 	if (!render_interface)
 		return;
 
-	constexpr bool is_backdrop = false; // TODO
+	render_interface->RenderEffect(CompiledEffectHandle(element_data));
+}
 
-	if (is_backdrop)
-	{
-		if (render_stage == RenderStage::BeforeDecoration)
-		{
-			ElementUtilities::ForceClippingRegion(element, Box::BORDER, clip_offset, clip_expand_size);
-			render_interface->RenderEffect(CompiledEffectHandle(element_data), RenderSource::Stack, RenderTarget::Stack);
-			ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
-		}
-	}
-	else
-	{
-		if (render_stage == RenderStage::Enter)
-		{
-			render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
-		}
-		else if (render_stage == RenderStage::Exit)
-		{
-			ElementUtilities::ForceClippingRegion(element, Box::BORDER, clip_offset, clip_expand_size);
-			render_interface->RenderEffect(CompiledEffectHandle(element_data), RenderSource::Stack, RenderTarget::StackBelow);
-			ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
-
-			render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
-		}
-	}
+void DecoratorDropShadow::GetClipExtension(Vector2f& top_left, Vector2f& bottom_right) const
+{
+	top_left = expand_top_left;
+	bottom_right = expand_bottom_right;
 }
 
 DecoratorDropShadowInstancer::DecoratorDropShadowInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)

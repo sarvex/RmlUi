@@ -42,10 +42,7 @@ class Context;
 // TODO: Move
 using CompiledEffectHandle = uintptr_t;
 enum class StencilCommand { Clear, Write, WriteDisable, TestEqual, TestDisable };
-
 enum class RenderCommand { None, StackPush, StackPop, StackToTexture, StackToFilter, FilterToStack };
-enum class RenderTarget { None, Stack, StackBelow, Texture }; // TODO: Remove and replace with render commands
-enum class RenderSource { None, Stack, Filter }; // TODO: Can we remove this, always assume filter?
 
 /**
 	The abstract base class for application-specific rendering implementation. Your application must provide a concrete
@@ -89,11 +86,11 @@ public:
 	virtual void ReleaseCompiledGeometry(CompiledGeometryHandle geometry);
 
 	
-	virtual TextureHandle ExecuteRenderCommand(RenderCommand command, Vector2f offset = Vector2f(), Vector2f dimensions = Vector2f());
+	virtual TextureHandle ExecuteRenderCommand(RenderCommand command, Vector2f offset = {}, Vector2f dimensions = {});
 	/// Called by RmlUi when...
 	virtual CompiledEffectHandle CompileEffect(const String& name, const Dictionary& parameters);
 	/// Called by RmlUi when...
-	virtual TextureHandle RenderEffect(CompiledEffectHandle effect, RenderSource source, RenderTarget target);
+	virtual TextureHandle RenderEffect(CompiledEffectHandle effect, CompiledGeometryHandle geometry = {}, Vector2f translation = {});
 	/// Called by RmlUi when...
 	virtual void ReleaseCompiledEffect(CompiledEffectHandle effect);
 
@@ -108,7 +105,7 @@ public:
 	/// @param[in] height The height of the scissored region. All pixels to below (y + height) should be clipped.
 	virtual void SetScissorRegion(int x, int y, int width, int height) = 0;
 	/// Called by RmlUi when it wants to setup the stencil buffer.
-	virtual void StencilCommand(StencilCommand command, int value = 0, int mask = 0xff) {}
+	virtual void StencilCommand(StencilCommand command, int value = 0, int mask = 0xff);
 
 	/// Called by RmlUi when a texture is required by the library.
 	/// @param[out] texture_handle The handle to write the texture handle for the loaded texture to.

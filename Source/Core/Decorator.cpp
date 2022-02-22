@@ -42,11 +42,7 @@ Decorator::~Decorator()
 {
 }
 
-void Decorator::RenderElement(Element* element, DecoratorDataHandle element_data, RenderStage render_stage) const
-{
-	if (render_stage == RenderStage::Decoration)
-		RenderElement(element, element_data);
-}
+void Decorator::GetClipExtension(Vector2f& /*top_left*/, Vector2f& /*bottom_right*/) const {}
 
 int Decorator::AddTexture(const Texture& texture)
 {
