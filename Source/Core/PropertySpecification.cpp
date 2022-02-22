@@ -361,9 +361,6 @@ bool PropertySpecification::ParseShorthandDeclaration(PropertyDictionary& dictio
 	}
 	else if (shorthand_definition->type == ShorthandType::RecursiveCommaSeparated)
 	{
-		if (property_values.size() > 0 && property_values[0] == "10deg,")
-			int x = 0;
-
 		StringList subvalues;
 		StringUtilities::ExpandString(subvalues, property_value);
 
