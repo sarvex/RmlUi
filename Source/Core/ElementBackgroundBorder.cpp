@@ -248,14 +248,13 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 					inset ? nullptr : shadow_colors);
 			}
 
-			const bool has_blur = (shadow.blur_radius > 0.5f) || true;
 			CompiledEffectHandle fullscreen_color = render_interface->CompileEffect("color", Dictionary{{"color", Variant(shadow.color)}});
 			CompiledEffectHandle blur = {};
-			if (has_blur)
+			if (shadow.blur_radius > 0.5f)
+			{
 				blur = render_interface->CompileEffect("blur", Dictionary{{"radius", Variant(shadow.blur_radius)}});
-
-
-			render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
+				render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
+			}
 
 			render_interface->EnableScissorRegion(false);
 
@@ -265,37 +264,47 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 				shadow_geometry.Render(shadow.offset + element_offset_in_texture);
 				render_interface->StencilCommand(StencilCommand::WriteDisable);
 
-				render_interface->StencilCommand(StencilCommand::TestEqual, 0, mask_inset);
-				//(render_interface->RenderEffect(fullscreen_color, RenderSource::Stack, RenderTarget::Stack);
+				if (blur)
+					render_interface->StencilCommand(StencilCommand::TestEqual, 0, mask_inset);
+				else
+					render_interface->StencilCommand(StencilCommand::TestEqual, mask_padding);
 				render_interface->RenderEffect(fullscreen_color);
 
 				render_interface->StencilCommand(StencilCommand::Clear, 0, mask_inset);
 
-				if (has_blur)
+				if (blur)
 				{
-					render_interface->EnableScissorRegion(false); // TODO: Scissoring
 					render_interface->StencilCommand(StencilCommand::TestEqual, mask_padding, mask_padding);
-					//render_interface->RenderEffect(blur, RenderSource::Stack, RenderTarget::StackBelow);
+					render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter);
+					render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
 					render_interface->RenderEffect(blur);
-					//render_interface->EnableScissorRegion(true);
+					render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
 				}
 			}
 			else
 			{
+				if (blur)
+					render_interface->StencilCommand(StencilCommand::TestDisable);
+				else
+					render_interface->StencilCommand(StencilCommand::TestEqual, 0);
+
 				shadow_geometry.Render(shadow.offset + element_offset_in_texture);
 
-				if (has_blur)
+				if (blur)
 				{
 					render_interface->StencilCommand(StencilCommand::TestEqual, 0);
+					render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter);
+					render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
 					render_interface->RenderEffect(blur);
+					render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
 				}
 			}
 
-			render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
 			render_interface->StencilCommand(StencilCommand::TestDisable, 0);
 
-			if (has_blur)
+			if (blur)
 				render_interface->ReleaseCompiledEffect(blur);
+
 			render_interface->ReleaseCompiledEffect(fullscreen_color);
 		}
 
