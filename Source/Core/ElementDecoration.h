@@ -83,8 +83,8 @@ private:
 	// The list of every decorator used by this element in every class.
 	DecoratorHandleList decorators;
 	int num_backgrounds = 0;
-	int num_filters = 0;
 	int num_backdrop_filters = 0;
+	int num_filters = 0;
 
 	// If set, a full reload is necessary.
 	bool decorators_dirty = false;

@@ -69,7 +69,7 @@ void ElementDecoration::ReloadDecorators()
 	if (!computed.has_decorator() && !computed.has_filter() && !computed.has_backdrop_filter())
 		return;
 
-	for (const PropertyId id : {PropertyId::Decorator, PropertyId::Filter, PropertyId::BackdropFilter})
+	for (const PropertyId id : {PropertyId::Decorator, PropertyId::BackdropFilter, PropertyId::Filter})
 	{
 		const Property* property = element->GetLocalProperty(id);
 		if (!property || property->unit != Property::DECORATOR)
@@ -156,6 +156,8 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 	if (!num_backgrounds && !num_filters && !num_backdrop_filters)
 		return;
 
+	RMLUI_ASSERT(num_backgrounds + num_filters + num_backdrop_filters == (int)decorators.size());
+
 	if (num_backgrounds > 0)
 	{
 		if (render_stage == RenderStage::Decoration)
@@ -174,18 +176,41 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 	if (!render_interface)
 		return;
 
+	if (num_backdrop_filters > 0)
+	{
+		if (render_stage == RenderStage::Enter)
+		{
+			ElementUtilities::ApplyTransform(element);
+
+			Vector2f filter_origin, filter_size;
+			ElementUtilities::GetElementRegionInWindowSpace(filter_origin, filter_size, element, Box::BORDER);
+			render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter, filter_origin, filter_size);
+
+			const int i0 = num_backgrounds;
+			for (int i = i0; i < i0 + num_backdrop_filters; i++)
+			{
+				DecoratorHandle& decorator = decorators[i];
+				decorator.decorator->RenderElement(element, decorator.decorator_data);
+			}
+
+			ElementUtilities::ForceClippingRegion(element, Box::BORDER);
+			render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
+
+			ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
+		}
+	}
+
 	if (num_filters > 0)
 	{
 		if (render_stage == RenderStage::Enter)
 		{
 			render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
-
 		}
 		else if (render_stage == RenderStage::Exit)
 		{
 			Vector2f max_top_left, max_bottom_right;
-			const int i0 = num_backgrounds;
-			for (int i = i0 + num_filters - 1; i >= i0; i--)
+			const int i0 = num_backgrounds + num_backdrop_filters;
+			for (int i = i0; i < i0 + num_filters; i++)
 			{
 				DecoratorHandle& decorator = decorators[i];
 				Vector2f top_left, bottom_right;
@@ -201,7 +226,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 
 			render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter, filter_origin, filter_size);
 
-			for (int i = i0 + num_filters - 1; i >= i0; i--)
+			for (int i = i0; i < i0 + num_filters; i++)
 			{
 				DecoratorHandle& decorator = decorators[i];
 				decorator.decorator->RenderElement(element, decorator.decorator_data);
@@ -211,27 +236,6 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
 
 			ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
-		}
-	}
-
-	if (num_backdrop_filters > 0)
-	{
-		if (render_stage == RenderStage::BeforeDecoration)
-		{
-			Vector2f filter_origin, filter_size;
-			ElementUtilities::GetElementRegionInWindowSpace(filter_origin, filter_size, element, Box::BORDER);
-			
-			ElementUtilities::ForceClippingRegion(element, Box::BORDER);
-			render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter, filter_origin, filter_size);
-
-			const int i0 = num_backgrounds + num_filters;
-			for (int i = i0 + num_backdrop_filters - 1; i >= i0; i--)
-			{
-				DecoratorHandle& decorator = decorators[i];
-				decorator.decorator->RenderElement(element, decorator.decorator_data);
-			}
-
-			render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
 		}
 	}
 }
