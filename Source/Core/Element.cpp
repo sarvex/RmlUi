@@ -222,7 +222,6 @@ void Element::Render()
 	// Set up the clipping region for this element.
 	if (ElementUtilities::SetClippingRegion(this))
 	{
-		meta->decoration.RenderDecorators(RenderStage::BeforeDecoration);
 		meta->background_border.Render(this);
 		meta->decoration.RenderDecorators(RenderStage::Decoration);
 
@@ -231,7 +230,6 @@ void Element::Render()
 
 			OnRender();
 		}
-		meta->decoration.RenderDecorators(RenderStage::AfterDecoration);
 	}
 
 	// Render the rest of the elements in the stacking context.

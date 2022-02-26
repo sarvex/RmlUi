@@ -47,7 +47,7 @@ using std::size_t;
 enum class Character : char32_t { Null, Replacement = 0xfffd };
 
 // TODO
-enum class RenderStage { Enter, BeforeDecoration, Decoration, AfterDecoration, Exit };
+enum class RenderStage { Enter, Decoration, Exit };
 
 }
 
