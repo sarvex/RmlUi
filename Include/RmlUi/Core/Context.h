@@ -227,14 +227,8 @@ public:
 	/// Gets the context's render interface.
 	/// @return The render interface the context renders through.
 	RenderInterface* GetRenderInterface() const;
-	/// Gets the current clipping region for the render traversal
-	/// @param[out] origin The clipping origin
-	/// @param[out] dimensions The clipping dimensions
-	bool GetActiveClipRegion(Vector2i& origin, Vector2i& dimensions) const;
-	/// Sets the current clipping region for the render traversal
-	/// @param[out] origin The clipping origin
-	/// @param[out] dimensions The clipping dimensions
-	void SetActiveClipRegion(Vector2i origin, Vector2i dimensions);
+	/// Gets the current render state for the render traversal
+	RenderState& GetRenderState();
 
 	/// Sets the instancer to use for releasing this object.
 	/// @param[in] instancer The context's instancer.
@@ -335,8 +329,7 @@ private:
 
 	// The render interface this context renders through.
 	RenderInterface* render_interface;
-	Vector2i clip_origin;
-	Vector2i clip_dimensions;
+	RenderState render_state;
 
 	using DataModels = UnorderedMap<String, UniquePtr<DataModel>>;
 	DataModels data_models;

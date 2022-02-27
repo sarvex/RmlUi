@@ -239,72 +239,113 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 }
 
 // Sets the clipping region from an element and its ancestors.
-bool ElementUtilities::SetClippingRegion(Element* element, Context* context)
-{	
-	RenderInterface* render_interface = nullptr;
-	if (element)
-	{
-		render_interface = element->GetRenderInterface();
-		if (!context)
-			context = element->GetContext();
-	}
-	else if (context)
-	{
-		render_interface = context->GetRenderInterface();
-		if (!render_interface)
-			render_interface = GetRenderInterface();
-	}
+bool ElementUtilities::SetClippingRegion(Element* element)
+{
+	RMLUI_ASSERT(element);
+	Context* context = element->GetContext();
+	RenderInterface* render_interface = context ? context->GetRenderInterface() : nullptr;
 
 	if (!render_interface || !context)
 		return false;
-	
-	Vector2i clip_origin = { -1, -1 };
-	Vector2i clip_dimensions = { -1, -1 };
-	bool clip = element && GetClippingRegion(clip_origin, clip_dimensions, element);
-	
-	Vector2i current_origin = { -1, -1 };
-	Vector2i current_dimensions = { -1, -1 };
-	bool current_clip = context->GetActiveClipRegion(current_origin, current_dimensions);
-	if (current_clip != clip || (clip && (clip_origin != current_origin || clip_dimensions != current_dimensions)))
+
+	RenderState& render_state = context->GetRenderState();
+
+	Vector2i clip_origin = {-1, -1};
+	Vector2i clip_dimensions = {-1, -1};
+	const bool enable_clip = GetClippingRegion(clip_origin, clip_dimensions, element);
+
+	const ClipState clip = (enable_clip ? (render_state.transform_pointer ? ClipState::Stencil : ClipState::Scissor) : ClipState::None);
+
+	Vector2i& active_origin = render_state.clip_origin;
+	Vector2i& active_dimensions = render_state.clip_dimensions;
+	ClipState& active_clip = render_state.clip_state;
+
+	if (active_clip != clip || (clip != ClipState::None && (clip_origin != active_origin || clip_dimensions != active_dimensions)))
 	{
-		context->SetActiveClipRegion(clip_origin, clip_dimensions);
-		ApplyActiveClipRegion(context, render_interface);
+		active_origin = clip_origin;
+		active_dimensions = clip_dimensions;
+		active_clip = clip;
+		ElementUtilities::ApplyActiveClipRegion(render_interface, render_state);
 	}
 
 	return true;
 }
 
-bool ElementUtilities::ForceClippingRegion(Element* element, Box::Area area, Vector2f relative_offset, Vector2f expand_size)
+bool ElementUtilities::ForceClippingRegion(Element* element, Box::Area area)
 {
 	RMLUI_ASSERT(element);
-	RenderInterface* render_interface = element->GetRenderInterface();
-	if (!render_interface)
+	Context* context = element->GetContext();
+	RenderInterface* render_interface = context ? context->GetRenderInterface() : nullptr;
+
+	if (!render_interface || !context)
 		return false;
 
-	Vector2f element_origin_f = element->GetAbsoluteOffset(area) + relative_offset;
-	Vector2f element_dimensions_f = element->GetBox().GetSize(area) + expand_size;
-	Math::SnapToPixelGrid(element_origin_f, element_dimensions_f);
-	const Vector2i element_origin(element_origin_f);
-	const Vector2i element_dimensions(element_dimensions_f);
+	RenderState render_state_copy = context->GetRenderState();
 
-	render_interface->EnableScissorRegion(true);
-	render_interface->SetScissorRegion(element_origin.x, element_origin.y, element_dimensions.x, element_dimensions.y);
+	Vector2f element_origin_f = element->GetAbsoluteOffset(area);
+	Vector2f element_dimensions_f = element->GetBox().GetSize(area);
+	Math::SnapToPixelGrid(element_origin_f, element_dimensions_f);
+
+	render_state_copy.clip_origin = Vector2i(element_origin_f);
+	render_state_copy.clip_dimensions = Vector2i(element_dimensions_f);
+	constexpr bool enable_clip = true;
+	render_state_copy.clip_state = (enable_clip ? (render_state_copy.transform_pointer ? ClipState::Stencil : ClipState::Scissor) : ClipState::None);
+
+	ApplyActiveClipRegion(render_interface, render_state_copy);
 	return true;
 }
 
-void ElementUtilities::ApplyActiveClipRegion(Context* context, RenderInterface* render_interface)
+void ElementUtilities::DisableClippingRegion(Context* context)
 {
-	if (render_interface == nullptr)
-		return;
-	
-	Vector2i origin;
-	Vector2i dimensions;
-	bool clip_enabled = context->GetActiveClipRegion(origin, dimensions);
+	RMLUI_ASSERT(context);
+	RenderInterface* render_interface = context->GetRenderInterface();
 
-	render_interface->EnableScissorRegion(clip_enabled);
-	if (clip_enabled)
+	RenderState render_state;
+	RMLUI_ASSERT(render_state.clip_state == ClipState::None);
+
+	ApplyActiveClipRegion(render_interface, render_state);
+}
+
+void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, const RenderState& render_state)
+{
+	RMLUI_ASSERT(render_interface);
+
+	switch (render_state.clip_state)
 	{
-		render_interface->SetScissorRegion(origin.x, origin.y, dimensions.x, dimensions.y);
+	case ClipState::None:
+	{
+		render_interface->StencilCommand(StencilCommand::TestDisable);
+		render_interface->EnableScissorRegion(false);
+	}
+	break;
+	case ClipState::Scissor:
+	{
+		render_interface->StencilCommand(StencilCommand::TestDisable);
+		render_interface->EnableScissorRegion(true);
+		render_interface->SetScissorRegion(render_state.clip_origin.x, render_state.clip_origin.y, render_state.clip_dimensions.x,
+			render_state.clip_dimensions.y);
+	}
+	break;
+	case ClipState::Stencil:
+	{
+		render_interface->EnableScissorRegion(false);
+		constexpr int stencil_value = 1;
+
+		render_interface->StencilCommand(StencilCommand::Clear, 0);
+		render_interface->StencilCommand(StencilCommand::Write, stencil_value);
+
+		// Write to stencil buffer by rendering a quad.
+		{
+			Vertex vertices[4];
+			int indices[6];
+			GeometryUtilities::GenerateQuad(vertices, indices, Vector2f(render_state.clip_origin), Vector2f(render_state.clip_dimensions), Colourb());
+			render_interface->RenderGeometry(vertices, 4, indices, 6, {}, {});
+		}
+
+		render_interface->StencilCommand(StencilCommand::WriteDisable);
+		render_interface->StencilCommand(StencilCommand::TestEqual, stencil_value);
+	}
+	break;
 	}
 }
 
@@ -405,26 +446,28 @@ bool ElementUtilities::PositionElement(Element* element, Vector2f offset, Positi
 	return true;
 }
 
-bool ElementUtilities::ApplyTransform(Element* element, RenderInterface* render_interface)
+bool ElementUtilities::ApplyTransform(Element* element, Context* context)
 {
-	if (!render_interface && element)
+	RenderInterface* render_interface = nullptr;
+	if (element)
+	{
 		render_interface = element->GetRenderInterface();
-	if (!render_interface)
+		if (!context)
+			context = element->GetContext();
+	}
+	else if (context)
+	{
+		render_interface = context->GetRenderInterface();
+		if (!render_interface)
+			render_interface = GetRenderInterface();
+	}
+
+	if (!render_interface || !context)
 		return false;
 
-	struct PreviousMatrix {
-		const Matrix4f* pointer; // This may be expired, dereferencing not allowed!
-		Matrix4f value;
-	};
-	static SmallUnorderedMap<RenderInterface*, PreviousMatrix> previous_matrix;
+	RenderState& render_state = context->GetRenderState();
 
-	auto it = previous_matrix.find(render_interface);
-	if (it == previous_matrix.end())
-		it = previous_matrix.emplace(render_interface, PreviousMatrix{nullptr, Matrix4f::Identity()}).first;
-
-	RMLUI_ASSERT(it != previous_matrix.end());
-
-	const Matrix4f*& old_transform = it->second.pointer;
+	const Matrix4f*& old_transform = render_state.transform_pointer;
 	const Matrix4f* new_transform = nullptr;
 
 	if (element)
@@ -436,7 +479,7 @@ bool ElementUtilities::ApplyTransform(Element* element, RenderInterface* render_
 	// Only changed transforms are submitted.
 	if (old_transform != new_transform)
 	{
-		Matrix4f& old_transform_value = it->second.value;
+		Matrix4f& old_transform_value = render_state.transform;
 
 		// Do a deep comparison as well to avoid submitting a new transform which is equal.
 		if (!old_transform || !new_transform || (old_transform_value != *new_transform))

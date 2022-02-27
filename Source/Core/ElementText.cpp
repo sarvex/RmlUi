@@ -116,10 +116,13 @@ void ElementText::OnRender()
 	const Vector2f translation = GetAbsoluteOffset();
 	
 	bool render = true;
-	Vector2i clip_origin;
-	Vector2i clip_dimensions;
-	if (GetContext()->GetActiveClipRegion(clip_origin, clip_dimensions))
+	const RenderState& render_state = GetContext()->GetRenderState();
+
+	if (render_state.clip_state != ClipState::None)
 	{
+		Vector2i clip_origin = render_state.clip_origin;
+		Vector2i clip_dimensions = render_state.clip_dimensions;
+
 		float clip_top = (float)clip_origin.y;
 		float clip_left = (float)clip_origin.x;
 		float clip_right = (float)(clip_origin.x + clip_dimensions.x);

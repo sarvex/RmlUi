@@ -95,17 +95,17 @@ public:
 	static bool GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element);
 	/// Sets the clipping region from an element and its ancestors.
 	/// @param[in] element The element to generate the clipping region from.
-	/// @param[in] context The context of the element; if this is not supplied, it will be derived from the element.
 	/// @return The visibility of the given element within its clipping region.
-	static bool SetClippingRegion(Element* element, Context* context = nullptr);
-	/// Sets the clipping region to the given element, optionally offseting and expanding the region.
+	static bool SetClippingRegion(Element* element);
+	/// Sets the clipping region to the given element's area.
 	/// @return The visibility of the given element within its clipping region.
-	static bool ForceClippingRegion(Element* element, Box::Area area = Box::PADDING, Vector2f relative_offset = Vector2f(0),
-		Vector2f expand_size = Vector2f(0));
-	/// Applies the clip region from the render interface to the renderer
-	/// @param[in] context The context to read the clip region from
+	static bool ForceClippingRegion(Element* element, Box::Area area);
+	/// Disable clipping.
+	static void DisableClippingRegion(Context* context);
+	/// Applies the clip region from the render interface to the renderer.
 	/// @param[in] render_interface The render interface to update.
-	static void ApplyActiveClipRegion(Context* context, RenderInterface* render_interface);
+	/// @param[in] render_state The render state to be applied.
+	static void ApplyActiveClipRegion(RenderInterface* render_interface, const RenderState& render_state);
 
 	/// Returns a rectangle covering the element's area in window coordinate space.
 	/// @return True on success, otherwise false.
@@ -137,7 +137,7 @@ public:
 	/// @param[in] element The element whose transform to apply, or nullptr for identity transform.
 	/// @param[in] render_interface The target render interface, or nullptr to fetch from element.
 	/// @return True if a render interface is available to set the transform.
-	static bool ApplyTransform(Element* element, RenderInterface* render_interface = nullptr);
+	static bool ApplyTransform(Element* element, Context* context = nullptr);
 
 	/// Creates data views and data controllers if a data model applies to the element.
 	/// Attributes such as 'data-' are used to create the views and controllers.
