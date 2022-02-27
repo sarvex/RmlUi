@@ -153,9 +153,6 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 	InstanceDecorators();
 	ReloadDecoratorsData();
 
-	if (!num_backgrounds && !num_filters && !num_backdrop_filters)
-		return;
-
 	RMLUI_ASSERT(num_backgrounds + num_filters + num_backdrop_filters == (int)decorators.size());
 
 	if (num_backgrounds > 0)
@@ -172,8 +169,12 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 		}
 	}
 
-	RenderInterface* render_interface = element->GetRenderInterface();
-	if (!render_interface)
+	if (!num_backdrop_filters && !num_filters)
+		return;
+
+	Context* context = element->GetContext();
+	RenderInterface* render_interface = context ? context->GetRenderInterface() : nullptr;
+	if (!context || !render_interface)
 		return;
 
 	if (num_backdrop_filters > 0)
@@ -181,6 +182,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 		if (render_stage == RenderStage::Enter)
 		{
 			ElementUtilities::ApplyTransform(element);
+			ElementUtilities::ForceClippingRegion(element, Box::BORDER);
 
 			Vector2f filter_origin, filter_size;
 			ElementUtilities::GetElementRegionInWindowSpace(filter_origin, filter_size, element, Box::BORDER);
@@ -193,10 +195,10 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				decorator.decorator->RenderElement(element, decorator.decorator_data);
 			}
 
-			ElementUtilities::ForceClippingRegion(element, Box::BORDER);
+			// ElementUtilities::ForceClippingRegion(element, Box::BORDER);
 			render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
 
-			ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
+			ElementUtilities::ApplyActiveClipRegion(render_interface, context->GetRenderState());
 		}
 	}
 
@@ -235,7 +237,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
 			render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
 
-			ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
+			ElementUtilities::ApplyActiveClipRegion(render_interface, context->GetRenderState());
 		}
 	}
 }

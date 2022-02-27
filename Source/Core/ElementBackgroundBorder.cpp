@@ -60,20 +60,17 @@ void ElementBackgroundBorder::Render(Element* element)
 
 	if (shadow_geometry)
 	{
-		RenderInterface* render_interface = element->GetRenderInterface();
-		if (!render_interface)
+		Context* context = element->GetContext();
+		RenderInterface* render_interface = context ? context->GetRenderInterface() : nullptr;
+		if (!context || !render_interface)
 		{
 			RMLUI_ERROR;
 			return;
 		}
 
-		// TODO: Render texture
-		// render_interface->RenderEffect(shadow_texture, RenderStage::Decoration, 0, element);
-		render_interface->EnableScissorRegion(false);
-		// ElementUtilities::ApplyTransform(*element->GetContext()->GetRootElement());
+		ElementUtilities::DisableClippingRegion(context);
 		render_interface->RenderCompiledGeometry(shadow_geometry, element->GetAbsoluteOffset(Box::BORDER));
-		// ElementUtilities::ApplyTransform(*element);
-		ElementUtilities::ApplyActiveClipRegion(element->GetContext(), render_interface);
+		ElementUtilities::ApplyActiveClipRegion(render_interface, context->GetRenderState());
 	}
 	else if (geometry)
 	{
@@ -149,7 +146,8 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			return;
 		}
 
-		Geometry geometry_border, geometry_padding;
+		Geometry geometry_border(element);
+		Geometry geometry_padding(element);
 		Vector2f element_offset_in_texture;
 		Vector2f texture_dimensions;
 
@@ -189,7 +187,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			texture_dimensions = RoundUp(element_offset_in_texture + element->GetBox().GetSize(Box::BORDER) + extend_bottom_right + offset_max);
 		}
 
-		ElementUtilities::ApplyTransform(nullptr, render_interface);
+		ElementUtilities::ApplyTransform(nullptr, element->GetContext());
 		render_interface->EnableScissorRegion(true);
 		render_interface->SetScissorRegion(0, 0, (int)texture_dimensions.x, (int)texture_dimensions.y);
 		render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
@@ -320,7 +318,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		GeometryUtilities::GenerateQuad(vertices, indices, -element_offset_in_texture, texture_dimensions, color_white);
 		shadow_geometry = render_interface->CompileGeometry(vertices, 4, indices, 6, shadow_texture);
 
-		ElementUtilities::ApplyTransform(element, render_interface);
+		ElementUtilities::ApplyTransform(element, element->GetContext());
 		ElementUtilities::SetClippingRegion(element);
 	}
 }
