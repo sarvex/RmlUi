@@ -41,7 +41,7 @@ class Context;
 
 // TODO: Move
 using CompiledEffectHandle = uintptr_t;
-enum class StencilCommand { Clear, Write, WriteDisable, TestEqual, TestDisable };
+enum class StencilCommand { Clear, WriteValue, WriteIncrement, WriteDisable, TestEqual, TestDisable };
 enum class RenderCommand { None, StackPush, StackPop, StackToTexture, StackToFilter, FilterToStack };
 
 /**

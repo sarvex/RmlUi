@@ -92,7 +92,7 @@ public:
 	/// @param[out] clip_dimensions The size, in context coordinates, of the element's clipping window.
 	/// @param[in] element The element to generate the clipping region for.
 	/// @return True if a clipping region exists for the element and clip_origin and clip_window were set, false if not.
-	static bool GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element);
+	static bool GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementList* stencil_elements = nullptr);
 	/// Sets the clipping region from an element and its ancestors.
 	/// @param[in] element The element to generate the clipping region from.
 	/// @return The visibility of the given element within its clipping region.

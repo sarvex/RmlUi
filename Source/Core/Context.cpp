@@ -143,8 +143,6 @@ void Context::SetDimensions(const Vector2i _dimensions)
 				document->DispatchEvent(EventId::Resize, Dictionary());
 			}
 		}
-		
-		render_state.clip_dimensions = dimensions;
 	}
 }
 
@@ -211,6 +209,7 @@ bool Context::Render()
 		return false;
 
 	render_interface->context = this;
+	render_state = RenderState{};
 	ElementUtilities::ApplyActiveClipRegion(render_interface, render_state);
 
 	root->Render();

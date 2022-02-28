@@ -197,9 +197,9 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		constexpr int mask_inset = 0b100;
 
 		render_interface->StencilCommand(StencilCommand::Clear, 0);
-		render_interface->StencilCommand(StencilCommand::Write, mask_padding);
+		render_interface->StencilCommand(StencilCommand::WriteValue, mask_padding);
 		geometry_padding.Render(element_offset_in_texture);
-		render_interface->StencilCommand(StencilCommand::Write, mask_border);
+		render_interface->StencilCommand(StencilCommand::WriteValue, mask_border);
 		geometry_border.Render(element_offset_in_texture);
 		render_interface->StencilCommand(StencilCommand::WriteDisable);
 
@@ -258,7 +258,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 
 			if (inset)
 			{
-				render_interface->StencilCommand(StencilCommand::Write, mask_inset, mask_inset);
+				render_interface->StencilCommand(StencilCommand::WriteValue, mask_inset, mask_inset);
 				shadow_geometry.Render(shadow.offset + element_offset_in_texture);
 				render_interface->StencilCommand(StencilCommand::WriteDisable);
 
