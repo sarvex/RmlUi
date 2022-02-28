@@ -182,7 +182,8 @@ struct RenderState {
 	ClipState clip_state = ClipState::None;
 	Vector2i clip_origin = {-1, -1};
 	Vector2i clip_dimensions = {-1, -1};
-	const Matrix4f* transform_pointer; // This may be expired, dereferencing not allowed!
+	ElementList clip_stencil_elements;
+	const Matrix4f* transform_pointer = nullptr;
 	Matrix4f transform;
 };
 

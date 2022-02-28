@@ -1,0 +1,63 @@
+<rml>
+<head>
+    <title>Stencil clipping</title>
+    <link type="text/rcss" href="../style.rcss"/>
+	<meta name="Description" content="Clipping with border-radius using stencil buffer." />
+	<style>
+		.clip {
+			overflow: hidden;
+		}
+		.box {
+			margin: 20dp auto;
+			position: relative;
+			width: 250dp;
+			border-color: #55f;
+			border-width: 20dp;
+			border-radius: 150dp;
+		}
+		.A {
+			height: 70dp;
+			background: #ffd34f;
+			border: 5dp #f57;
+		}
+		.B {
+			position: relative;
+			left: 50%;
+			background: #ffd34f;
+			border: 5dp #f57;
+			border-radius: 25dp;
+		}
+		.C {
+			width: 50%;
+			position: relative;
+			top: 50dp;
+			margin: 10dp auto;
+			height: 30dp;
+			background: #d3ff4f;
+			border: 5dp #3a4;
+			border-radius: 50dp;
+		}
+	</style>
+</head>
+
+<body>
+<div class="box clip">
+	Duck aloft
+	<div class="A">
+			A
+	</div>
+	X
+</div>
+<div class="box clip">
+	Y
+	<div class="B clip">
+			C
+		<div class="C clip">
+				Some long text
+		</div>
+			Z
+	</div>
+	W
+</div>
+</body>
+</rml>
