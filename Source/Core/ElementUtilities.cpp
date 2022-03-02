@@ -164,14 +164,15 @@ int ElementUtilities::GetStringWidth(Element* element, const String& string, Cha
 }
 
 // Generates the clipping region for an element.
-bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementList* stencil_elements)
+bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementList* stencil_elements,
+	bool force_clip_self)
 {
 	using Style::Clip;
 	clip_origin = Vector2i(-1, -1);
 	clip_dimensions = Vector2i(-1, -1);
 
 	Clip target_element_clip = element->GetComputedValues().clip();
-	if (target_element_clip == Clip::Type::None)
+	if (target_element_clip == Clip::Type::None && !force_clip_self)
 		return false;
 
 	int num_ignored_clips = target_element_clip.GetNumber();
@@ -179,78 +180,92 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 	// Search through the element's ancestors, finding all elements that clip their overflow and have overflow to clip.
 	// For each that we find, we combine their clipping region with the existing clipping region, and so build up a
 	// complete clipping region for the element.
-	Element* clipping_element = element->GetParentNode();
+	Element* clipping_element = (force_clip_self ? element : element->GetParentNode());
+
+	bool clip_region_set = false;
+	Vector2f clip_top_left;
+	Vector2f clip_bottom_right;
 
 	while (clipping_element != nullptr)
 	{
 		const ComputedValues& clip_computed = clipping_element->GetComputedValues();
 		const bool clip_enabled = (clip_computed.overflow_x() != Style::Overflow::Visible || clip_computed.overflow_y() != Style::Overflow::Visible);
-		const bool clip_always = (clip_computed.clip() == Clip::Type::Always);
 		const bool clip_none = (clip_computed.clip() == Clip::Type::None);
 		const int clip_number = clip_computed.clip().GetNumber();
+		const bool force_clipping_current_element = (force_clip_self && clipping_element == element);
 
 		// Merge the existing clip region with the current clip region if we aren't ignoring clip regions.
-		if ((clip_always || clip_enabled) && num_ignored_clips == 0)
+		if ((clip_enabled && num_ignored_clips == 0) || force_clipping_current_element)
 		{
+			bool disable_scissor_clipping = false;
+
 			if (stencil_elements)
 			{
 				const TransformState* transform_state = clipping_element->GetTransformState();
-				const bool requires_stencil = ((transform_state && transform_state->GetTransform()) || clip_computed.border_top_left_radius > 0.f ||
-					clip_computed.border_top_right_radius > 0.f || clip_computed.border_bottom_right_radius > 0.f ||
-					clip_computed.border_bottom_left_radius > 0.f);
+				const bool has_transform = (transform_state && transform_state->GetTransform());
+				const bool has_border_radius = (clip_computed.border_top_left_radius() > 0.f || clip_computed.border_top_right_radius() > 0.f ||
+					clip_computed.border_bottom_right_radius() > 0.f || clip_computed.border_bottom_left_radius() > 0.f);
 
-				if (requires_stencil)
+				// If the element has transforms or uses border-radius, we need to clip using a stencil buffer.
+				// TODO: Need a way to select content/padding/border area.
+				if (has_transform || has_border_radius)
 					stencil_elements->push_back(clipping_element);
+
+				// If we only have border-radius then we add this element to the scissor region as well as the stencil buffer. This may help with eg.
+				// culling text render calls. However, when we have a transform, the element cannot be added to the scissor region since its geometry
+				// may be projected entirely elsewhere.
+				disable_scissor_clipping = has_transform;
 			}
 
-			// Ignore nodes that don't clip.
-			if (clip_always || clipping_element->GetClientWidth() < clipping_element->GetScrollWidth() - 0.5f ||
-				clipping_element->GetClientHeight() < clipping_element->GetScrollHeight() - 0.5f)
+			if (!disable_scissor_clipping)
 			{
-				const Box::Area client_area = clipping_element->GetClientArea();
-				Vector2f element_origin_f = clipping_element->GetAbsoluteOffset(client_area);
-				Vector2f element_dimensions_f = clipping_element->GetBox().GetSize(client_area);
-				Math::SnapToPixelGrid(element_origin_f, element_dimensions_f);
+				const Box::Area client_area = (force_clipping_current_element ? Box::BORDER : clipping_element->GetClientArea());
+				Vector2f element_top_left = clipping_element->GetAbsoluteOffset(client_area);
+				Vector2f element_bottom_right = element_top_left + clipping_element->GetBox().GetSize(client_area);
 
-				const Vector2i element_origin(element_origin_f);
-				const Vector2i element_dimensions(element_dimensions_f);
-				
-				if (clip_origin == Vector2i(-1, -1) && clip_dimensions == Vector2i(-1, -1))
+				if (!clip_region_set)
 				{
-					clip_origin = element_origin;
-					clip_dimensions = element_dimensions;
+					clip_top_left = element_top_left;
+					clip_bottom_right = element_bottom_right;
+					clip_region_set = true;
 				}
 				else
 				{
-					const Vector2i top_left = Math::Max(clip_origin, element_origin);
-					const Vector2i bottom_right = Math::Min(clip_origin + clip_dimensions, element_origin + element_dimensions);
-					
-					clip_origin = top_left;
-					clip_dimensions = Math::Max(Vector2i(0), bottom_right - top_left);
+					clip_top_left = Math::Max(clip_top_left, element_top_left);
+					clip_bottom_right = Math::Min(clip_bottom_right, element_bottom_right);
 				}
 			}
 		}
 
-		// If this region is meant to clip and we're skipping regions, update the counter.
-		if (num_ignored_clips > 0 && clip_enabled)
-			num_ignored_clips--;
-		
-		// Inherit how many clip regions this ancestor ignores.
-		num_ignored_clips = Math::Max(num_ignored_clips, clip_number);
+		if (!force_clipping_current_element)
+		{
+			// If this region is meant to clip and we're skipping regions, update the counter.
+			if (num_ignored_clips > 0 && clip_enabled)
+				num_ignored_clips--;
 
-		// If this region ignores all clipping regions, then we do too.
-		if (clip_none)
-			break;
+			// Inherit how many clip regions this ancestor ignores.
+			num_ignored_clips = Math::Max(num_ignored_clips, clip_number);
+
+			// If this region ignores all clipping regions, then we do too.
+			if (clip_none)
+				break;
+		}
 
 		// Climb the tree to this region's parent.
 		clipping_element = clipping_element->GetParentNode();
 	}
-	
-	return clip_dimensions.x >= 0 && clip_dimensions.y >= 0;
+
+	if (clip_region_set)
+	{
+		clip_origin = Vector2i(clip_top_left.Round());
+		clip_dimensions = Math::Max(Vector2i(0), Vector2i(clip_bottom_right.Round()) - clip_origin);
+	}
+
+	return clip_region_set;
 }
 
 // Sets the clipping region from an element and its ancestors.
-bool ElementUtilities::SetClippingRegion(Element* element)
+bool ElementUtilities::SetClippingRegion(Element* element, bool force_clip_self)
 {
 	RMLUI_ASSERT(element);
 	Context* context = element->GetContext();
@@ -264,49 +279,22 @@ bool ElementUtilities::SetClippingRegion(Element* element)
 	Vector2i clip_origin = {-1, -1};
 	Vector2i clip_dimensions = {-1, -1};
 	ElementList stencil_elements;
-	const bool enable_clip = GetClippingRegion(clip_origin, clip_dimensions, element, &stencil_elements) || !stencil_elements.empty();
-	const bool stencil_clip = (render_state.transform_pointer || !stencil_elements.empty());
+	ElementList* stencil_elements_ptr = (render_state.supports_stencil ? &stencil_elements : nullptr);
 
-	const ClipState clip = (enable_clip ? (stencil_clip ? ClipState::Stencil : ClipState::Scissor) : ClipState::None);
+	GetClippingRegion(clip_origin, clip_dimensions, element, stencil_elements_ptr, force_clip_self);
 
 	Vector2i& active_origin = render_state.clip_origin;
 	Vector2i& active_dimensions = render_state.clip_dimensions;
-	ClipState& active_clip = render_state.clip_state;
 	ElementList& active_stencil_elements = render_state.clip_stencil_elements;
 
-	if (active_clip != clip || (clip != ClipState::None && (clip_origin != active_origin || clip_dimensions != active_dimensions || stencil_elements != active_stencil_elements)))
+	if (clip_origin != active_origin || clip_dimensions != active_dimensions || stencil_elements != active_stencil_elements)
 	{
 		active_origin = clip_origin;
 		active_dimensions = clip_dimensions;
-		active_clip = clip;
 		active_stencil_elements = std::move(stencil_elements);
 		ElementUtilities::ApplyActiveClipRegion(render_interface, render_state);
 	}
 
-	return true;
-}
-
-bool ElementUtilities::ForceClippingRegion(Element* element, Box::Area area)
-{
-	RMLUI_ASSERT(element);
-	Context* context = element->GetContext();
-	RenderInterface* render_interface = context ? context->GetRenderInterface() : nullptr;
-
-	if (!render_interface || !context)
-		return false;
-
-	RenderState render_state_copy = context->GetRenderState();
-
-	Vector2f element_origin_f = element->GetAbsoluteOffset(area);
-	Vector2f element_dimensions_f = element->GetBox().GetSize(area);
-	Math::SnapToPixelGrid(element_origin_f, element_dimensions_f);
-
-	render_state_copy.clip_origin = Vector2i(element_origin_f);
-	render_state_copy.clip_dimensions = Vector2i(element_dimensions_f);
-	constexpr bool enable_clip = true;
-	render_state_copy.clip_state = (enable_clip ? (render_state_copy.transform_pointer ? ClipState::Stencil : ClipState::Scissor) : ClipState::None);
-
-	ApplyActiveClipRegion(render_interface, render_state_copy);
 	return true;
 }
 
@@ -316,8 +304,6 @@ void ElementUtilities::DisableClippingRegion(Context* context)
 	RenderInterface* render_interface = context->GetRenderInterface();
 
 	RenderState render_state;
-	RMLUI_ASSERT(render_state.clip_state == ClipState::None);
-
 	ApplyActiveClipRegion(render_interface, render_state);
 }
 
@@ -325,74 +311,49 @@ void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, 
 {
 	RMLUI_ASSERT(render_interface);
 
-	switch (render_state.clip_state)
+	const bool scissoring_enabled = (render_state.clip_dimensions != Vector2i(-1, -1));
+	if (scissoring_enabled)
 	{
-	case ClipState::None:
-	{
-		render_interface->StencilCommand(StencilCommand::TestDisable);
-		render_interface->EnableScissorRegion(false);
-	}
-	break;
-	case ClipState::Scissor:
-	{
-		render_interface->StencilCommand(StencilCommand::TestDisable);
 		render_interface->EnableScissorRegion(true);
 		render_interface->SetScissorRegion(render_state.clip_origin.x, render_state.clip_origin.y, render_state.clip_dimensions.x,
 			render_state.clip_dimensions.y);
 	}
-	break;
-	case ClipState::Stencil:
+	else
+	{
+		render_interface->EnableScissorRegion(false);
+	}
+
+	const ElementList& stencil_elements = render_state.clip_stencil_elements;
+	const bool stencil_test_enabled = !stencil_elements.empty();
+	if (stencil_test_enabled)
 	{
 		render_interface->StencilCommand(StencilCommand::TestDisable);
-		render_interface->EnableScissorRegion(false);
-		const ElementList& stencil_elements = render_state.clip_stencil_elements;
+		render_interface->StencilCommand(StencilCommand::Clear, 0);
+		render_interface->StencilCommand(StencilCommand::WriteIncrement);
 
-		if (!stencil_elements.empty())
+		for (Element* stencil_element : stencil_elements)
 		{
-			const int stencil_value = (int)stencil_elements.size();
+			const Box& box = stencil_element->GetBox();
+			const ComputedValues& computed = stencil_element->GetComputedValues();
+			const Vector4f radii(computed.border_top_left_radius(), computed.border_top_right_radius(), computed.border_bottom_right_radius(),
+				computed.border_bottom_left_radius());
 
-			render_interface->StencilCommand(StencilCommand::Clear, 0);
-			render_interface->StencilCommand(StencilCommand::WriteIncrement);
-			for (Element* stencil_element : stencil_elements)
-			{
-				const Box& box = stencil_element->GetBox();
-				const ComputedValues& computed = stencil_element->GetComputedValues();
-				const Vector4f radii(computed.border_top_left_radius, computed.border_top_right_radius, computed.border_bottom_right_radius,
-					computed.border_bottom_left_radius);
+			ApplyTransform(stencil_element);
 
-				ApplyTransform(stencil_element);
-
-				// @performance: Store clipping geometry on element.
-				Geometry geometry;
-				GeometryUtilities::GenerateBackgroundBorder(&geometry, box, {}, radii, Colourb());
-				geometry.Render(stencil_element->GetAbsoluteOffset(Box::BORDER));
-			}
-
-			// TODO: Apply transform to the current element again
-			render_interface->StencilCommand(StencilCommand::WriteDisable);
-			render_interface->StencilCommand(StencilCommand::TestEqual, stencil_value);
+			// @performance: Store clipping geometry on element.
+			Geometry geometry;
+			GeometryUtilities::GenerateBackgroundBorder(&geometry, box, {}, radii, Colourb());
+			geometry.Render(stencil_element->GetAbsoluteOffset(Box::BORDER));
 		}
-		else
-		{
-			constexpr int stencil_value = 1;
 
-			render_interface->StencilCommand(StencilCommand::Clear, 0);
-			render_interface->StencilCommand(StencilCommand::WriteValue, stencil_value);
-
-			// Write to stencil buffer by rendering a quad.
-			{
-				Vertex vertices[4];
-				int indices[6];
-				GeometryUtilities::GenerateQuad(vertices, indices, Vector2f(render_state.clip_origin), Vector2f(render_state.clip_dimensions),
-					Colourb());
-				render_interface->RenderGeometry(vertices, 4, indices, 6, {}, {});
-			}
-
-			render_interface->StencilCommand(StencilCommand::WriteDisable);
-			render_interface->StencilCommand(StencilCommand::TestEqual, stencil_value);
-		}
+		// TODO: Apply transform to the current element again
+		const int stencil_value = (int)stencil_elements.size();
+		render_interface->StencilCommand(StencilCommand::WriteDisable);
+		render_interface->StencilCommand(StencilCommand::TestEqual, stencil_value);
 	}
-	break;
+	else
+	{
+		render_interface->StencilCommand(StencilCommand::TestDisable);
 	}
 }
 

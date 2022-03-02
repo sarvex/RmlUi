@@ -91,15 +91,16 @@ public:
 	/// @param[out] clip_origin The origin, in context coordinates, of the origin of the element's clipping window.
 	/// @param[out] clip_dimensions The size, in context coordinates, of the element's clipping window.
 	/// @param[in] element The element to generate the clipping region for.
-	/// @return True if a clipping region exists for the element and clip_origin and clip_window were set, false if not.
-	static bool GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementList* stencil_elements = nullptr);
+	/// @param[out] stencil_elements Optional, returns a list of elements that require stencil clipping.
+	/// @param[in] force_clip_self If true, also clips to the border area of the provided element regardless.
+	/// @return True if a scissor region exists for the element and clip_origin and clip_dimensions were set, otherwise false.
+	static bool GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementList* stencil_elements = nullptr,
+		bool force_clip_self = false);
 	/// Sets the clipping region from an element and its ancestors.
 	/// @param[in] element The element to generate the clipping region from.
+	/// @param[in] force_clip_self If true, also clips to the border area of the provided element regardless.
 	/// @return The visibility of the given element within its clipping region.
-	static bool SetClippingRegion(Element* element);
-	/// Sets the clipping region to the given element's area.
-	/// @return The visibility of the given element within its clipping region.
-	static bool ForceClippingRegion(Element* element, Box::Area area);
+	static bool SetClippingRegion(Element* element, bool force_clip_self = false);
 	/// Disable clipping.
 	static void DisableClippingRegion(Context* context);
 	/// Applies the clip region from the render interface to the renderer.

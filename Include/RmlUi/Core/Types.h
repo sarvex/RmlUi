@@ -179,7 +179,7 @@ inline DecoratorClasses operator&(DecoratorClasses a, DecoratorClasses b)
 }
 enum class ClipState : std::uint8_t { None, Scissor, Stencil };
 struct RenderState {
-	ClipState clip_state = ClipState::None;
+	bool supports_stencil = false;
 	Vector2i clip_origin = {-1, -1};
 	Vector2i clip_dimensions = {-1, -1};
 	ElementList clip_stencil_elements;

@@ -78,10 +78,10 @@ TextureHandle RenderInterface::RenderEffect(CompiledEffectHandle /*effect*/, Com
 
 void RenderInterface::ReleaseCompiledEffect(CompiledEffectHandle /*effect*/) {}
 
-
-/// Called by RmlUi when it wants to setup the stencil buffer.
-
-void RenderInterface::StencilCommand(::Rml::StencilCommand /*command*/, int /*value*/, int /*mask*/) {}
+bool RenderInterface::StencilCommand(::Rml::StencilCommand /*command*/, int /*value*/, int /*mask*/)
+{
+	return false;
+}
 
 // Called by RmlUi when a texture is required by the library.
 bool RenderInterface::LoadTexture(TextureHandle& /*texture_handle*/, Vector2i& /*texture_dimensions*/, const String& /*source*/)
