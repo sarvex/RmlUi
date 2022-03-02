@@ -118,7 +118,7 @@ void ElementText::OnRender()
 	bool render = true;
 	const RenderState& render_state = GetContext()->GetRenderState();
 
-	if (render_state.clip_state != ClipState::None && render_state.clip_dimensions != Vector2i(-1, -1))
+	if (render_state.clip_dimensions != Vector2i(-1, -1))
 	{
 		Vector2i clip_origin = render_state.clip_origin;
 		Vector2i clip_dimensions = render_state.clip_dimensions;
