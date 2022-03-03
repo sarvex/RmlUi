@@ -177,15 +177,6 @@ inline DecoratorClasses operator&(DecoratorClasses a, DecoratorClasses b)
 {
 	return DecoratorClasses(int(a) & int(b));
 }
-enum class ClipState : std::uint8_t { None, Scissor, Stencil };
-struct RenderState {
-	bool supports_stencil = false;
-	Vector2i clip_origin = {-1, -1};
-	Vector2i clip_dimensions = {-1, -1};
-	ElementList clip_stencil_elements;
-	const Matrix4f* transform_pointer = nullptr;
-	Matrix4f transform;
-};
 
 // Additional smart pointers
 using TransformPtr = SharedPtr< Transform >;

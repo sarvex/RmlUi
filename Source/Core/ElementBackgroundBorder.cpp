@@ -139,8 +139,10 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		RMLUI_ASSERT(p_box_shadow->value.GetType() == Variant::SHADOWLIST);
 		const ShadowList& shadow_list = p_box_shadow->value.GetReference<ShadowList>();
 
-		RenderInterface* render_interface = element->GetRenderInterface();
-		if (!render_interface)
+		Context* context = element->GetContext();
+		RenderInterface* render_interface = context ? context->GetRenderInterface() : nullptr;
+
+		if (!render_interface || !context)
 		{
 			RMLUI_ERROR;
 			return;
@@ -187,7 +189,9 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			texture_dimensions = RoundUp(element_offset_in_texture + element->GetBox().GetSize(Box::BORDER) + extend_bottom_right + offset_max);
 		}
 
-		ElementUtilities::ApplyTransform(nullptr, element->GetContext());
+		RenderState& render_state = context->GetRenderState();
+		const Matrix4f* active_element_transform = render_state.transform_pointer;
+		ElementUtilities::ApplyTransform(render_interface, render_state, nullptr);
 		render_interface->EnableScissorRegion(true);
 		render_interface->SetScissorRegion(0, 0, (int)texture_dimensions.x, (int)texture_dimensions.y);
 		render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
@@ -318,7 +322,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		GeometryUtilities::GenerateQuad(vertices, indices, -element_offset_in_texture, texture_dimensions, color_white);
 		shadow_geometry = render_interface->CompileGeometry(vertices, 4, indices, 6, shadow_texture);
 
-		ElementUtilities::ApplyTransform(element, element->GetContext());
+		ElementUtilities::ApplyTransform(render_interface, render_state, active_element_transform);
 		ElementUtilities::SetClippingRegion(element);
 	}
 }

@@ -215,8 +215,6 @@ bool Context::Render()
 
 	root->Render();
 
-	ElementUtilities::DisableClippingRegion(this);
-
 	// Render the cursor proxy so that any attached drag clone will be rendered below the cursor.
 	if (drag_clone)
 	{
@@ -226,6 +224,10 @@ bool Context::Render()
 			nullptr);
 		cursor_proxy->Render();
 	}
+
+	ElementUtilities::ApplyTransform(render_interface, render_state, nullptr);
+	render_state = RenderState{};
+	ElementUtilities::ApplyActiveClipRegion(render_interface, render_state);
 
 	render_interface->context = nullptr;
 

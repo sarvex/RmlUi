@@ -33,6 +33,7 @@
 #include "Types.h"
 #include "Traits.h"
 #include "Input.h"
+#include "RenderState.h"
 #include "ScriptInterface.h"
 
 namespace Rml {
