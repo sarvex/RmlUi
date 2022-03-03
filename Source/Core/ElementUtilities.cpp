@@ -164,7 +164,7 @@ int ElementUtilities::GetStringWidth(Element* element, const String& string, Cha
 }
 
 // Generates the clipping region for an element.
-bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementList* stencil_elements,
+bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementClipList* stencil_elements,
 	bool force_clip_self)
 {
 	using Style::Clip;
@@ -198,6 +198,7 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 		if ((clip_enabled && num_ignored_clips == 0) || force_clipping_current_element)
 		{
 			bool disable_scissor_clipping = false;
+			const Box::Area client_area = (force_clipping_current_element ? Box::BORDER : clipping_element->GetClientArea());
 
 			if (stencil_elements)
 			{
@@ -207,9 +208,8 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 					clip_computed.border_bottom_right_radius() > 0.f || clip_computed.border_bottom_left_radius() > 0.f);
 
 				// If the element has transforms or uses border-radius, we need to clip using a stencil buffer.
-				// TODO: Need a way to select content/padding/border area.
 				if (has_transform || has_border_radius)
-					stencil_elements->push_back(clipping_element);
+					stencil_elements->push_back(ElementClip{clipping_element, client_area});
 
 				// If we only have border-radius then we add this element to the scissor region as well as the stencil buffer. This may help with eg.
 				// culling text render calls. However, when we have a transform, the element cannot be added to the scissor region since its geometry
@@ -219,7 +219,6 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 
 			if (!disable_scissor_clipping)
 			{
-				const Box::Area client_area = (force_clipping_current_element ? Box::BORDER : clipping_element->GetClientArea());
 				Vector2f element_top_left = clipping_element->GetAbsoluteOffset(client_area);
 				Vector2f element_bottom_right = element_top_left + clipping_element->GetBox().GetSize(client_area);
 
@@ -278,14 +277,14 @@ bool ElementUtilities::SetClippingRegion(Element* element, bool force_clip_self)
 
 	Vector2i clip_origin = {-1, -1};
 	Vector2i clip_dimensions = {-1, -1};
-	ElementList stencil_elements;
-	ElementList* stencil_elements_ptr = (render_state.supports_stencil ? &stencil_elements : nullptr);
+	ElementClipList stencil_elements;
+	ElementClipList* stencil_elements_ptr = (render_state.supports_stencil ? &stencil_elements : nullptr);
 
 	GetClippingRegion(clip_origin, clip_dimensions, element, stencil_elements_ptr, force_clip_self);
 
 	Vector2i& active_origin = render_state.clip_origin;
 	Vector2i& active_dimensions = render_state.clip_dimensions;
-	ElementList& active_stencil_elements = render_state.clip_stencil_elements;
+	ElementClipList& active_stencil_elements = render_state.clip_stencil_elements;
 
 	if (clip_origin != active_origin || clip_dimensions != active_dimensions || stencil_elements != active_stencil_elements)
 	{
@@ -307,7 +306,7 @@ void ElementUtilities::DisableClippingRegion(Context* context)
 	ApplyActiveClipRegion(render_interface, render_state);
 }
 
-void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, const RenderState& render_state)
+void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, RenderState& render_state)
 {
 	RMLUI_ASSERT(render_interface);
 
@@ -323,16 +322,20 @@ void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, 
 		render_interface->EnableScissorRegion(false);
 	}
 
-	const ElementList& stencil_elements = render_state.clip_stencil_elements;
+	const ElementClipList& stencil_elements = render_state.clip_stencil_elements;
 	const bool stencil_test_enabled = !stencil_elements.empty();
 	if (stencil_test_enabled)
 	{
+		const Matrix4f* active_transform = render_state.transform_pointer;
+
 		render_interface->StencilCommand(StencilCommand::TestDisable);
 		render_interface->StencilCommand(StencilCommand::Clear, 0);
 		render_interface->StencilCommand(StencilCommand::WriteIncrement);
 
-		for (Element* stencil_element : stencil_elements)
+		for (const ElementClip& element_clip : stencil_elements)
 		{
+			const Box::Area clip_area = element_clip.clip_area;
+			Element* stencil_element = element_clip.element;
 			const Box& box = stencil_element->GetBox();
 			const ComputedValues& computed = stencil_element->GetComputedValues();
 			const Vector4f radii(computed.border_top_left_radius(), computed.border_top_right_radius(), computed.border_bottom_right_radius(),
@@ -342,14 +345,18 @@ void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, 
 
 			// @performance: Store clipping geometry on element.
 			Geometry geometry;
-			GeometryUtilities::GenerateBackgroundBorder(&geometry, box, {}, radii, Colourb());
+			static const Colourb opaque_colors[4];
+			GeometryUtilities::GenerateBackgroundBorder(&geometry, box, {}, radii, Colourb(),
+				(clip_area == Box::Area::BORDER ? opaque_colors : nullptr));
 			geometry.Render(stencil_element->GetAbsoluteOffset(Box::BORDER));
 		}
 
-		// TODO: Apply transform to the current element again
 		const int stencil_value = (int)stencil_elements.size();
 		render_interface->StencilCommand(StencilCommand::WriteDisable);
 		render_interface->StencilCommand(StencilCommand::TestEqual, stencil_value);
+
+		// Apply the initially set transform in case it was changed.
+		ApplyTransform(render_interface, render_state, active_transform);
 	}
 	else
 	{
@@ -454,35 +461,33 @@ bool ElementUtilities::PositionElement(Element* element, Vector2f offset, Positi
 	return true;
 }
 
-bool ElementUtilities::ApplyTransform(Element* element, Context* context)
+bool ElementUtilities::ApplyTransform(Element* element)
 {
-	RenderInterface* render_interface = nullptr;
-	if (element)
-	{
-		render_interface = element->GetRenderInterface();
-		if (!context)
-			context = element->GetContext();
-	}
-	else if (context)
-	{
-		render_interface = context->GetRenderInterface();
-		if (!render_interface)
-			render_interface = GetRenderInterface();
-	}
+	RMLUI_ASSERT(element);
+	Context* context = element->GetContext();
+	RenderInterface* render_interface = context ? context->GetRenderInterface() : nullptr;
 
 	if (!render_interface || !context)
 		return false;
 
 	RenderState& render_state = context->GetRenderState();
 
-	const Matrix4f*& old_transform = render_state.transform_pointer;
 	const Matrix4f* new_transform = nullptr;
-
 	if (element)
 	{
 		if (const TransformState* state = element->GetTransformState())
 			new_transform = state->GetTransform();
 	}
+
+	ApplyTransform(render_interface, render_state, new_transform);
+
+	return true;
+}
+
+void ElementUtilities::ApplyTransform(RenderInterface* render_interface, RenderState& render_state, const Matrix4f* new_transform)
+{
+	RMLUI_ASSERT(render_interface);
+	const Matrix4f*& old_transform = render_state.transform_pointer;
 
 	// Only changed transforms are submitted.
 	if (old_transform != new_transform)
@@ -500,10 +505,7 @@ bool ElementUtilities::ApplyTransform(Element* element, Context* context)
 
 		old_transform = new_transform;
 	}
-
-	return true;
 }
-
 
 static bool ApplyDataViewsControllersInternal(Element* element, const bool construct_structural_view, const String& structural_view_inner_rml)
 {

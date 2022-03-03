@@ -30,6 +30,7 @@
 #define RMLUI_CORE_ELEMENTUTILITIES_H
 
 #include "Header.h"
+#include "RenderState.h"
 #include "Types.h"
 
 namespace Rml {
@@ -94,7 +95,7 @@ public:
 	/// @param[out] stencil_elements Optional, returns a list of elements that require stencil clipping.
 	/// @param[in] force_clip_self If true, also clips to the border area of the provided element regardless.
 	/// @return True if a scissor region exists for the element and clip_origin and clip_dimensions were set, otherwise false.
-	static bool GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementList* stencil_elements = nullptr,
+	static bool GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementClipList* stencil_elements = nullptr,
 		bool force_clip_self = false);
 	/// Sets the clipping region from an element and its ancestors.
 	/// @param[in] element The element to generate the clipping region from.
@@ -106,7 +107,7 @@ public:
 	/// Applies the clip region from the render interface to the renderer.
 	/// @param[in] render_interface The render interface to update.
 	/// @param[in] render_state The render state to be applied.
-	static void ApplyActiveClipRegion(RenderInterface* render_interface, const RenderState& render_state);
+	static void ApplyActiveClipRegion(RenderInterface* render_interface, RenderState& render_state);
 
 	/// Returns a rectangle covering the element's area in window coordinate space.
 	/// @return True on success, otherwise false.
@@ -134,11 +135,11 @@ public:
 	static bool PositionElement(Element* element, Vector2f offset, PositionAnchor anchor);
 
 	/// Applies an element's accumulated transform matrix, determined from its and ancestor's `perspective' and `transform' properties.
-	/// Note: All calls to RenderInterface::SetTransform must go through here.
 	/// @param[in] element The element whose transform to apply, or nullptr for identity transform.
-	/// @param[in] render_interface The target render interface, or nullptr to fetch from element.
 	/// @return True if a render interface is available to set the transform.
-	static bool ApplyTransform(Element* element, Context* context = nullptr);
+	static bool ApplyTransform(Element* element);
+	/// Applies the new transform to the provided render interface and updates the render state. Low-level interface.
+	static void ApplyTransform(RenderInterface* render_interface, RenderState& render_state, const Matrix4f* new_transform);
 
 	/// Creates data views and data controllers if a data model applies to the element.
 	/// Attributes such as 'data-' are used to create the views and controllers.
