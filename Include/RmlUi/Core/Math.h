@@ -39,6 +39,7 @@ template <typename ColourType, int AlphaDefault> class Colour;
 using Colourb = Colour< byte, 255 >;
 template <typename Type> class Vector2;
 using Vector2f = Vector2< float >;
+using Vector2i = Vector2< int >;
 
 namespace Math {
 
@@ -88,6 +89,13 @@ RMLUICORE_API Vector2f Max<Vector2f>(Vector2f a, Vector2f b);
 /// Element-wise minimum.
 template <>
 RMLUICORE_API Vector2f Min<Vector2f>(Vector2f a, Vector2f b);
+/// Element-wise maximum.
+template <>
+RMLUICORE_API Vector2i Max<Vector2i>(Vector2i a, Vector2i b);
+/// Element-wise minimum.
+template <>
+RMLUICORE_API Vector2i Min<Vector2i>(Vector2i a, Vector2i b);
+
 
 /// Color interpolation.
 RMLUICORE_API Colourb RoundedLerp(float t, Colourb c0, Colourb c1);
