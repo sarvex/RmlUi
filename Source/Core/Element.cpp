@@ -1738,7 +1738,7 @@ void Element::OnPropertyChange(const PropertyIdSet& changed_properties)
 		changed_properties.Contains(PropertyId::BorderBottomRightRadius) ||
 		changed_properties.Contains(PropertyId::BorderBottomLeftRadius)
 	);
-
+	const bool filter_changed = (changed_properties.Contains(PropertyId::Filter) || changed_properties.Contains(PropertyId::BackdropFilter));
 
 	// Update the visibility.
 	if (changed_properties.Contains(PropertyId::Visibility) ||
@@ -1778,47 +1778,32 @@ void Element::OnPropertyChange(const PropertyIdSet& changed_properties)
 		DirtyAbsoluteOffset();
 	}
 
-	// Update the z-index.
-	if (changed_properties.Contains(PropertyId::ZIndex))
+	// Update the z-index and stacking context.
+	if (changed_properties.Contains(PropertyId::ZIndex) || filter_changed)
 	{
-		Style::ZIndex z_index_property = meta->computed_values.z_index();
+		const Style::ZIndex z_index_property = meta->computed_values.z_index();
 
-		if (z_index_property.type == Style::ZIndex::Auto)
+		const float new_z_index = (z_index_property.type == Style::ZIndex::Auto ? 0.f : z_index_property.value);
+		const bool enable_local_stacking_context = (z_index_property.type != Style::ZIndex::Auto || local_stacking_context_forced ||
+			meta->computed_values.has_filter() || meta->computed_values.has_backdrop_filter());
+
+		if (z_index != new_z_index || local_stacking_context != enable_local_stacking_context)
 		{
-			if (local_stacking_context &&
-				!local_stacking_context_forced)
-			{
-				// We're no longer acting as a stacking context.
-				local_stacking_context = false;
+			z_index = new_z_index;
 
-				stacking_context_dirty = false;
+			if (local_stacking_context != enable_local_stacking_context)
+			{
+				local_stacking_context = enable_local_stacking_context;
+
+				// If we are no longer acting as a local stacking context, then we clear the list and are all set. Otherwise, we need to rebuild our
+				// local stacking context.
 				stacking_context.clear();
+				stacking_context_dirty = local_stacking_context;
 			}
 
-			// If our old z-index was not zero, then we must dirty our stacking context so we'll be re-indexed.
-			if (z_index != 0)
-			{
-				z_index = 0;
-				DirtyStackingContext();
-			}
-		}
-		else
-		{
-			float new_z_index = z_index_property.value;
-
-			if (new_z_index != z_index)
-			{
-				z_index = new_z_index;
-
-				if (parent != nullptr)
-					parent->DirtyStackingContext();
-			}
-
-			if (!local_stacking_context)
-			{
-				local_stacking_context = true;
-				stacking_context_dirty = true;
-			}
+			// When our z-index or local stacking context changes, then we must dirty our parent stacking context so we are re-indexed.
+			if (parent)
+				parent->DirtyStackingContext();
 		}
 	}
 
@@ -1848,15 +1833,9 @@ void Element::OnPropertyChange(const PropertyIdSet& changed_properties)
 	}
 	
 	// Dirty the decoration if it's changed.
-	if (changed_properties.Contains(PropertyId::Decorator))
+	if (changed_properties.Contains(PropertyId::Decorator) || filter_changed)
 	{
 		meta->decoration.DirtyDecorators();
-	}
-
-	if (changed_properties.Contains(PropertyId::Filter) || changed_properties.Contains(PropertyId::BackdropFilter))
-	{
-		meta->decoration.DirtyDecorators();
-		bool should_force_local_stacking_context = (meta->computed_values.has_filter() || meta->computed_values.has_backdrop_filter()); // TODO
 	}
 
 	// Dirty the decoration data when its visual looks may have changed.
