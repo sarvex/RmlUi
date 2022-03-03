@@ -54,7 +54,7 @@ class PropertyDefinition;
 class RMLUICORE_API DecoratorInstancer
 {
 public:
-	DecoratorInstancer(DecoratorClasses decorator_classes);
+	DecoratorInstancer(DecoratorClasses decorator_classes = DecoratorClasses::Background);
 	virtual ~DecoratorInstancer();
 
 	/// Instances a decorator given the property tag and attributes from the RCSS file.
