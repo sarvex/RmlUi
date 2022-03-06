@@ -34,7 +34,9 @@
 #include "../../Include/RmlUi/Core/GeometryUtilities.h"
 #include "../../Include/RmlUi/Core/Math.h"
 #include "../../Include/RmlUi/Core/PropertyDefinition.h"
+#include "../../Include/RmlUi/Core/RenderInterface.h"
 #include "ComputeProperty.h"
+#include "DecoratorBasicFilter.h"
 
 /*
 Gradient decorator usage in CSS:
@@ -271,42 +273,33 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 	}
 #endif
 
-	ElementData* element_data = new ElementData{};
-
-	element_data->effect = render_interface->CompileEffect("linear-gradient",
+	CompiledEffectHandle effect_handle = render_interface->CompileEffect("linear-gradient",
 		Dictionary{{"angle", Variant(angle)}, {"p0", Variant(gradient_points.p0)}, {"p1", Variant(gradient_points.p1)},
 			{"length", Variant(gradient_points.length)}, {"color_stop_list", Variant(std::move(stops))}});
 
 	Vertex vertices[4];
 	int indices[6];
 	GeometryUtilities::GenerateQuad(vertices, indices, Vector2f(), dimensions, Colourb(255), Vector2f(), dimensions);
-	element_data->geometry = render_interface->CompileGeometry(vertices, 4, indices, 6, TextureHandle{});
+	CompiledGeometryHandle geometry_handle = render_interface->CompileGeometry(vertices, 4, indices, 6, TextureHandle{});
 
+	BasicEffectElementData* element_data = GetBasicEffectElementDataPool().AllocateAndConstruct(render_interface, effect_handle, geometry_handle);
 	return reinterpret_cast<DecoratorDataHandle>(element_data);
 }
 
 void DecoratorLinearGradient::ReleaseElementData(DecoratorDataHandle handle) const
 {
-	// TODO: Get the render interface from element
-	// RenderInterface* render_interface = element->GetRenderInterface();
-	RenderInterface* render_interface = ::Rml::GetRenderInterface();
-	if (!render_interface)
-		return;
+	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
+	RMLUI_ASSERT(element_data && element_data->render_interface);
 
-	ElementData* element_data = reinterpret_cast<ElementData*>(handle);
-	render_interface->ReleaseCompiledGeometry(element_data->geometry);
-	render_interface->ReleaseCompiledEffect(element_data->effect);
-	delete element_data;
+	element_data->render_interface->ReleaseCompiledGeometry(element_data->geometry);
+	element_data->render_interface->ReleaseCompiledEffect(element_data->effect);
+	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
 }
 
 void DecoratorLinearGradient::RenderElement(Element* element, DecoratorDataHandle handle) const
 {
-	RenderInterface* render_interface = element->GetRenderInterface();
-	if (!render_interface)
-		return;
-
-	ElementData* element_data = reinterpret_cast<ElementData*>(handle);
-	render_interface->RenderEffect(element_data->effect, element_data->geometry, element->GetAbsoluteOffset(Box::PADDING));
+	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
+	element_data->render_interface->RenderEffect(element_data->effect, element_data->geometry, element->GetAbsoluteOffset(Box::PADDING));
 }
 
 DecoratorLinearGradientInstancer::DecoratorLinearGradientInstancer() : DecoratorInstancer(DecoratorClasses::Background)

@@ -29,10 +29,17 @@
 #include "DecoratorBasicFilter.h"
 #include "../../Include/RmlUi/Core/Element.h"
 #include "../../Include/RmlUi/Core/ElementUtilities.h"
+#include "../../Include/RmlUi/Core/PropertyDefinition.h"
 #include "../../Include/RmlUi/Core/RenderInterface.h"
 #include "ComputeProperty.h"
 
 namespace Rml {
+
+Pool<BasicEffectElementData>& GetBasicEffectElementDataPool()
+{
+	static Pool<BasicEffectElementData> basic_effect_element_data_pool(20, true);
+	return basic_effect_element_data_pool;
+}
 
 DecoratorBasicFilter::DecoratorBasicFilter() {}
 
@@ -53,26 +60,23 @@ DecoratorDataHandle DecoratorBasicFilter::GenerateElementData(Element* element) 
 
 	CompiledEffectHandle handle = render_interface->CompileEffect(name, Dictionary{{"value", Variant(value)}});
 
-	return DecoratorDataHandle(handle);
+	BasicEffectElementData* element_data = GetBasicEffectElementDataPool().AllocateAndConstruct(render_interface, handle);
+	return reinterpret_cast<DecoratorDataHandle>(element_data);
 }
 
 void DecoratorBasicFilter::ReleaseElementData(DecoratorDataHandle handle) const
 {
-	// TODO: Get the render interface from element
-	// RenderInterface* render_interface = element->GetRenderInterface();
-	RenderInterface* render_interface = ::Rml::GetRenderInterface();
-	if (!render_interface)
-		return;
-	render_interface->ReleaseCompiledEffect(CompiledEffectHandle(handle));
+	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
+	RMLUI_ASSERT(element_data && element_data->render_interface);
+
+	element_data->render_interface->ReleaseCompiledEffect(element_data->effect);
+	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
 }
 
-void DecoratorBasicFilter::RenderElement(Element* element, DecoratorDataHandle element_data) const
+void DecoratorBasicFilter::RenderElement(Element* /*element*/, DecoratorDataHandle handle) const
 {
-	RenderInterface* render_interface = element->GetRenderInterface();
-	if (!render_interface)
-		return;
-
-	render_interface->RenderEffect(CompiledEffectHandle(element_data));
+	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
+	element_data->render_interface->RenderEffect(element_data->effect);
 }
 
 DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)
