@@ -203,12 +203,12 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		constexpr int mask_border = 0b010;
 		constexpr int mask_inset = 0b100;
 
-		render_interface->StencilCommand(StencilCommand::Clear, 0);
-		render_interface->StencilCommand(StencilCommand::WriteValue, mask_padding);
+		render_interface->ExecuteStencilCommand(StencilCommand::Clear, 0);
+		render_interface->ExecuteStencilCommand(StencilCommand::WriteValue, mask_padding);
 		geometry_padding.Render(element_offset_in_texture);
-		render_interface->StencilCommand(StencilCommand::WriteValue, mask_border);
+		render_interface->ExecuteStencilCommand(StencilCommand::WriteValue, mask_border);
 		geometry_border.Render(element_offset_in_texture);
-		render_interface->StencilCommand(StencilCommand::WriteDisable);
+		render_interface->ExecuteStencilCommand(StencilCommand::WriteDisable);
 
 		geometry.Render(element_offset_in_texture);
 
@@ -265,21 +265,21 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 
 			if (inset)
 			{
-				render_interface->StencilCommand(StencilCommand::WriteValue, mask_inset, mask_inset);
+				render_interface->ExecuteStencilCommand(StencilCommand::WriteValue, mask_inset, mask_inset);
 				shadow_geometry.Render(shadow.offset + element_offset_in_texture);
-				render_interface->StencilCommand(StencilCommand::WriteDisable);
+				render_interface->ExecuteStencilCommand(StencilCommand::WriteDisable);
 
 				if (blur)
-					render_interface->StencilCommand(StencilCommand::TestEqual, 0, mask_inset);
+					render_interface->ExecuteStencilCommand(StencilCommand::TestEqual, 0, mask_inset);
 				else
-					render_interface->StencilCommand(StencilCommand::TestEqual, mask_padding);
+					render_interface->ExecuteStencilCommand(StencilCommand::TestEqual, mask_padding);
 				render_interface->RenderEffect(fullscreen_color);
 
-				render_interface->StencilCommand(StencilCommand::Clear, 0, mask_inset);
+				render_interface->ExecuteStencilCommand(StencilCommand::Clear, 0, mask_inset);
 
 				if (blur)
 				{
-					render_interface->StencilCommand(StencilCommand::TestEqual, mask_padding, mask_padding);
+					render_interface->ExecuteStencilCommand(StencilCommand::TestEqual, mask_padding, mask_padding);
 					render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter);
 					render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
 					render_interface->RenderEffect(blur);
@@ -289,15 +289,15 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			else
 			{
 				if (blur)
-					render_interface->StencilCommand(StencilCommand::TestDisable);
+					render_interface->ExecuteStencilCommand(StencilCommand::TestDisable);
 				else
-					render_interface->StencilCommand(StencilCommand::TestEqual, 0);
+					render_interface->ExecuteStencilCommand(StencilCommand::TestEqual, 0);
 
 				shadow_geometry.Render(shadow.offset + element_offset_in_texture);
 
 				if (blur)
 				{
-					render_interface->StencilCommand(StencilCommand::TestEqual, 0);
+					render_interface->ExecuteStencilCommand(StencilCommand::TestEqual, 0);
 					render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter);
 					render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
 					render_interface->RenderEffect(blur);
@@ -305,7 +305,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 				}
 			}
 
-			render_interface->StencilCommand(StencilCommand::TestDisable, 0);
+			render_interface->ExecuteStencilCommand(StencilCommand::TestDisable, 0);
 
 			if (blur)
 				render_interface->ReleaseCompiledEffect(blur);
@@ -315,7 +315,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 
 		render_interface->EnableScissorRegion(false);
 
-		shadow_texture = render_interface->ExecuteRenderCommand(RenderCommand::StackToTexture, Vector2f(), texture_dimensions);
+		shadow_texture = render_interface->ExecuteRenderCommand(RenderCommand::StackToTexture, Vector2i(), Vector2i(texture_dimensions));
 
 		render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
 

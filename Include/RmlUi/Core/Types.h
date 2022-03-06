@@ -46,9 +46,6 @@ using std::size_t;
 // Unicode code point
 enum class Character : char32_t { Null, Replacement = 0xfffd };
 
-// TODO
-enum class RenderStage { Enter, Decoration, Exit };
-
 }
 
 #include "Colour.h"
@@ -103,6 +100,7 @@ using CompiledGeometryHandle = uintptr_t;
 using DecoratorDataHandle = uintptr_t;
 using FontFaceHandle = uintptr_t;
 using FontEffectsHandle = uintptr_t;
+using CompiledEffectHandle = uintptr_t;
 
 using ElementPtr = UniqueReleaserPtr<Element>;
 using ContextPtr = UniqueReleaserPtr<Context>;

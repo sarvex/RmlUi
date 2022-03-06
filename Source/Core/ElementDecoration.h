@@ -36,6 +36,8 @@ namespace Rml {
 class Decorator;
 class Element;
 
+enum class RenderStage { Enter, Decoration, Exit };
+
 /**
 	Manages an elements decorator state
 
