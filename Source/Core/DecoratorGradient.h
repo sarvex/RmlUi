@@ -82,11 +82,6 @@ public:
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
 
 private:
-	struct ElementData {
-		CompiledEffectHandle effect;
-		CompiledGeometryHandle geometry;
-	};
-
 	float angle;
 	ColorStopList color_stops;
 };

@@ -32,6 +32,7 @@
 #include "../../Include/RmlUi/Core/Decorator.h"
 #include "../../Include/RmlUi/Core/DecoratorInstancer.h"
 #include "../../Include/RmlUi/Core/Property.h"
+#include "Pool.h"
 
 namespace Rml {
 
@@ -66,6 +67,17 @@ private:
 	};
 	BasicFilterPropertyIds ids;
 };
+
+struct BasicEffectElementData {
+	BasicEffectElementData(RenderInterface* render_interface, CompiledEffectHandle effect, CompiledGeometryHandle geometry = {}) :
+		render_interface(render_interface), effect(effect), geometry(geometry)
+	{}
+	RenderInterface* render_interface;
+	CompiledEffectHandle effect;
+	CompiledGeometryHandle geometry;
+};
+
+Pool<BasicEffectElementData>& GetBasicEffectElementDataPool();
 
 } // namespace Rml
 #endif

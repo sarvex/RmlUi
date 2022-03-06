@@ -29,8 +29,10 @@
 #include "DecoratorDropShadow.h"
 #include "../../Include/RmlUi/Core/Element.h"
 #include "../../Include/RmlUi/Core/ElementUtilities.h"
+#include "../../Include/RmlUi/Core/PropertyDefinition.h"
 #include "../../Include/RmlUi/Core/RenderInterface.h"
 #include "ComputeProperty.h"
+#include "DecoratorBasicFilter.h"
 
 namespace Rml {
 
@@ -61,26 +63,23 @@ DecoratorDataHandle DecoratorDropShadow::GenerateElementData(Element* element) c
 	CompiledEffectHandle handle =
 		render_interface->CompileEffect("drop-shadow", Dictionary{{"color", Variant(color)}, {"offset", Variant(offset)}, {"sigma", Variant(sigma)}});
 
-	return DecoratorDataHandle(handle);
+	BasicEffectElementData* element_data = GetBasicEffectElementDataPool().AllocateAndConstruct(render_interface, handle);
+	return reinterpret_cast<DecoratorDataHandle>(element_data);
 }
 
 void DecoratorDropShadow::ReleaseElementData(DecoratorDataHandle handle) const
 {
-	// TODO: Get the render interface from element
-	// RenderInterface* render_interface = element->GetRenderInterface();
-	RenderInterface* render_interface = ::Rml::GetRenderInterface();
-	if (!render_interface)
-		return;
-	render_interface->ReleaseCompiledEffect(CompiledEffectHandle(handle));
+	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
+	RMLUI_ASSERT(element_data && element_data->render_interface);
+
+	element_data->render_interface->ReleaseCompiledEffect(element_data->effect);
+	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
 }
 
-void DecoratorDropShadow::RenderElement(Element* element, DecoratorDataHandle element_data) const
+void DecoratorDropShadow::RenderElement(Element* /*element*/, DecoratorDataHandle handle) const
 {
-	RenderInterface* render_interface = element->GetRenderInterface();
-	if (!render_interface)
-		return;
-
-	render_interface->RenderEffect(CompiledEffectHandle(element_data));
+	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
+	element_data->render_interface->RenderEffect(element_data->effect);
 }
 
 void DecoratorDropShadow::GetClipExtension(Vector2f& top_left, Vector2f& bottom_right) const
