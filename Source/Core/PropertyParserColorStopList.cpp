@@ -27,6 +27,7 @@
  */
 
 #include "PropertyParserColorStopList.h"
+#include "../../Include/RmlUi/Core/ComputedValues.h"
 #include <string.h>
 
 namespace Rml {

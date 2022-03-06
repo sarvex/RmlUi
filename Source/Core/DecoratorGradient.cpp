@@ -186,7 +186,7 @@ static GradientPoints CalculateGradientPoints(float angle, Vector2f dim)
 	const float distance = Math::AbsoluteValue(dim.x * line_vector.x) + Math::AbsoluteValue(-dim.y * line_vector.y);
 
 	return {starting_point, ending_point, distance};
-};
+}
 
 DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* element) const
 {
