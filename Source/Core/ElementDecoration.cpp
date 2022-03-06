@@ -189,7 +189,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 
 			Vector2f filter_origin, filter_size;
 			ElementUtilities::GetElementRegionInWindowSpace(filter_origin, filter_size, element, Box::BORDER);
-			render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter, filter_origin, filter_size);
+			render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter, Vector2i(filter_origin), Vector2i(filter_size));
 
 			const int i0 = num_backgrounds;
 			for (int i = i0; i < i0 + num_backdrop_filters; i++)
@@ -228,7 +228,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			Vector2f filter_origin, filter_size;
 			ElementUtilities::GetElementRegionInWindowSpace(filter_origin, filter_size, element, Box::BORDER, max_top_left, max_bottom_right);
 
-			render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter, filter_origin, filter_size);
+			render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter, Vector2i(filter_origin), Vector2i(filter_size));
 
 			for (int i = i0; i < i0 + num_filters; i++)
 			{

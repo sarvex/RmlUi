@@ -39,8 +39,6 @@ namespace Rml {
 
 class Context;
 
-// TODO: Move
-using CompiledEffectHandle = uintptr_t;
 enum class StencilCommand { None, Clear, WriteValue, WriteIncrement, WriteDisable, TestEqual, TestDisable };
 enum class RenderCommand { None, StackPush, StackPop, StackToTexture, StackToFilter, FilterToStack };
 
@@ -85,17 +83,7 @@ public:
 	/// Called by RmlUi when it wants to release application-compiled geometry.
 	/// @param[in] geometry The application-specific compiled geometry to release.
 	virtual void ReleaseCompiledGeometry(CompiledGeometryHandle geometry);
-
 	
-	virtual TextureHandle ExecuteRenderCommand(RenderCommand command, Vector2f offset = {}, Vector2f dimensions = {});
-	/// Called by RmlUi when...
-	virtual CompiledEffectHandle CompileEffect(const String& name, const Dictionary& parameters);
-	/// Called by RmlUi when...
-	virtual TextureHandle RenderEffect(CompiledEffectHandle effect, CompiledGeometryHandle geometry = {}, Vector2f translation = {});
-	/// Called by RmlUi when...
-	virtual void ReleaseCompiledEffect(CompiledEffectHandle effect);
-
-
 	/// Called by RmlUi when it wants to enable or disable scissoring to clip content.
 	/// @param[in] enable True if scissoring is to enabled, false if it is to be disabled.
 	virtual void EnableScissorRegion(bool enable) = 0;
@@ -106,7 +94,7 @@ public:
 	/// @param[in] height The height of the scissored region. All pixels to below (y + height) should be clipped.
 	virtual void SetScissorRegion(int x, int y, int width, int height) = 0;
 	/// Called by RmlUi when it wants to setup the stencil buffer.
-	virtual bool StencilCommand(StencilCommand command, int value = 0, int mask = 0xff);
+	virtual bool ExecuteStencilCommand(StencilCommand command, int value = 0, int mask = 0xff);
 
 	/// Called by RmlUi when a texture is required by the library.
 	/// @param[out] texture_handle The handle to write the texture handle for the loaded texture to.
@@ -129,6 +117,15 @@ public:
 	/// is submitted. Then it expects the renderer to use an identity matrix or otherwise omit the multiplication with the transform.
 	/// @param[in] transform The new transform to apply, or nullptr if no transform applies to the current element.
 	virtual void SetTransform(const Matrix4f* transform);
+
+	/// Called by RmlUi when...
+	virtual TextureHandle ExecuteRenderCommand(RenderCommand command, Vector2i offset = {}, Vector2i dimensions = {});
+	/// Called by RmlUi when...
+	virtual CompiledEffectHandle CompileEffect(const String& name, const Dictionary& parameters);
+	/// Called by RmlUi when...
+	virtual TextureHandle RenderEffect(CompiledEffectHandle effect, CompiledGeometryHandle geometry = {}, Vector2f translation = {});
+	/// Called by RmlUi when...
+	virtual void ReleaseCompiledEffect(CompiledEffectHandle effect);
 
 	/// Get the context currently being rendered. This is only valid during RenderGeometry,
 	/// CompileGeometry, RenderCompiledGeometry, EnableScissorRegion and SetScissorRegion.

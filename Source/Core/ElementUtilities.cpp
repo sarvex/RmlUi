@@ -335,9 +335,9 @@ void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, 
 	{
 		const Matrix4f* active_transform = render_state.transform_pointer;
 
-		render_interface->StencilCommand(StencilCommand::TestDisable);
-		render_interface->StencilCommand(StencilCommand::Clear, 0);
-		render_interface->StencilCommand(StencilCommand::WriteIncrement);
+		render_interface->ExecuteStencilCommand(StencilCommand::TestDisable);
+		render_interface->ExecuteStencilCommand(StencilCommand::Clear, 0);
+		render_interface->ExecuteStencilCommand(StencilCommand::WriteIncrement);
 
 		for (const ElementClip& element_clip : stencil_elements)
 		{
@@ -359,15 +359,15 @@ void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, 
 		}
 
 		const int stencil_value = (int)stencil_elements.size();
-		render_interface->StencilCommand(StencilCommand::WriteDisable);
-		render_interface->StencilCommand(StencilCommand::TestEqual, stencil_value);
+		render_interface->ExecuteStencilCommand(StencilCommand::WriteDisable);
+		render_interface->ExecuteStencilCommand(StencilCommand::TestEqual, stencil_value);
 
 		// Apply the initially set transform in case it was changed.
 		ApplyTransform(render_interface, render_state, active_transform);
 	}
 	else
 	{
-		render_interface->StencilCommand(StencilCommand::TestDisable);
+		render_interface->ExecuteStencilCommand(StencilCommand::TestDisable);
 	}
 }
 

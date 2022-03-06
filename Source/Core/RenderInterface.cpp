@@ -61,24 +61,7 @@ void RenderInterface::RenderCompiledGeometry(CompiledGeometryHandle /*geometry*/
 void RenderInterface::ReleaseCompiledGeometry(CompiledGeometryHandle /*geometry*/)
 {}
 
-TextureHandle RenderInterface::ExecuteRenderCommand(RenderCommand /*command*/, Vector2f /*offset*/, Vector2f /*dimensions*/)
-{
-	return TextureHandle();
-}
-
-CompiledEffectHandle RenderInterface::CompileEffect(const String& /*name*/, const Dictionary& /*parameters*/)
-{
-	return CompiledEffectHandle(0);
-}
-
-TextureHandle RenderInterface::RenderEffect(CompiledEffectHandle /*effect*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/)
-{
-	return TextureHandle{};
-}
-
-void RenderInterface::ReleaseCompiledEffect(CompiledEffectHandle /*effect*/) {}
-
-bool RenderInterface::StencilCommand(::Rml::StencilCommand /*command*/, int /*value*/, int /*mask*/)
+bool RenderInterface::ExecuteStencilCommand(StencilCommand /*command*/, int /*value*/, int /*mask*/)
 {
 	return false;
 }
@@ -104,6 +87,23 @@ void RenderInterface::ReleaseTexture(TextureHandle /*texture*/)
 void RenderInterface::SetTransform(const Matrix4f* /*transform*/)
 {
 }
+
+TextureHandle RenderInterface::ExecuteRenderCommand(RenderCommand /*command*/, Vector2i /*offset*/, Vector2i /*dimensions*/)
+{
+	return TextureHandle();
+}
+
+CompiledEffectHandle RenderInterface::CompileEffect(const String& /*name*/, const Dictionary& /*parameters*/)
+{
+	return CompiledEffectHandle(0);
+}
+
+TextureHandle RenderInterface::RenderEffect(CompiledEffectHandle /*effect*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/)
+{
+	return TextureHandle{};
+}
+
+void RenderInterface::ReleaseCompiledEffect(CompiledEffectHandle /*effect*/) {}
 
 // Get the context currently being rendered.
 Context* RenderInterface::GetContext() const
