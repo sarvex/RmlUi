@@ -188,17 +188,21 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 
 	while (clipping_element != nullptr)
 	{
+		const bool force_clipping_current_element = (force_clip_self && clipping_element == element);
 		const ComputedValues& clip_computed = clipping_element->GetComputedValues();
 		const bool clip_enabled = (clip_computed.overflow_x() != Style::Overflow::Visible || clip_computed.overflow_y() != Style::Overflow::Visible);
+		const bool clip_always = (clip_computed.clip() == Clip::Type::Always);
 		const bool clip_none = (clip_computed.clip() == Clip::Type::None);
 		const int clip_number = clip_computed.clip().GetNumber();
-		const bool force_clipping_current_element = (force_clip_self && clipping_element == element);
 
 		// Merge the existing clip region with the current clip region if we aren't ignoring clip regions.
-		if ((clip_enabled && num_ignored_clips == 0) || force_clipping_current_element)
+		if (((clip_always || clip_enabled) && num_ignored_clips == 0) || force_clipping_current_element)
 		{
-			bool disable_scissor_clipping = false;
 			const Box::Area client_area = (force_clipping_current_element ? Box::BORDER : clipping_element->GetClientArea());
+			const bool has_clipping_content =
+				(clip_always || force_clipping_current_element || clipping_element->GetClientWidth() < clipping_element->GetScrollWidth() - 0.5f ||
+					clipping_element->GetClientHeight() < clipping_element->GetScrollHeight() - 0.5f);
+			bool disable_scissor_clipping = false;
 
 			if (stencil_elements)
 			{
@@ -207,8 +211,9 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 				const bool has_border_radius = (clip_computed.border_top_left_radius() > 0.f || clip_computed.border_top_right_radius() > 0.f ||
 					clip_computed.border_bottom_right_radius() > 0.f || clip_computed.border_bottom_left_radius() > 0.f);
 
-				// If the element has transforms or uses border-radius, we need to clip using a stencil buffer.
-				if (has_transform || has_border_radius)
+				// If the element has border-radius we always use stencil clipping, since we can't easily predict if content is located on the
+				// curved region to be clipped. If the element has a transform we only clip when the content clips.
+				if (has_border_radius || (has_transform && has_clipping_content))
 					stencil_elements->push_back(ElementClip{clipping_element, client_area});
 
 				// If we only have border-radius then we add this element to the scissor region as well as the stencil buffer. This may help with eg.
@@ -217,8 +222,9 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 				disable_scissor_clipping = has_transform;
 			}
 
-			if (!disable_scissor_clipping)
+			if (has_clipping_content && !disable_scissor_clipping)
 			{
+				// Shrink the scissor region to the element's client area.
 				Vector2f element_top_left = clipping_element->GetAbsoluteOffset(client_area);
 				Vector2f element_bottom_right = element_top_left + clipping_element->GetBox().GetSize(client_area);
 
