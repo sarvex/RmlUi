@@ -28,11 +28,14 @@
 
 #include "ElementDecoration.h"
 #include "../../Include/RmlUi/Core/ComputedValues.h"
+#include "../../Include/RmlUi/Core/Context.h"
 #include "../../Include/RmlUi/Core/Decorator.h"
 #include "../../Include/RmlUi/Core/DecoratorInstancer.h"
 #include "../../Include/RmlUi/Core/Element.h"
 #include "../../Include/RmlUi/Core/ElementDocument.h"
+#include "../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../Include/RmlUi/Core/Profiling.h"
+#include "../../Include/RmlUi/Core/RenderInterface.h"
 #include "../../Include/RmlUi/Core/StyleSheet.h"
 
 namespace Rml {

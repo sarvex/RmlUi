@@ -33,6 +33,7 @@
 #include "../../Include/RmlUi/Core/ElementScroll.h"
 #include "../../Include/RmlUi/Core/Factory.h"
 #include "../../Include/RmlUi/Core/FontEngineInterface.h"
+#include "../../Include/RmlUi/Core/GeometryUtilities.h"
 #include "../../Include/RmlUi/Core/RenderInterface.h"
 #include "DataController.h"
 #include "DataModel.h"
