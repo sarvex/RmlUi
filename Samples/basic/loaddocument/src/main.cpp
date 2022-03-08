@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -28,70 +28,42 @@
 
 #include <RmlUi/Core.h>
 #include <RmlUi/Debugger.h>
-#include <Input.h>
 #include <Shell.h>
-#include <ShellRenderInterfaceOpenGL.h>
 
 Rml::Context* context = nullptr;
-
-ShellRenderInterfaceExtensions *shell_renderer;
 
 void GameLoop()
 {
 	context->Update();
 
-	shell_renderer->PrepareRenderBuffer();
+	Shell::BeginFrame();
 	context->Render();
-	shell_renderer->PresentRenderBuffer();
+	Shell::PresentFrame();
 }
 
 #if defined RMLUI_PLATFORM_WIN32
-#include <windows.h>
-int APIENTRY WinMain(HINSTANCE RMLUI_UNUSED_PARAMETER(instance_handle), HINSTANCE RMLUI_UNUSED_PARAMETER(previous_instance_handle), char* RMLUI_UNUSED_PARAMETER(command_line), int RMLUI_UNUSED_PARAMETER(command_show))
+	#include <RmlUi_Include_Windows.h>
+int APIENTRY WinMain(HINSTANCE /*instance_handle*/, HINSTANCE /*previous_instance_handle*/, char* /*command_line*/, int /*command_show*/)
 #else
-int main(int RMLUI_UNUSED_PARAMETER(argc), char** RMLUI_UNUSED_PARAMETER(argv))
+int main(int /*argc*/, char** /*argv*/)
 #endif
 {
-#ifdef RMLUI_PLATFORM_WIN32
-	RMLUI_UNUSED(instance_handle);
-	RMLUI_UNUSED(previous_instance_handle);
-	RMLUI_UNUSED(command_line);
-	RMLUI_UNUSED(command_show);
-#else
-	RMLUI_UNUSED(argc);
-	RMLUI_UNUSED(argv);
-#endif
+	int window_width = 1024;
+	int window_height = 768;
 
-#ifdef RMLUI_PLATFORM_WIN32
-        AllocConsole();
-#endif
-
-    int window_width = 1024;
-    int window_height = 768;
-
-	ShellRenderInterfaceOpenGL opengl_renderer;
-	shell_renderer = &opengl_renderer;
-
-	// Generic OS initialisation, creates a window and attaches OpenGL.
-	if (!Shell::Initialise() ||
-		!Shell::OpenWindow("Load Document Sample", shell_renderer, window_width, window_height, true))
+	// Initializes and sets the system and render interfaces, creates a window, and attaches the renderer.
+	if (!Shell::Initialize() || !Shell::OpenWindow("Load Document Sample", window_width, window_height, true))
 	{
 		Shell::Shutdown();
 		return -1;
 	}
 
 	// RmlUi initialisation.
-	Rml::SetRenderInterface(&opengl_renderer);
-	shell_renderer->SetViewport(window_width, window_height);
-
-	ShellSystemInterface system_interface;
-	Rml::SetSystemInterface(&system_interface);
-
 	Rml::Initialise();
 
-	// Create the main RmlUi context and set it on the shell's input layer.
+	// Create the main RmlUi context.
 	context = Rml::CreateContext("main", Rml::Vector2i(window_width, window_height));
-	if (context == nullptr)
+	if (!context)
 	{
 		Rml::Shutdown();
 		Shell::Shutdown();
@@ -99,13 +71,11 @@ int main(int RMLUI_UNUSED_PARAMETER(argc), char** RMLUI_UNUSED_PARAMETER(argv))
 	}
 
 	Rml::Debugger::Initialise(context);
-	Input::SetContext(context);
 	Shell::SetContext(context);
-
-	Shell::LoadFonts("assets/");
+	Shell::LoadFonts();
 
 	// Load and show the demo document.
-	if (Rml::ElementDocument * document = context->LoadDocument("assets/demo.rml"))
+	if (Rml::ElementDocument* document = context->LoadDocument("assets/demo.rml"))
 		document->Show();
 
 	Shell::EventLoop(GameLoop);

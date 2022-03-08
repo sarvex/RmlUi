@@ -36,34 +36,31 @@
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Debugger.h>
 #include <Shell.h>
-#include <Input.h>
-#include <ShellRenderInterfaceOpenGL.h>
+#include <PlatformExtensions.h>
 
 
 Rml::Context* context = nullptr;
-ShellRenderInterfaceOpenGL* shell_renderer = nullptr;
 TestNavigator* g_navigator = nullptr;
 
 void GameLoop()
 {
 	context->Update();
 
-	shell_renderer->PrepareRenderBuffer();
+	Shell::BeginFrame();
 	context->Render();
 
 	if (g_navigator)
 		g_navigator->Render();
 
-	shell_renderer->PresentRenderBuffer();
+	Shell::PresentFrame();
 
 	if (g_navigator)
 		g_navigator->Update();
 }
 
-
 #if defined RMLUI_PLATFORM_WIN32
-#include <windows.h>
-int APIENTRY WinMain(HINSTANCE RMLUI_UNUSED_PARAMETER(instance_handle), HINSTANCE RMLUI_UNUSED_PARAMETER(previous_instance_handle), char* command_line, int RMLUI_UNUSED_PARAMETER(command_show))
+	#include <RmlUi_Include_Windows.h>
+int APIENTRY WinMain(HINSTANCE /*instance_handle*/, HINSTANCE /*previous_instance_handle*/, char* command_line, int /*command_show*/)
 #else
 int main(int argc, char** argv)
 #endif
@@ -71,43 +68,28 @@ int main(int argc, char** argv)
 	int load_test_case_index = -1;
 
 #ifdef RMLUI_PLATFORM_WIN32
-	RMLUI_UNUSED(instance_handle);
-	RMLUI_UNUSED(previous_instance_handle);
-	RMLUI_UNUSED(command_show);
-
 	load_test_case_index = std::atoi(command_line) - 1;
 #else
 	if (argc > 1)
 		load_test_case_index = std::atoi(argv[1]) - 1;
 #endif
 
-
 	int window_width = 1500;
 	int window_height = 800;
 
-	ShellRenderInterfaceOpenGL opengl_renderer;
-	shell_renderer = &opengl_renderer;
-
-	// Generic OS initialisation, creates a window and attaches OpenGL.
-	if (!Shell::Initialise() ||
-		!Shell::OpenWindow("Visual tests", shell_renderer, window_width, window_height, true))
+	// Initializes and sets the system and render interfaces, creates a window, and attaches the renderer.
+	if (!Shell::Initialize() || !Shell::OpenWindow("Visual tests", window_width, window_height, true))
 	{
 		Shell::Shutdown();
 		return -1;
 	}
 
 	// RmlUi initialisation.
-	Rml::SetRenderInterface(&opengl_renderer);
-	shell_renderer->SetViewport(window_width, window_height);
-
-	ShellSystemInterface system_interface;
-	Rml::SetSystemInterface(&system_interface);
-
 	Rml::Initialise();
 
-	// Create the main RmlUi context and set it on the shell's input layer.
+	// Create the main RmlUi context.
 	context = Rml::CreateContext("main", Rml::Vector2i(window_width, window_height));
-	if (context == nullptr)
+	if (!context)
 	{
 		Rml::Shutdown();
 		Shell::Shutdown();
@@ -115,10 +97,8 @@ int main(int argc, char** argv)
 	}
 
 	Rml::Debugger::Initialise(context);
-	Input::SetContext(context);
 	Shell::SetContext(context);
-
-	Shell::LoadFonts("assets/");
+	Shell::LoadFonts();
 
 	{
 		const Rml::StringList directories = GetTestInputDirectories();
@@ -127,7 +107,7 @@ int main(int argc, char** argv)
 
 		for (const Rml::String& directory : directories)
 		{
-			const Rml::StringList files = Shell::ListFiles(directory, "rml");
+			const Rml::StringList files = PlatformExtensions::ListFiles(directory, "rml");
 
 			if (files.empty())
 			{
@@ -143,7 +123,7 @@ int main(int argc, char** argv)
 
 		TestViewer viewer(context);
 
-		TestNavigator navigator(shell_renderer, context, &viewer, std::move(test_suites), load_test_case_index);
+		TestNavigator navigator(context->GetRenderInterface(), context, &viewer, std::move(test_suites), load_test_case_index);
 		g_navigator = &navigator;
 
 		Shell::EventLoop(GameLoop);

@@ -26,67 +26,45 @@
  *
  */
 
-#include <RmlUi/Core.h>
-#include <RmlUi/Debugger.h>
-#include <RmlUi/Lua.h>
-
-#include <Input.h>
-#include <Shell.h>
-#include <ShellRenderInterfaceOpenGL.h>
 #include "DecoratorInstancerDefender.h"
 #include "DecoratorInstancerStarfield.h"
 #include "ElementGame.h"
 #include "HighScores.h"
 #include "LuaInterface.h"
+#include <RmlUi/Core.h>
+#include <RmlUi/Debugger.h>
+#include <RmlUi/Lua.h>
+#include <Shell.h>
 
 Rml::Context* context = nullptr;
-
-void DoAllocConsole();
-
-ShellRenderInterfaceExtensions *shell_renderer;
 
 void GameLoop()
 {
 	context->Update();
 
-	shell_renderer->PrepareRenderBuffer();
+	Shell::BeginFrame();
 	context->Render();
-	shell_renderer->PresentRenderBuffer();
+	Shell::PresentFrame();
 }
 
 #if defined RMLUI_PLATFORM_WIN32
-#include <windows.h>
-int APIENTRY WinMain(HINSTANCE, HINSTANCE, char*, int)
+	#include <RmlUi_Include_Windows.h>
+int APIENTRY WinMain(HINSTANCE /*instance_handle*/, HINSTANCE /*previous_instance_handle*/, char* /*command_line*/, int /*command_show*/)
 #else
-int main(int, char**)
+int main(int /*argc*/, char** /*argv*/)
 #endif
 {
-
-#ifdef RMLUI_PLATFORM_WIN32
-	DoAllocConsole();
-#endif
-
 	int window_width = 1024;
 	int window_height = 768;
 
-	ShellRenderInterfaceOpenGL opengl_renderer;
-	shell_renderer = &opengl_renderer;
-
-	// Generic OS initialisation, creates a window and attaches OpenGL.
-	if (!Shell::Initialise() ||
-		!Shell::OpenWindow("RmlUi Invaders from Mars (Lua Powered)", shell_renderer, window_width, window_height, false))
+	// Initializes and sets the system and render interfaces, creates a window, and attaches the renderer.
+	if (!Shell::Initialize() || !Shell::OpenWindow("RmlUi Invaders from Mars (Lua Powered)", window_width, window_height, false))
 	{
 		Shell::Shutdown();
 		return -1;
 	}
 
 	// RmlUi initialisation.
-	Rml::SetRenderInterface(&opengl_renderer);
-	opengl_renderer.SetViewport(window_width, window_height);
-
-	ShellSystemInterface system_interface;
-	Rml::SetSystemInterface(&system_interface);
-
 	Rml::Initialise();
 
 	// Initialise the Lua interface
@@ -102,11 +80,10 @@ int main(int, char**)
 	}
 
 	Rml::Debugger::Initialise(context);
-	Input::SetContext(context);
 	Shell::SetContext(context);
 
 	// Load the font faces required for Invaders.
-	Shell::LoadFonts("assets/");
+	Shell::LoadFonts();
 
 	// Register Invader's custom decorator instancers.
 	DecoratorInstancerStarfield decorator_starfield;
@@ -134,53 +111,3 @@ int main(int, char**)
 
 	return 0;
 }
-
-#ifdef RMLUI_PLATFORM_WIN32
-
-#include <windows.h>
-#include <fcntl.h>
-#include <io.h>
-#include <process.h>
-
-void DoAllocConsole()
-{
-	static const WORD MAX_CONSOLE_LINES = 500;
-	int hConHandle;
-	HANDLE lStdHandle;
-	CONSOLE_SCREEN_BUFFER_INFO coninfo;
-	FILE *fp;
-
-	// allocate a console for this app
-	AllocConsole();
-
-	// set the screen buffer to be big enough to let us scroll text
-	GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &coninfo);
-	coninfo.dwSize.Y = MAX_CONSOLE_LINES;
-	SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), coninfo.dwSize);
-
-	// redirect unbuffered STDOUT to the console
-	lStdHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-	hConHandle = _open_osfhandle((intptr_t)lStdHandle, _O_TEXT);
-	fp = _fdopen( hConHandle, "w" );
-
-	*stdout = *fp;
-	setvbuf( stdout, nullptr, _IONBF, 0 );
-
-	// redirect unbuffered STDIN to the console
-	lStdHandle = GetStdHandle(STD_INPUT_HANDLE);
-	hConHandle = _open_osfhandle((intptr_t)lStdHandle, _O_TEXT);
-	fp = _fdopen( hConHandle, "r" );
-
-	*stdin = *fp;
-	setvbuf( stdin, nullptr, _IONBF, 0 );
-
-	// redirect unbuffered STDERR to the console
-	lStdHandle = GetStdHandle(STD_ERROR_HANDLE);
-	hConHandle = _open_osfhandle((intptr_t)lStdHandle, _O_TEXT);
-	fp = _fdopen( hConHandle, "w" );
-	*stderr = *fp;
-
-	setvbuf( stderr, nullptr, _IONBF, 0 );
-	ShowWindow(GetConsoleWindow(), SW_SHOW);
-}
-#endif

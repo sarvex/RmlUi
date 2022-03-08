@@ -27,21 +27,17 @@
  */
 
 #include "TestsShell.h"
+#include "TestsInterface.h"
 #include <RmlUi/Core/Context.h>
-#include <RmlUi/Core/EventListener.h>
-#include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/Core.h>
+#include <RmlUi/Core/Element.h>
+#include <RmlUi/Core/EventListener.h>
 #include <RmlUi/Debugger.h>
 #include <Shell.h>
-#include <Input.h>
-#include <ShellRenderInterfaceOpenGL.h>
-#include "TestsInterface.h"
-
 #include <doctest.h>
 
 // Uncomment the following to render to the shell window instead of the dummy renderer. Useful for viewing the result while building RML.
 //#define RMLUI_TESTS_USE_SHELL
-
 
 namespace {
 	const Rml::Vector2i window_size(1500, 800);
@@ -53,8 +49,6 @@ namespace {
 	TestsSystemInterface tests_system_interface;
 
 #ifdef RMLUI_TESTS_USE_SHELL
-	ShellRenderInterfaceOpenGL shell_render_interface;
-
 	class TestsShellEventListener : public Rml::EventListener {
 	public:
 		void ProcessEvent(Rml::Event& event) override
@@ -81,27 +75,24 @@ static void InitializeShell()
 	if (!shell_initialized)
 	{
 		shell_initialized = true;
+		REQUIRE(Shell::Initialize());
 
+		// Override the default installed system and render interfaces.
 		Rml::SetSystemInterface(&tests_system_interface);
+#ifndef RMLUI_TESTS_USE_SHELL
 		Rml::SetRenderInterface(&shell_render_interface);
+#endif
 
 		REQUIRE(Rml::Initialise());
 		shell_context = Rml::CreateContext("main", window_size);
-
-		REQUIRE(Shell::Initialise());
-		Shell::LoadFonts("assets/");
+		Shell::LoadFonts();
 
 #ifdef RMLUI_TESTS_USE_SHELL
 		// Also, create the window.
-
 		Rml::Debugger::Initialise(shell_context);
 		num_documents_begin = shell_context->GetNumDocuments();
 
-		REQUIRE(Shell::OpenWindow("RmlUi Tests", &shell_render_interface, window_size.x, window_size.y, true));
-
-		shell_render_interface.SetViewport(window_size.x, window_size.y);
-
-		::Input::SetContext(shell_context);
+		REQUIRE(Shell::OpenWindow("RmlUi Tests", window_size.x, window_size.y, true));
 		Shell::SetContext(shell_context);
 
 		shell_context->GetRootElement()->AddEventListener(Rml::EventId::Keydown, &shell_event_listener, true);
@@ -116,17 +107,17 @@ Rml::Context* TestsShell::GetContext()
 	return shell_context;
 }
 
-void TestsShell::PrepareRenderBuffer()
+void TestsShell::BeginFrame()
 {
 #ifdef RMLUI_TESTS_USE_SHELL
-	shell_render_interface.PrepareRenderBuffer();
+	Shell::BeginFrame();
 #endif
 }
 
-void TestsShell::PresentRenderBuffer()
+void TestsShell::PresentFrame()
 {
 #ifdef RMLUI_TESTS_USE_SHELL
-	shell_render_interface.PresentRenderBuffer();
+	Shell::PresentFrame();
 #endif
 }
 
@@ -137,9 +128,9 @@ void TestsShell::RenderLoop()
 #if defined(RMLUI_TESTS_USE_SHELL)
 	Shell::EventLoop([]() {
 		shell_context->Update();
-		PrepareRenderBuffer();
+		BeginFrame();
 		shell_context->Render();
-		PresentRenderBuffer();
+		PresentFrame();
 	});
 #else
 	shell_context->Update();
@@ -160,9 +151,10 @@ void TestsShell::ShutdownShell()
 
 #ifdef RMLUI_TESTS_USE_SHELL
 		Shell::CloseWindow();
-		Shell::Shutdown();
 		Shell::SetContext(nullptr);
 #endif
+		
+		Shell::Shutdown();
 
 		shell_context = nullptr;
 		shell_initialized = false;

@@ -28,9 +28,7 @@
 
 #include <RmlUi/Core.h>
 #include <RmlUi/Debugger.h>
-#include <Input.h>
 #include <Shell.h>
-#include <ShellRenderInterfaceOpenGL.h>
 #include <numeric>
 
 
@@ -419,7 +417,6 @@ class DemoWindow : public Rml::EventListener
 public:
 	DemoWindow(const Rml::String &title, Rml::Context *context)
 	{
-		using namespace Rml;
 		document = context->LoadDocument("basic/databinding/data/databinding.rml");
 		if (document)
 		{
@@ -469,7 +466,6 @@ private:
 
 
 Rml::Context* context = nullptr;
-ShellRenderInterfaceExtensions *shell_renderer;
 
 void GameLoop()
 {
@@ -483,54 +479,34 @@ void GameLoop()
 
 	context->Update();
 
-	shell_renderer->PrepareRenderBuffer();
+	Shell::BeginFrame();
 	context->Render();
-	shell_renderer->PresentRenderBuffer();
+	Shell::PresentFrame();
 }
 
 
 
 #if defined RMLUI_PLATFORM_WIN32
-#include <windows.h>
-int APIENTRY WinMain(HINSTANCE RMLUI_UNUSED_PARAMETER(instance_handle), HINSTANCE RMLUI_UNUSED_PARAMETER(previous_instance_handle), char* RMLUI_UNUSED_PARAMETER(command_line), int RMLUI_UNUSED_PARAMETER(command_show))
+	#include <RmlUi_Include_Windows.h>
+int APIENTRY WinMain(HINSTANCE /*instance_handle*/, HINSTANCE /*previous_instance_handle*/, char* /*command_line*/, int /*command_show*/)
 #else
-int main(int RMLUI_UNUSED_PARAMETER(argc), char** RMLUI_UNUSED_PARAMETER(argv))
+int main(int /*argc*/, char** /*argv*/)
 #endif
 {
-#ifdef RMLUI_PLATFORM_WIN32
-	RMLUI_UNUSED(instance_handle);
-	RMLUI_UNUSED(previous_instance_handle);
-	RMLUI_UNUSED(command_line);
-	RMLUI_UNUSED(command_show);
-#else
-	RMLUI_UNUSED(argc);
-	RMLUI_UNUSED(argv);
-#endif
-
 	const int width = 1600;
 	const int height = 900;
 
-	ShellRenderInterfaceOpenGL opengl_renderer;
-	shell_renderer = &opengl_renderer;
-
-	// Generic OS initialisation, creates a window and attaches OpenGL.
-	if (!Shell::Initialise() ||
-		!Shell::OpenWindow("Data Binding Sample", shell_renderer, width, height, true))
+	// Initializes and sets the system and render interfaces, creates a window, and attaches the renderer.
+	if (!Shell::Initialize() || !Shell::OpenWindow("Data Binding Sample", width, height, true))
 	{
 		Shell::Shutdown();
 		return -1;
 	}
 
 	// RmlUi initialisation.
-	Rml::SetRenderInterface(&opengl_renderer);
-	opengl_renderer.SetViewport(width, height);
-
-	ShellSystemInterface system_interface;
-	Rml::SetSystemInterface(&system_interface);
-
 	Rml::Initialise();
 
-	// Create the main RmlUi context and set it on the shell's input layer.
+	// Create the main RmlUi context.
 	context = Rml::CreateContext("main", Rml::Vector2i(width, height));
 
 	if (!context
@@ -546,10 +522,8 @@ int main(int RMLUI_UNUSED_PARAMETER(argc), char** RMLUI_UNUSED_PARAMETER(argv))
 	}
 
 	Rml::Debugger::Initialise(context);
-	Input::SetContext(context);
 	Shell::SetContext(context);
-	
-	Shell::LoadFonts("assets/");
+	Shell::LoadFonts();
 
 	auto demo_window = Rml::MakeUnique<DemoWindow>("Data binding", context);
 	demo_window->GetDocument()->AddEventListener(Rml::EventId::Keydown, demo_window.get());
