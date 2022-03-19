@@ -100,6 +100,60 @@ void RenderInterface_GL2::SetScissorRegion(int x, int y, int width, int height)
 	glScissor(x, viewport_height - (y + height), width, height);
 }
 
+bool RenderInterface_GL2::ExecuteStencilCommand(Rml::StencilCommand command, int value, int mask)
+{
+	RMLUI_ASSERT(value >= 0 && value <= 255 && mask >= 0 && mask <= 255);
+	using Rml::StencilCommand;
+
+	switch (command)
+	{
+	case StencilCommand::Clear:
+	{
+		RMLUI_ASSERT(value == 0);
+		glEnable(GL_STENCIL_TEST);
+		glStencilMask(GLuint(mask));
+		glClear(GL_STENCIL_BUFFER_BIT);
+	}
+	break;
+	case StencilCommand::WriteValue:
+	{
+		glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+		glStencilFunc(GL_ALWAYS, GLint(value), GLuint(-1));
+		glStencilMask(GLuint(mask));
+		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+	}
+	break;
+	case StencilCommand::WriteIncrement:
+	{
+		glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+		glStencilMask(GLuint(mask));
+		glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
+	}
+	break;
+	case StencilCommand::WriteDisable:
+	{
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glStencilMask(0);
+		glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+	}
+	break;
+	case StencilCommand::TestEqual:
+	{
+		glStencilFunc(GL_EQUAL, GLint(value), GLuint(mask));
+	}
+	break;
+	case StencilCommand::TestDisable:
+	{
+		glStencilFunc(GL_ALWAYS, GLint(value), GLuint(mask));
+	}
+	break;
+	case StencilCommand::None:
+		break;
+	}
+
+	return true;
+}
+
 // Set to byte packing, or the compiler will expand our struct, which means it won't read correctly from file
 #pragma pack(1)
 struct TGAHeader {
