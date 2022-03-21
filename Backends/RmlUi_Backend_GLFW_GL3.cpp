@@ -73,12 +73,6 @@ bool Backend::OpenWindow(const char* name, int width, int height, bool allow_res
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 	glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
 
-	// Request stencil buffer of at least 8-bit size to supporting clipping on transformed elements.
-	glfwWindowHint(GLFW_STENCIL_BITS, 8);
-
-	// Enable MSAA for better-looking visuals, especially when transforms are applied.
-	glfwWindowHint(GLFW_SAMPLES, 2);
-
 	if (!RmlGLFW::CreateWindow(name, width, height, allow_resize, window))
 		return false;
 

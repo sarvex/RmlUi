@@ -29,6 +29,7 @@
 #include "RmlUi_Renderer_GL3.h"
 #include <RmlUi/Core/Core.h>
 #include <RmlUi/Core/FileInterface.h>
+#include <RmlUi/Core/GeometryUtilities.h>
 #include <RmlUi/Core/Log.h>
 #include <RmlUi/Core/Platform.h>
 #include <string.h>
@@ -41,12 +42,20 @@
 #endif
 
 #if defined RMLUI_PLATFORM_EMSCRIPTEN
-	#define RMLUI_SHADER_HEADER "#version 300 es\nprecision highp float;\n"
+	#define RMLUI_SHADER_HEADER_PRE "#version 300 es\nprecision highp float;\n"
 	#include <GLES3/gl3.h>
 #else
-	#define RMLUI_SHADER_HEADER "#version 330\n"
+	#define RMLUI_SHADER_HEADER_PRE "#version 330\n"
 	#define GLAD_GL_IMPLEMENTATION
 	#include "RmlUi_Include_GL3.h"
+#endif
+
+#define RMLUI_PREMULTIPLIED_ALPHA 1
+
+#if RMLUI_PREMULTIPLIED_ALPHA
+	#define RMLUI_SHADER_HEADER RMLUI_SHADER_HEADER_PRE "#define RMLUI_PREMULTIPLIED_ALPHA 1 "
+#else
+	#define RMLUI_SHADER_HEADER RMLUI_SHADER_HEADER_PRE "#define RMLUI_PREMULTIPLIED_ALPHA 0 "
 #endif
 
 static int viewport_width = 0;
@@ -67,13 +76,17 @@ void main() {
 	fragTexCoord = inTexCoord0;
 	fragColor = inColor0;
 
-	vec2 translatedPos = inPosition + _translate.xy;
+#if RMLUI_PREMULTIPLIED_ALPHA
+	// Pre-multiply vertex colors with their alpha.
+	fragColor.rgb = fragColor.rgb * fragColor.a;
+#endif
+
+	vec2 translatedPos = inPosition + _translate;
 	vec4 outPos = _transform * vec4(translatedPos, 0, 1);
 
     gl_Position = outPos;
 }
 )";
-
 static const char* shader_main_fragment_texture = RMLUI_SHADER_HEADER R"(
 uniform sampler2D _tex;
 in vec2 fragTexCoord;
@@ -83,6 +96,12 @@ out vec4 finalColor;
 
 void main() {
 	vec4 texColor = texture(_tex, fragTexCoord);
+
+#if RMLUI_PREMULTIPLIED_ALPHA
+	// Pre-multiply texure colors with their alpha.
+	texColor.rgb = texColor.rgb * texColor.a;
+#endif
+
 	finalColor = fragColor * texColor;
 }
 )";
@@ -97,6 +116,29 @@ void main() {
 }
 )";
 
+static const char* shader_postprocess_vertex = RMLUI_SHADER_HEADER R"(
+in vec2 inPosition;
+in vec2 inTexCoord0;
+
+out vec2 fragTexCoord;
+
+void main() {
+	fragTexCoord = inTexCoord0;
+    gl_Position = vec4(inPosition, 0.0, 1.0);
+}
+)";
+static const char* shader_postprocess_fragment = RMLUI_SHADER_HEADER R"(
+uniform sampler2D _tex;
+
+in vec2 fragTexCoord;
+out vec4 finalColor;
+
+void main() {
+	vec4 texColor = texture(_tex, fragTexCoord);
+	finalColor = texColor;
+}
+)";
+
 namespace Gfx {
 
 enum class ProgramUniform { Translate, Transform, Tex, Count };
@@ -106,7 +148,7 @@ enum class VertexAttribute { Position, Color0, TexCoord0, Count };
 static const char* const vertex_attribute_names[(size_t)VertexAttribute::Count] = {"inPosition", "inColor0", "inTexCoord0"};
 
 struct CompiledGeometryData {
-	GLuint texture;
+	Rml::TextureHandle texture;
 	GLuint vao;
 	GLuint vbo;
 	GLuint ibo;
@@ -121,12 +163,28 @@ struct ProgramData {
 struct ShadersData {
 	ProgramData program_color;
 	ProgramData program_texture;
+	ProgramData program_postprocess;
 	GLuint shader_main_vertex;
 	GLuint shader_main_fragment_color;
 	GLuint shader_main_fragment_texture;
+	GLuint shader_postprocess_vertex;
+	GLuint shader_postprocess_fragment;
 };
 
+struct FramebufferData {
+	int width, height;
+	GLuint framebuffer;
+	GLuint tex_color_buffer;
+	GLenum tex_color_target;
+	GLuint depth_stencil_buffer;
+	bool owns_depth_stencil_buffer;
+};
+
+enum class FramebufferAttachment { None, Depth, DepthStencil };
+
 static ShadersData shaders_data = {};
+static FramebufferData framebuffer_main = {};
+static FramebufferData framebuffer_postprocess = {};
 static Rml::Matrix4f projection;
 
 static RenderInterface_GL3* render_interface = nullptr;
@@ -155,7 +213,7 @@ static void CheckGLError(const char* operation_name)
 }
 
 // Create the shader, 'shader_type' is either GL_VERTEX_SHADER or GL_FRAGMENT_SHADER.
-static GLuint CreateShader(GLenum shader_type, const char* code_string)
+static bool CreateShader(GLuint& out_shader_id, GLenum shader_type, const char* code_string)
 {
 	GLuint id = glCreateShader(shader_type);
 
@@ -174,29 +232,24 @@ static GLuint CreateShader(GLenum shader_type, const char* code_string)
 		Rml::Log::Message(Rml::Log::LT_ERROR, "Compile failure in OpenGL shader: %s", info_log_string);
 		delete[] info_log_string;
 		glDeleteShader(id);
-		return 0;
+		return false;
 	}
 
 	CheckGLError("CreateShader");
 
-	return id;
+	out_shader_id = id;
+	return true;
 }
 
-static void BindAttribLocations(GLuint program)
-{
-	for (GLuint i = 0; i < (GLuint)VertexAttribute::Count; i++)
-	{
-		glBindAttribLocation(program, i, vertex_attribute_names[i]);
-	}
-	CheckGLError("BindAttribLocations");
-}
-
-static bool CreateProgram(GLuint vertex_shader, GLuint fragment_shader, ProgramData& out_program)
+static bool CreateProgram(ProgramData& out_program, GLuint vertex_shader, GLuint fragment_shader)
 {
 	GLuint id = glCreateProgram();
 	RMLUI_ASSERT(id);
 
-	BindAttribLocations(id);
+	for (GLuint i = 0; i < (GLuint)VertexAttribute::Count; i++)
+		glBindAttribLocation(id, i, vertex_attribute_names[i]);
+
+	CheckGLError("BindAttribLocations");
 
 	glAttachShader(id, vertex_shader);
 	glAttachShader(id, fragment_shader);
@@ -266,42 +319,125 @@ static bool CreateProgram(GLuint vertex_shader, GLuint fragment_shader, ProgramD
 	return true;
 }
 
-static bool CreateShaders(ShadersData& out_shaders)
+static bool CreateFramebuffer(FramebufferData& out_fb, int width, int height, int samples, FramebufferAttachment attachment,
+	GLuint shared_depth_stencil_buffer)
 {
-	out_shaders = {};
-	GLuint& main_vertex = out_shaders.shader_main_vertex;
-	GLuint& main_fragment_color = out_shaders.shader_main_fragment_color;
-	GLuint& main_fragment_texture = out_shaders.shader_main_fragment_texture;
+	constexpr GLenum color_format = GL_RGBA8;   // GL_RGBA8 GL_SRGB8_ALPHA8 GL_RGBA16F
+	constexpr GLint min_mag_filter = GL_LINEAR; // GL_NEAREST
+	constexpr GLint wrap_mode = GL_REPEAT;      // GL_MIRRORED_REPEAT GL_CLAMP_TO_EDGE
+	const GLenum tex_color_target = samples > 0 ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
 
-	main_vertex = CreateShader(GL_VERTEX_SHADER, shader_main_vertex);
-	if (!main_vertex)
+	GLuint framebuffer = 0;
+	glGenFramebuffers(1, &framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+	GLuint tex_color_buffer = 0;
 	{
-		Rml::Log::Message(Rml::Log::LT_ERROR, "Could not create OpenGL shader: 'shader_main_vertex'.");
-		return false;
+		glGenTextures(1, &tex_color_buffer);
+		glBindTexture(tex_color_target, tex_color_buffer);
+
+		if (samples > 0)
+			glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, color_format, width, height, GL_TRUE);
+		else
+			glTexImage2D(GL_TEXTURE_2D, 0, color_format, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_mag_filter);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, min_mag_filter);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex_color_target, tex_color_buffer, 0);
 	}
-	main_fragment_color = CreateShader(GL_FRAGMENT_SHADER, shader_main_fragment_color);
-	if (!main_fragment_color)
+
+	GLuint depth_stencil_buffer = 0;
+	// Create depth only or combined depth/stencil
+	if (attachment != FramebufferAttachment::None)
 	{
-		Rml::Log::Message(Rml::Log::LT_ERROR, "Could not create OpenGL shader: 'shader_main_fragment_color'.");
-		return false;
+		// Attach depth/stencil as buffer storage instead
+		if (shared_depth_stencil_buffer)
+		{
+			// Share depth/stencil buffer
+			depth_stencil_buffer = shared_depth_stencil_buffer;
+		}
+		else
+		{
+			// Create new depth/stencil buffer
+			glGenRenderbuffers(1, &depth_stencil_buffer);
+			glBindRenderbuffer(GL_RENDERBUFFER, depth_stencil_buffer);
+
+			const GLenum internal_format = (attachment == FramebufferAttachment::DepthStencil ? GL_DEPTH24_STENCIL8 : GL_DEPTH_COMPONENT32);
+			glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, internal_format, width, height);
+		}
+
+		const GLenum attachment_type = (attachment == FramebufferAttachment::DepthStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachment_type, GL_RENDERBUFFER, depth_stencil_buffer);
 	}
-	main_fragment_texture = CreateShader(GL_FRAGMENT_SHADER, shader_main_fragment_texture);
-	if (!main_fragment_texture)
+
+	const GLuint framebuffer_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+	if (framebuffer_status != GL_FRAMEBUFFER_COMPLETE)
 	{
-		Rml::Log::Message(Rml::Log::LT_ERROR, "Could not create OpenGL shader: 'shader_main_fragment_texture'.");
+		Rml::Log::Message(Rml::Log::LT_ERROR, "OpenGL framebuffer could not be generated. Error code %x.", framebuffer_status);
 		return false;
 	}
 
-	if (!CreateProgram(main_vertex, main_fragment_color, out_shaders.program_color))
-	{
-		Rml::Log::Message(Rml::Log::LT_ERROR, "Could not create OpenGL program: 'program_color'.");
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindTexture(tex_color_target, 0);
+
+	CheckGLError("CreateFramebuffer");
+
+	out_fb = {};
+	out_fb.width = width;
+	out_fb.height = height;
+	out_fb.framebuffer = framebuffer;
+	out_fb.tex_color_buffer = tex_color_buffer;
+	out_fb.tex_color_target = tex_color_target;
+	out_fb.depth_stencil_buffer = depth_stencil_buffer;
+	out_fb.owns_depth_stencil_buffer = !shared_depth_stencil_buffer;
+
+	return true;
+}
+
+void DestroyFramebuffer(FramebufferData& fb)
+{
+	glDeleteFramebuffers(1, &fb.framebuffer);
+	if (fb.tex_color_buffer)
+		glDeleteTextures(1, &fb.tex_color_buffer);
+	if (fb.owns_depth_stencil_buffer && fb.depth_stencil_buffer)
+		glDeleteRenderbuffers(1, &fb.depth_stencil_buffer);
+	fb = {};
+}
+
+static bool CreateShaders(ShadersData& out_data)
+{
+	auto ReportError = [](const char* type, const char* name) {
+		Rml::Log::Message(Rml::Log::LT_ERROR, "Could not create OpenGL %s: '%s'.", type, name);
 		return false;
-	}
-	if (!CreateProgram(main_vertex, main_fragment_texture, out_shaders.program_texture))
-	{
-		Rml::Log::Message(Rml::Log::LT_ERROR, "Could not create OpenGL program: 'program_texture'.");
-		return false;
-	}
+	};
+
+	out_data = {};
+
+	if (!CreateShader(out_data.shader_main_vertex, GL_VERTEX_SHADER, shader_main_vertex))
+		return ReportError("shader", "main_vertex");
+
+	if (!CreateShader(out_data.shader_main_fragment_color, GL_FRAGMENT_SHADER, shader_main_fragment_color))
+		return ReportError("shader", "main_fragment_color");
+
+	if (!CreateShader(out_data.shader_main_fragment_texture, GL_FRAGMENT_SHADER, shader_main_fragment_texture))
+		return ReportError("shader", "main_fragment_texture");
+
+	if (!CreateShader(out_data.shader_postprocess_vertex, GL_VERTEX_SHADER, shader_postprocess_vertex))
+		return ReportError("shader", "postprocess_vertex");
+
+	if (!CreateShader(out_data.shader_postprocess_fragment, GL_FRAGMENT_SHADER, shader_postprocess_fragment))
+		return ReportError("shader", "postprocess_fragment");
+
+	if (!CreateProgram(out_data.program_color, out_data.shader_main_vertex, out_data.shader_main_fragment_color))
+		return ReportError("program", "color");
+
+	if (!CreateProgram(out_data.program_texture, out_data.shader_main_vertex, out_data.shader_main_fragment_texture))
+		return ReportError("program", "texture");
+
+	if (!CreateProgram(out_data.program_postprocess, out_data.shader_postprocess_vertex, out_data.shader_postprocess_fragment))
+		return ReportError("program", "postprocess");
 
 	return true;
 }
@@ -310,10 +446,13 @@ static void DestroyShaders(ShadersData& shaders)
 {
 	glDeleteProgram(shaders.program_color.id);
 	glDeleteProgram(shaders.program_texture.id);
+	glDeleteProgram(shaders.program_postprocess.id);
 
 	glDeleteShader(shaders.shader_main_vertex);
 	glDeleteShader(shaders.shader_main_fragment_color);
 	glDeleteShader(shaders.shader_main_fragment_texture);
+	glDeleteShader(shaders.shader_postprocess_vertex);
+	glDeleteShader(shaders.shader_postprocess_fragment);
 
 	shaders = {};
 }
@@ -374,7 +513,7 @@ Rml::CompiledGeometryHandle RenderInterface_GL3::CompileGeometry(Rml::Vertex* ve
 	Gfx::CheckGLError("CompileGeometry");
 
 	Gfx::CompiledGeometryData* geometry = new Gfx::CompiledGeometryData;
-	geometry->texture = (GLuint)texture;
+	geometry->texture = texture;
 	geometry->vao = vao;
 	geometry->vbo = vbo;
 	geometry->ibo = ibo;
@@ -387,10 +526,17 @@ void RenderInterface_GL3::RenderCompiledGeometry(Rml::CompiledGeometryHandle han
 {
 	Gfx::CompiledGeometryData* geometry = (Gfx::CompiledGeometryData*)handle;
 
-	if (geometry->texture)
+	if (geometry->texture == TexturePostprocess)
+	{
+		glUseProgram(Gfx::shaders_data.program_postprocess.id);
+	}
+	else if (geometry->texture)
 	{
 		glUseProgram(Gfx::shaders_data.program_texture.id);
-		glBindTexture(GL_TEXTURE_2D, geometry->texture);
+
+		if (geometry->texture != TextureIgnoreBinding)
+			glBindTexture(GL_TEXTURE_2D, (GLuint)geometry->texture);
+
 		SubmitTransformUniform(ProgramId::Texture, Gfx::shaders_data.program_texture.uniform_locations[(size_t)Gfx::ProgramUniform::Transform]);
 		glUniform2fv(Gfx::shaders_data.program_texture.uniform_locations[(size_t)Gfx::ProgramUniform::Translate], 1, &translation.x);
 	}
@@ -406,11 +552,6 @@ void RenderInterface_GL3::RenderCompiledGeometry(Rml::CompiledGeometryHandle han
 	glDrawElements(GL_TRIANGLES, geometry->draw_count, GL_UNSIGNED_INT, (const GLvoid*)0);
 
 	Gfx::CheckGLError("RenderCompiledGeometry");
-
-	// if (texture && texture->premultiplied_alpha)
-	//	gfx::state::blending(GfxBlending::BlendPremultipliedAlpha);
-	// else
-	//	gfx::state::blending(GfxBlending::Blend);
 }
 
 void RenderInterface_GL3::ReleaseCompiledGeometry(Rml::CompiledGeometryHandle handle)
@@ -572,7 +713,7 @@ bool RenderInterface_GL3::LoadTexture(Rml::TextureHandle& texture_handle, Rml::V
 			if (color_mode == 4)
 			{
 				const int alpha = image_src[read_index + 3];
-#ifdef RMLUI_SRGB_PREMULTIPLIED_ALPHA_NO
+#ifdef RMLUI_PREMULTIPLIED_ALPHA_COMPUTE
 				image_dest[write_index + 0] = (image_dest[write_index + 0] * alpha) / 255;
 				image_dest[write_index + 1] = (image_dest[write_index + 1] * alpha) / 255;
 				image_dest[write_index + 2] = (image_dest[write_index + 2] * alpha) / 255;
@@ -612,8 +753,7 @@ bool RenderInterface_GL3::GenerateTexture(Rml::TextureHandle& texture_handle, co
 
 	glBindTexture(GL_TEXTURE_2D, texture_id);
 
-	GLint internal_format = GL_RGBA8;
-	glTexImage2D(GL_TEXTURE_2D, 0, internal_format, source_dimensions.x, source_dimensions.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, source);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, source_dimensions.x, source_dimensions.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, source);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -635,6 +775,26 @@ void RenderInterface_GL3::SetTransform(const Rml::Matrix4f* new_transform)
 	transform = Gfx::projection * (new_transform ? *new_transform : Rml::Matrix4f::Identity());
 	transform_dirty_state = ProgramId::All;
 }
+
+Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand command, Rml::Vector2i offset, Rml::Vector2i dimensions)
+{
+	Rml::TextureHandle texture_handle = {};
+
+	return texture_handle;
+}
+
+Rml::CompiledEffectHandle RenderInterface_GL3::CompileEffect(const Rml::String& name, const Rml::Dictionary& parameters)
+{
+	return Rml::CompiledEffectHandle();
+}
+
+Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle effect, Rml::CompiledGeometryHandle geometry,
+	Rml::Vector2f translation)
+{
+	return Rml::TextureHandle();
+}
+
+void RenderInterface_GL3::ReleaseCompiledEffect(Rml::CompiledEffectHandle effect) {}
 
 void RenderInterface_GL3::SubmitTransformUniform(ProgramId program_id, int uniform_location)
 {
@@ -669,6 +829,9 @@ bool RmlGL3::Initialize()
 
 void RmlGL3::Shutdown()
 {
+	Gfx::DestroyFramebuffer(Gfx::framebuffer_main);
+	Gfx::DestroyFramebuffer(Gfx::framebuffer_postprocess);
+
 	Gfx::DestroyShaders(Gfx::shaders_data);
 
 #if !defined RMLUI_PLATFORM_EMSCRIPTEN
@@ -687,26 +850,81 @@ void RmlGL3::SetViewport(int width, int height)
 
 void RmlGL3::BeginFrame()
 {
+	if (viewport_width != Gfx::framebuffer_main.width || viewport_height != Gfx::framebuffer_main.height)
+	{
+		constexpr int num_samples = 2;
+
+		Gfx::DestroyFramebuffer(Gfx::framebuffer_main);
+		Gfx::CreateFramebuffer(Gfx::framebuffer_main, viewport_width, viewport_height, num_samples, Gfx::FramebufferAttachment::DepthStencil, 0);
+
+		Gfx::DestroyFramebuffer(Gfx::framebuffer_postprocess);
+		Gfx::CreateFramebuffer(Gfx::framebuffer_postprocess, viewport_width, viewport_height, 0, Gfx::FramebufferAttachment::None, 0);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, Gfx::framebuffer_main.framebuffer);
+
 	RMLUI_ASSERT(viewport_width > 0 && viewport_height > 0);
 	glViewport(0, 0, viewport_width, viewport_height);
 
+	glClearStencil(0);
+	glClearColor(0, 0, 0, 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
 	glDisable(GL_CULL_FACE);
+
+	// We do blending in nonlinear sRGB space because everyone else does it like that.
+	glDisable(GL_FRAMEBUFFER_SRGB);
 
 	glEnable(GL_BLEND);
 	glBlendEquation(GL_FUNC_ADD);
+
+#if RMLUI_PREMULTIPLIED_ALPHA
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+#else
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+#endif
 
 	Gfx::projection = Rml::Matrix4f::ProjectOrtho(0, (float)viewport_width, (float)viewport_height, 0, -10000, 10000);
 
 	if (Gfx::render_interface)
 		Gfx::render_interface->SetTransform(nullptr);
+
+	Gfx::CheckGLError("BeginFrame");
 }
 
-void RmlGL3::EndFrame() {}
+void RmlGL3::EndFrame()
+{
+	// Resolve MSAA to postprocess framebuffer.
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, Gfx::framebuffer_main.framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, Gfx::framebuffer_postprocess.framebuffer);
+
+	glBlitFramebuffer(0, 0, Gfx::framebuffer_main.width, Gfx::framebuffer_main.height, 0, 0, Gfx::framebuffer_postprocess.width,
+		Gfx::framebuffer_postprocess.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+	// Draw to backbuffer
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glClearColor(0, 0, 0, 1);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	// Assuming we have an opaque background, we can just write to it with the premultiplied alpha blend mode and we'll get the correct result.
+	// Instead, if we had a transparent destination that didn't use pre-multiplied alpha, we would have to perform a manual un-premultiplication step.
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(Gfx::framebuffer_postprocess.tex_color_target, Gfx::framebuffer_postprocess.tex_color_buffer);
+	glUseProgram(Gfx::shaders_data.program_postprocess.id);
+
+	// Draw a fullscreen quad.
+	Rml::Vertex vertices[4];
+	int indices[6];
+	Rml::GeometryUtilities::GenerateQuad(vertices, indices, Rml::Vector2f(-1), Rml::Vector2f(2), {});
+	Gfx::render_interface->RenderGeometry(vertices, 4, indices, 6, RenderInterface_GL3::TexturePostprocess, {});
+
+	glBindTexture(Gfx::framebuffer_postprocess.tex_color_target, 0);
+
+	Gfx::CheckGLError("EndFrame");
+}
 
 void RmlGL3::Clear()
 {
 	glClearStencil(0);
-	glClearColor(0, 0, 0, 1);
+	glClearColor(0, 0, 0, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 }

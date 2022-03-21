@@ -53,7 +53,14 @@ public:
 
 	void SetTransform(const Rml::Matrix4f* transform) override;
 
+	Rml::TextureHandle ExecuteRenderCommand(Rml::RenderCommand command, Rml::Vector2i offset, Rml::Vector2i dimensions) override;
+
+	Rml::CompiledEffectHandle CompileEffect(const Rml::String& name, const Rml::Dictionary& parameters) override;
+	Rml::TextureHandle RenderEffect(Rml::CompiledEffectHandle effect, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation) override;
+	void ReleaseCompiledEffect(Rml::CompiledEffectHandle effect) override;
+
 	static const Rml::TextureHandle TextureIgnoreBinding = Rml::TextureHandle(-1);
+	static const Rml::TextureHandle TexturePostprocess = Rml::TextureHandle(-2);
 
 private:
 	enum class ProgramId { None, Texture = 1, Color = 2, All = (Texture | Color) };
