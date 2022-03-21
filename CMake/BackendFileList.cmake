@@ -63,3 +63,14 @@ set(GLFW_GL2_HDR_FILES
 	${PROJECT_SOURCE_DIR}/Backends/RmlUi_Platform_GLFW.h
 	${PROJECT_SOURCE_DIR}/Backends/RmlUi_Renderer_GL2.h
 )
+
+set(GLFW_GL3_SRC_FILES
+	${PROJECT_SOURCE_DIR}/Backends/RmlUi_Platform_GLFW.cpp
+	${PROJECT_SOURCE_DIR}/Backends/RmlUi_Renderer_GL3.cpp
+	${PROJECT_SOURCE_DIR}/Backends/RmlUi_Backend_GLFW_GL3.cpp
+)
+set(GLFW_GL3_HDR_FILES
+	${PROJECT_SOURCE_DIR}/Backends/RmlUi_Platform_GLFW.h
+	${PROJECT_SOURCE_DIR}/Backends/RmlUi_Renderer_GL3.h
+	${PROJECT_SOURCE_DIR}/Backends/RmlUi_Include_GL3.h
+)
