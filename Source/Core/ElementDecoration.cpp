@@ -212,6 +212,8 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 		}
 		else if (render_stage == RenderStage::Exit)
 		{
+			ElementUtilities::DisableClippingRegion(context);
+
 			Vector2f max_top_left, max_bottom_right;
 			const int i0 = num_backgrounds + num_backdrop_filters;
 			for (int i = i0; i < i0 + num_filters; i++)
