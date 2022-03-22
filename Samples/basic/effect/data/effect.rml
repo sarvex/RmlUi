@@ -1,0 +1,128 @@
+<rml>
+<head>
+<link type="text/rcss" href="/assets/rml.rcss"/>
+<title>Effect Sample</title>
+<style>
+@spritesheet effect-sheet
+{
+	src: /assets/invader.tga;
+	icon-invader: 179px 152px 51px 39px;
+}
+body
+{
+	font-family: LatoLatin;
+	font-weight: normal;
+	font-style: normal;
+	font-size: 15dp;
+	
+	left: 80dp;
+	right: 80dp;
+	top: 50dp;
+	bottom: 50dp;
+	min-width: 400dp;
+	min-height: 300dp;
+	background-color: #a4b6b7;
+	border: 3dp #def6f7;
+	border-radius: 30dp 8dp;
+	overflow: hidden;
+}
+h1
+{
+	margin: 0em 0 0.7em;
+	font-size: 22dp;
+	font-effect: glow(2dp #354c2e);
+	color: #fed;
+	padding: 1em 0 1em 40dp;
+	border-bottom: 3dp #def6f7;
+	text-align: left;
+	background-color: #619158;
+}
+.gradient-wrap {
+	overflow: scroll;	
+	width: 600dp;
+	border: 2dp #333;
+	padding: 35dp;
+	height: 100dp;
+	margin: -100dp auto 0;
+}
+.gradient {
+	decorator: linear-gradient(110deg, #fff3, #fff 10%, #c33 50%, #3c3, #33c, #000 90%, #0003 );
+	width: 500dp;
+	height: 250dp;
+	border: 2dp #f00;
+	margin-left: 150dp;
+}
+.box {
+	color: black;
+	font-size: 18dp;
+	width: 250dp;
+	height: 40dp;
+	background: #fff8;
+	border: 2dp #def6f7;
+	margin: 10dp auto 0 auto;
+	padding: 15dp;
+	border-radius: 30dp 8dp;
+}
+.box img {
+	float: left;
+	margin-right: 8dp;
+}
+
+/* .box > * { filter: drop-shadow(#cc5f 3px 5px 3px); } */
+
+.dropshadow { filter: drop-shadow(#f33f 430px 220px 3px); } 
+.blur { filter: blur(25px); }
+.back_blur { backdrop-filter: blur(35px);  }
+.opacity_one { filter: opacity(1); }
+.opacity_low { filter: opacity(0.2);  }
+.boxshadow {
+	box-shadow:
+		#f66 30px  30px 0px 0px,
+		#c88 60px  60px 0px 0px,
+		#baa 90px  90px 0px 0px,
+		#ffa8  0px  0px 25px 5px inset
+		;
+	margin-bottom: 100px;
+}
+.boxshadow_blur {
+	margin-top: 100px;
+	box-shadow: 
+		#f00f  40px  30px 25px 0px,
+		#00ff -40px -30px 45px 0px,
+		#0f08 -60px  70px 60px 0px,
+		#333a  0px  0px 30px 15px inset
+		;
+	transform: rotate3d(0.2, 0.4, 0.1, 15deg);
+	margin-bottom: 100px;
+}
+.filter {
+	/*
+	filter: sepia(80%);
+	filter: brightness(100%);
+	filter: contrast(120%);
+	filter: drop-shadow(#111b 10px 10px 8px);
+	filter: opacity(0.7);
+	filter: grayscale(1), drop-shadow(#f11b 10px 10px 8px);
+	backdrop-filter: sepia(1);
+	*/
+}
+</style>
+</head>
+
+<body class="filter">
+<h1>Effect sample</h1>
+
+<div class="box"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box boxshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box dropshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<!--
+<div class="box dropshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box boxshadow_blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+
+<div class="gradient-wrap">
+	<div id="gradient"/>
+</div>
+-->
+
+</body>
+</rml>
