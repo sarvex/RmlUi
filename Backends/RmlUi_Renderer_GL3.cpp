@@ -82,7 +82,7 @@ void main() {
 #endif
 
 	vec2 translatedPos = inPosition + _translate;
-	vec4 outPos = _transform * vec4(translatedPos, 0, 1);
+	vec4 outPos = _transform * vec4(translatedPos, 0.0, 1.0);
 
     gl_Position = outPos;
 }
@@ -96,12 +96,6 @@ out vec4 finalColor;
 
 void main() {
 	vec4 texColor = texture(_tex, fragTexCoord);
-
-#if RMLUI_PREMULTIPLIED_ALPHA
-	// Pre-multiply texure colors with their alpha.
-	texColor.rgb = texColor.rgb * texColor.a;
-#endif
-
 	finalColor = fragColor * texColor;
 }
 )";
@@ -722,19 +716,9 @@ bool RenderInterface_GL3::LoadTexture(Rml::TextureHandle& texture_handle, Rml::V
 			image_dest[write_index + 1] = image_src[read_index + 1];
 			image_dest[write_index + 2] = image_src[read_index];
 			if (color_mode == 4)
-			{
-				const int alpha = image_src[read_index + 3];
-#ifdef RMLUI_PREMULTIPLIED_ALPHA_COMPUTE
-				image_dest[write_index + 0] = (image_dest[write_index + 0] * alpha) / 255;
-				image_dest[write_index + 1] = (image_dest[write_index + 1] * alpha) / 255;
-				image_dest[write_index + 2] = (image_dest[write_index + 2] * alpha) / 255;
-#endif
-				image_dest[write_index + 3] = (byte)alpha;
-			}
+				image_dest[write_index + 3] = image_src[read_index + 3];
 			else
-			{
 				image_dest[write_index + 3] = 255;
-			}
 
 			write_index += 4;
 			read_index += color_mode;
@@ -761,6 +745,26 @@ bool RenderInterface_GL3::GenerateTexture(Rml::TextureHandle& texture_handle, co
 		Rml::Log::Message(Rml::Log::LT_ERROR, "Failed to generate texture.");
 		return false;
 	}
+
+#if RMLUI_PREMULTIPLIED_ALPHA
+	Rml::UniquePtr<byte[]> source_premultiplied;
+	if (source)
+	{
+		using Rml::byte;
+		const size_t num_bytes = source_dimensions.x * source_dimensions.y * 4;
+		source_premultiplied = Rml::UniquePtr<byte[]>(new byte[num_bytes]);
+
+		for (size_t i = 0; i < num_bytes; i += 4)
+		{
+			const byte alpha = source[i + 3];
+			for (size_t j = 0; j < 3; j++)
+				source_premultiplied[i + j] = byte((int(source[i + j]) * int(alpha)) / 255);
+			source_premultiplied[i + 3] = alpha;
+		}
+
+		source = source_premultiplied.get();
+	}
+#endif
 
 	glBindTexture(GL_TEXTURE_2D, texture_id);
 
