@@ -183,8 +183,6 @@ struct FramebufferData {
 enum class FramebufferAttachment { None, Depth, DepthStencil };
 
 static ShadersData shaders_data = {};
-static FramebufferData framebuffer_main = {};
-static FramebufferData framebuffer_postprocess = {};
 static Rml::Matrix4f projection;
 
 static RenderInterface_GL3* render_interface = nullptr;
@@ -348,11 +346,10 @@ static bool CreateFramebuffer(FramebufferData& out_fb, int width, int height, in
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, tex_color_target, tex_color_buffer, 0);
 	}
 
+	// Create depth/stencil buffer storage attachment.
 	GLuint depth_stencil_buffer = 0;
-	// Create depth only or combined depth/stencil
 	if (attachment != FramebufferAttachment::None)
 	{
-		// Attach depth/stencil as buffer storage instead
 		if (shared_depth_stencil_buffer)
 		{
 			// Share depth/stencil buffer
@@ -442,6 +439,15 @@ static bool CreateShaders(ShadersData& out_data)
 	return true;
 }
 
+static void DrawFullscreenQuad()
+{
+	// Draw a fullscreen quad.
+	Rml::Vertex vertices[4];
+	int indices[6];
+	Rml::GeometryUtilities::GenerateQuad(vertices, indices, Rml::Vector2f(-1), Rml::Vector2f(2), {});
+	render_interface->RenderGeometry(vertices, 4, indices, 6, RenderInterface_GL3::TexturePostprocess, {});
+}
+
 static void DestroyShaders(ShadersData& shaders)
 {
 	glDeleteProgram(shaders.program_color.id);
@@ -528,7 +534,7 @@ void RenderInterface_GL3::RenderCompiledGeometry(Rml::CompiledGeometryHandle han
 
 	if (geometry->texture == TexturePostprocess)
 	{
-		glUseProgram(Gfx::shaders_data.program_postprocess.id);
+		// Do nothing.
 	}
 	else if (geometry->texture)
 	{
@@ -571,11 +577,16 @@ void RenderInterface_GL3::EnableScissorRegion(bool enable)
 		glEnable(GL_SCISSOR_TEST);
 	else
 		glDisable(GL_SCISSOR_TEST);
+	scissor_state.enabled = enable;
 }
 
 void RenderInterface_GL3::SetScissorRegion(int x, int y, int width, int height)
 {
 	glScissor(x, viewport_height - (y + height), width, height);
+	scissor_state.x = x;
+	scissor_state.y = y;
+	scissor_state.width = width;
+	scissor_state.height = height;
 }
 
 bool RenderInterface_GL3::ExecuteStencilCommand(Rml::StencilCommand command, int value, int mask)
@@ -776,9 +787,171 @@ void RenderInterface_GL3::SetTransform(const Rml::Matrix4f* new_transform)
 	transform_dirty_state = ProgramId::All;
 }
 
+class RenderState {
+public:
+	void PushStack()
+	{
+		if (fb_stack_size == (int)fb_stack.size())
+		{
+			constexpr int num_samples = 2;
+			Gfx::FramebufferData fb = {};
+
+			// All framebuffers should share a single stencil buffer.
+			GLuint shared_depth_stencil = (fb_stack_size >= 1 ? fb_stack[0].depth_stencil_buffer : 0);
+			Gfx::CreateFramebuffer(fb, width, height, num_samples, Gfx::FramebufferAttachment::DepthStencil, shared_depth_stencil);
+			fb_stack.push_back(std::move(fb));
+
+			RMLUI_ASSERT(fb_stack_size + 1 == (int)fb_stack.size());
+		}
+
+		const Gfx::FramebufferData& fb_new = fb_stack[fb_stack_size];
+		fb_stack_size += 1;
+
+		glBindFramebuffer(GL_FRAMEBUFFER, fb_new.framebuffer);
+		glClear(GL_COLOR_BUFFER_BIT);
+	}
+
+	void PopStack()
+	{
+		RMLUI_ASSERT(fb_stack_size > 0);
+		fb_stack_size -= 1;
+	}
+
+	const Gfx::FramebufferData& GetActiveFramebuffer() const
+	{
+		RMLUI_ASSERT(fb_stack_size > 0);
+		return fb_stack[fb_stack_size - 1];
+	}
+
+	const Gfx::FramebufferData& GetPostprocessMain() const { return fb_postprocess_main; }
+	const Gfx::FramebufferData& GetPostprocessSecondary() const { return fb_postprocess_secondary; }
+
+	void BeginFrame(int new_width, int new_height)
+	{
+		RMLUI_ASSERT(fb_stack_size == 0);
+
+		if (new_width != width || new_height != height)
+		{
+			width = new_width;
+			height = new_height;
+
+			DestroyFramebuffers();
+			Gfx::CreateFramebuffer(fb_postprocess_main, width, height, 0, Gfx::FramebufferAttachment::None, 0);
+			Gfx::CreateFramebuffer(fb_postprocess_secondary, width, height, 0, Gfx::FramebufferAttachment::None, 0);
+		}
+
+		PushStack();
+	}
+
+	void EndFrame()
+	{
+		RMLUI_ASSERT(fb_stack_size == 1);
+		PopStack();
+	}
+
+	void Shutdown() { DestroyFramebuffers(); }
+
+private:
+	void DestroyFramebuffers()
+	{
+		RMLUI_ASSERTMSG(fb_stack_size == 0, "Do not call this during frame rendering, that is, between BeginFrame() and EndFrame().");
+
+		for (Gfx::FramebufferData& fb : fb_stack)
+			Gfx::DestroyFramebuffer(fb);
+
+		fb_stack.clear();
+
+		Gfx::DestroyFramebuffer(fb_postprocess_main);
+		Gfx::DestroyFramebuffer(fb_postprocess_secondary);
+	}
+
+	int width = 0, height = 0;
+
+	int fb_stack_size = 0;
+	Rml::Vector<Gfx::FramebufferData> fb_stack;
+
+	Gfx::FramebufferData fb_postprocess_main = {};
+	Gfx::FramebufferData fb_postprocess_secondary = {};
+};
+
+static RenderState render_state;
+
 Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand command, Rml::Vector2i offset, Rml::Vector2i dimensions)
 {
 	Rml::TextureHandle texture_handle = {};
+
+	switch (command)
+	{
+	case Rml::RenderCommand::StackPush:
+	{
+		render_state.PushStack();
+	}
+	break;
+	case Rml::RenderCommand::StackPop:
+	{
+		render_state.PopStack();
+		glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetActiveFramebuffer().framebuffer);
+	}
+	break;
+	case Rml::RenderCommand::StackToTexture:
+	{
+		const bool scissor_initially_enabled = scissor_state.enabled;
+		EnableScissorRegion(false);
+
+		const Gfx::FramebufferData& source = render_state.GetActiveFramebuffer();
+		const Gfx::FramebufferData& destination = render_state.GetPostprocessMain();
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
+
+		// Blit the desired stack region to the postprocess framebuffer to resolve MSAA. Also flip the image vertically since that convention is used
+		// for textures.
+		glBlitFramebuffer(offset.x, source.height - offset.y, offset.x + dimensions.x, source.height - (offset.y + dimensions.y), 0, 0, dimensions.x,
+			dimensions.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+		if (GenerateTexture(texture_handle, nullptr, dimensions))
+		{
+			glBindTexture(GL_TEXTURE_2D, (GLuint)texture_handle);
+
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, destination.framebuffer);
+			glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, dimensions.x, dimensions.y);
+		}
+
+		Gfx::CheckGLError("StackToTexture");
+
+		EnableScissorRegion(scissor_initially_enabled);
+	}
+	break;
+	case Rml::RenderCommand::StackToFilter:
+	{
+		pre_filter_scissor_state = scissor_state;
+		EnableScissorRegion(true);
+		SetScissorRegion(offset.x, offset.y, dimensions.x, dimensions.y);
+
+		const Gfx::FramebufferData& source = render_state.GetActiveFramebuffer();
+		const Gfx::FramebufferData& destination = render_state.GetPostprocessMain();
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
+		glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, destination.width, destination.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	}
+	break;
+	case Rml::RenderCommand::FilterToStack:
+	{
+		const Gfx::FramebufferData& source = render_state.GetPostprocessMain();
+		const Gfx::FramebufferData& destination = render_state.GetActiveFramebuffer();
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(source.tex_color_target, source.tex_color_buffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
+		glUseProgram(Gfx::shaders_data.program_postprocess.id);
+		Gfx::DrawFullscreenQuad();
+
+		EnableScissorRegion(pre_filter_scissor_state.enabled);
+		SetScissorRegion(pre_filter_scissor_state.x, pre_filter_scissor_state.y, pre_filter_scissor_state.width, pre_filter_scissor_state.height);
+	}
+	break;
+	case Rml::RenderCommand::None:
+		break;
+	}
 
 	return texture_handle;
 }
@@ -829,8 +1002,7 @@ bool RmlGL3::Initialize()
 
 void RmlGL3::Shutdown()
 {
-	Gfx::DestroyFramebuffer(Gfx::framebuffer_main);
-	Gfx::DestroyFramebuffer(Gfx::framebuffer_postprocess);
+	render_state.Shutdown();
 
 	Gfx::DestroyShaders(Gfx::shaders_data);
 
@@ -850,24 +1022,8 @@ void RmlGL3::SetViewport(int width, int height)
 
 void RmlGL3::BeginFrame()
 {
-	if (viewport_width != Gfx::framebuffer_main.width || viewport_height != Gfx::framebuffer_main.height)
-	{
-		constexpr int num_samples = 2;
-
-		Gfx::DestroyFramebuffer(Gfx::framebuffer_main);
-		Gfx::CreateFramebuffer(Gfx::framebuffer_main, viewport_width, viewport_height, num_samples, Gfx::FramebufferAttachment::DepthStencil, 0);
-
-		Gfx::DestroyFramebuffer(Gfx::framebuffer_postprocess);
-		Gfx::CreateFramebuffer(Gfx::framebuffer_postprocess, viewport_width, viewport_height, 0, Gfx::FramebufferAttachment::None, 0);
-	}
-	glBindFramebuffer(GL_FRAMEBUFFER, Gfx::framebuffer_main.framebuffer);
-
 	RMLUI_ASSERT(viewport_width > 0 && viewport_height > 0);
 	glViewport(0, 0, viewport_width, viewport_height);
-
-	glClearStencil(0);
-	glClearColor(0, 0, 0, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 	glDisable(GL_CULL_FACE);
 
@@ -883,6 +1039,12 @@ void RmlGL3::BeginFrame()
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 #endif
 
+	render_state.BeginFrame(viewport_width, viewport_height);
+
+	glClearStencil(0);
+	glClearColor(0, 0, 0, 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
 	Gfx::projection = Rml::Matrix4f::ProjectOrtho(0, (float)viewport_width, (float)viewport_height, 0, -10000, 10000);
 
 	if (Gfx::render_interface)
@@ -893,12 +1055,15 @@ void RmlGL3::BeginFrame()
 
 void RmlGL3::EndFrame()
 {
-	// Resolve MSAA to postprocess framebuffer.
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, Gfx::framebuffer_main.framebuffer);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, Gfx::framebuffer_postprocess.framebuffer);
+	const Gfx::FramebufferData& fb_active = render_state.GetActiveFramebuffer();
+	const Gfx::FramebufferData& fb_postprocess_main = render_state.GetPostprocessMain();
 
-	glBlitFramebuffer(0, 0, Gfx::framebuffer_main.width, Gfx::framebuffer_main.height, 0, 0, Gfx::framebuffer_postprocess.width,
-		Gfx::framebuffer_postprocess.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	// Resolve MSAA to postprocess framebuffer.
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_active.framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_postprocess_main.framebuffer);
+
+	glBlitFramebuffer(0, 0, fb_active.width, fb_active.height, 0, 0, fb_postprocess_main.width, fb_postprocess_main.height, GL_COLOR_BUFFER_BIT,
+		GL_NEAREST);
 
 	// Draw to backbuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -908,16 +1073,11 @@ void RmlGL3::EndFrame()
 	// Assuming we have an opaque background, we can just write to it with the premultiplied alpha blend mode and we'll get the correct result.
 	// Instead, if we had a transparent destination that didn't use pre-multiplied alpha, we would have to perform a manual un-premultiplication step.
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(Gfx::framebuffer_postprocess.tex_color_target, Gfx::framebuffer_postprocess.tex_color_buffer);
+	glBindTexture(fb_postprocess_main.tex_color_target, fb_postprocess_main.tex_color_buffer);
 	glUseProgram(Gfx::shaders_data.program_postprocess.id);
+	Gfx::DrawFullscreenQuad();
 
-	// Draw a fullscreen quad.
-	Rml::Vertex vertices[4];
-	int indices[6];
-	Rml::GeometryUtilities::GenerateQuad(vertices, indices, Rml::Vector2f(-1), Rml::Vector2f(2), {});
-	Gfx::render_interface->RenderGeometry(vertices, 4, indices, 6, RenderInterface_GL3::TexturePostprocess, {});
-
-	glBindTexture(Gfx::framebuffer_postprocess.tex_color_target, 0);
+	render_state.EndFrame();
 
 	Gfx::CheckGLError("EndFrame");
 }

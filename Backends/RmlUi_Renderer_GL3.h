@@ -68,6 +68,13 @@ private:
 
 	Rml::Matrix4f transform;
 	ProgramId transform_dirty_state = ProgramId::All;
+
+	struct ScissorState {
+		bool enabled;
+		int x, y, width, height;
+	};
+	ScissorState scissor_state = {}; 
+	ScissorState pre_filter_scissor_state = {}; 
 };
 
 namespace RmlGL3 {

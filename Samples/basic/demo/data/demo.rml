@@ -601,6 +601,7 @@ progress {
 	border: 2px #0f0;
 	margin: 10px auto;
 	background: #c99a;
+	overflow: hidden;
 	padding: 20px;
 	font-size: 1.8em;
 }
@@ -615,7 +616,7 @@ progress {
 	filter: drop-shadow(#f339 10px 20px 5px);
 }
 #boxshadow {
-	box-shadow: #fc39 40px 30px 5px 20px;
+	box-shadow: #fc39 40px 30px 0px 20px;
 }
 </style>
 </head>
@@ -626,9 +627,9 @@ progress {
 <tab>Welcome</tab>
 <panel id="welcome">
 	<p class="title" style="margin-top: 1.8em;">RmlUi 😍</p>
-	<div class="box" id="gradient"/>
-	<div class="box" id="dropshadow"/>
-	<div class="box" id="boxshadow">Helluw!</div>
+	<div class="box" id="boxshadow">Helluw!<br/>A<br/>B<br/>C<br/>D</div>
+	<!--div class="box" id="gradient"/>
+	<div class="box" id="dropshadow"/-->
 	<p>Have fun fiddling about in this demo.</p>
 	<p>Press 'F8' to open up the debugger.</p>
 	<p class="basic_blur">Press 'F8' to open up the debugger.</p>
