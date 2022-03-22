@@ -71,9 +71,7 @@ void ElementBackgroundBorder::Render(Element* element)
 			return;
 		}
 
-		ElementUtilities::DisableClippingRegion(context);
 		render_interface->RenderCompiledGeometry(shadow_geometry, element->GetAbsoluteOffset(Box::BORDER));
-		ElementUtilities::ApplyActiveClipRegion(render_interface, context->GetRenderState());
 	}
 	else if (geometry)
 	{
@@ -135,6 +133,9 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			render_interface->ReleaseCompiledGeometry(shadow_geometry);
 			render_interface->ReleaseTexture(shadow_texture);
 		}
+
+		shadow_texture = 0;
+		shadow_geometry = 0;
 	}
 
 	if (const Property* p_box_shadow = element->GetLocalProperty(PropertyId::BoxShadow))
@@ -258,7 +259,8 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			if (shadow.blur_radius > 0.5f)
 			{
 				blur = render_interface->CompileEffect("blur", Dictionary{{"radius", Variant(shadow.blur_radius)}});
-				render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
+				if (blur)
+					render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
 			}
 
 			render_interface->EnableScissorRegion(false);
