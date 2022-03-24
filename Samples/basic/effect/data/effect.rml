@@ -71,8 +71,10 @@ h1
 /* .box > * { filter: drop-shadow(#cc5f 3px 5px 3px); } */
 
 .dropshadow { filter: drop-shadow(#f33f 430px 220px 3px); } 
-.blur { filter: blur(25px); }
+.blur { filter: blur(14px); }
 .back_blur { backdrop-filter: blur(35px);  }
+.sepia { filter: sepia(60%); }
+.grayscale { filter: grayscale(0.9); }
 .opacity_one { filter: opacity(1); }
 .opacity_low { filter: opacity(0.2);  }
 .boxshadow {
@@ -84,8 +86,11 @@ h1
 		;
 	margin-bottom: 100px;
 }
+.inset{
+	box-shadow: #ffa8 10px 5px 5px 3px inset;
+}
 .boxshadow_blur {
-	margin-top: 100px;
+	margin-top: 200px;
 	box-shadow: 
 		#f00f  40px  30px 25px 0px,
 		#00ff -40px -30px 45px 0px,
@@ -110,14 +115,17 @@ h1
 </head>
 
 <body class="filter">
-<h1>Effect sample</h1>
+<h1>Effect Sample</h1>
 
-<div class="box"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
-<div class="box boxshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
-<div class="box dropshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <!--
-<div class="box dropshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box boxshadow_blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box inset"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box boxshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box grayscale"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box opacity_low"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box dropshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box dropshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 
 <div class="gradient-wrap">
 	<div id="gradient"/>

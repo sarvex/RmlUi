@@ -58,6 +58,9 @@
 	#define RMLUI_SHADER_HEADER RMLUI_SHADER_HEADER_PRE "#define RMLUI_PREMULTIPLIED_ALPHA 0 "
 #endif
 
+#define STRINGIFY_MACRO_IMPL(x) #x
+#define STRINGIFY_MACRO(x) STRINGIFY_MACRO_IMPL(x)
+
 static int viewport_width = 0;
 static int viewport_height = 0;
 
@@ -132,11 +135,79 @@ void main() {
 	finalColor = texColor;
 }
 )";
+static const char* shader_postprocess_fragment_pre = RMLUI_SHADER_HEADER R"(
+uniform sampler2D _tex;
+uniform float _value;
+uniform vec4 _color;
+
+in vec2 fragTexCoord;
+out vec4 finalColor;
+
+void main() {
+	vec4 texColor = texture(_tex, fragTexCoord);
+)";
+static const char* shader_postprocess_fragment_post = R"(
+	finalColor = texColor;
+}
+)";
+static const char* shader_postprocess_fragment_passthrough = "";
+static const char* shader_postprocess_fragment_sepia = R"(
+	vec3 r_mix = vec3(0.393, 0.769, 0.189);
+	vec3 g_mix = vec3(0.349, 0.686, 0.168);
+	vec3 b_mix = vec3(0.272, 0.534, 0.131);
+	vec3 sepia = vec3(dot(texColor.rgb, r_mix), dot(texColor.rgb, g_mix), dot(texColor.rgb, b_mix));
+	texColor.rgb = mix(texColor.rgb, sepia, _value);
+)";
+static const char* shader_postprocess_fragment_gray = R"(
+	float gray = 0.2126 * texColor.r + 0.7152 * texColor.g + 0.0722 * texColor.b;
+	texColor.rgb = mix(texColor.rgb, vec3(gray), _value);
+)";
+
+#define BLUR_SIZE 7
+#define NUM_WEIGHTS ((BLUR_SIZE + 1) / 2)
+
+static constexpr int blur_size = BLUR_SIZE;
+static constexpr int num_weights = NUM_WEIGHTS;
+
+#define RMLUI_SHADER_BLUR_HEADER \
+	RMLUI_SHADER_HEADER "\n#define BLUR_SIZE " STRINGIFY_MACRO(BLUR_SIZE) "\n#define NUM_WEIGHTS " STRINGIFY_MACRO(NUM_WEIGHTS)
+
+static const char* shader_blur_vertex = RMLUI_SHADER_BLUR_HEADER R"(
+uniform vec2 _texelOffset;
+
+in vec3 inPosition;
+in vec2 inTexCoord0;
+
+out vec2 fragTexCoord[BLUR_SIZE];
+
+void main() {
+	for(int i = 0; i < BLUR_SIZE; i++)
+		fragTexCoord[i] = inTexCoord0 - float(i - NUM_WEIGHTS + 1) * _texelOffset;
+    gl_Position = vec4(inPosition, 1.0);
+}
+)";
+
+static const char* shader_blur_fragment = RMLUI_SHADER_BLUR_HEADER R"(
+uniform sampler2D _tex;
+uniform float _weights[NUM_WEIGHTS];
+uniform float _value;
+
+in vec2 fragTexCoord[BLUR_SIZE];
+out vec4 finalColor;
+
+void main() {    
+	vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
+	for(int i = 0; i < BLUR_SIZE; i++)
+		 color += texture(_tex, fragTexCoord[i]) * _weights[abs(i - NUM_WEIGHTS + 1)];
+	finalColor = color * _value;
+}
+)";
 
 namespace Gfx {
 
-enum class ProgramUniform { Translate, Transform, Tex, Count };
-static const char* const program_uniform_names[(size_t)ProgramUniform::Count] = {"_translate", "_transform", "_tex"};
+enum class ProgramUniform { Translate, Transform, Tex, Value, Color, TexelOffset, Weights, Count };
+static const char* const program_uniform_names[(size_t)ProgramUniform::Count] = {"_translate", "_transform", "_tex", "_value", "_color",
+	"_texelOffset", "_weights[0]"};
 
 enum class VertexAttribute { Position, Color0, TexCoord0, Count };
 static const char* const vertex_attribute_names[(size_t)VertexAttribute::Count] = {"inPosition", "inColor0", "inTexCoord0"};
@@ -155,14 +226,21 @@ struct ProgramData {
 };
 
 struct ShadersData {
-	ProgramData program_color;
-	ProgramData program_texture;
-	ProgramData program_postprocess;
 	GLuint shader_main_vertex;
 	GLuint shader_main_fragment_color;
 	GLuint shader_main_fragment_texture;
 	GLuint shader_postprocess_vertex;
 	GLuint shader_postprocess_fragment;
+	GLuint shader_sepia_fragment;
+	GLuint shader_gray_fragment;
+	GLuint shader_blur_vertex;
+	GLuint shader_blur_fragment;
+	ProgramData program_color;
+	ProgramData program_texture;
+	ProgramData program_postprocess;
+	ProgramData program_sepia;
+	ProgramData program_gray;
+	ProgramData program_blur;
 };
 
 struct FramebufferData {
@@ -204,11 +282,19 @@ static void CheckGLError(const char* operation_name)
 	(void)operation_name;
 }
 
-// Create the shader, 'shader_type' is either GL_VERTEX_SHADER or GL_FRAGMENT_SHADER.
-static bool CreateShader(GLuint& out_shader_id, GLenum shader_type, const char* code_string)
+static bool CreateShader(GLuint& out_shader_id, GLenum shader_type, const char* code_string, const char* code_pre = nullptr,
+	const char* code_post = nullptr)
 {
-	GLuint id = glCreateShader(shader_type);
+	RMLUI_ASSERT(shader_type == GL_VERTEX_SHADER || shader_type == GL_FRAGMENT_SHADER);
 
+	Rml::String combined_code;
+	if (code_pre && code_post)
+	{
+		combined_code = Rml::String(code_pre) + Rml::String(code_string) + Rml::String(code_post);
+		code_string = combined_code.c_str();
+	}
+
+	GLuint id = glCreateShader(shader_type);
 	glShaderSource(id, 1, (const GLchar**)&code_string, NULL);
 	glCompileShader(id);
 
@@ -406,31 +492,71 @@ static bool CreateShaders(ShadersData& out_data)
 
 	out_data = {};
 
+	// Main shaders
 	if (!CreateShader(out_data.shader_main_vertex, GL_VERTEX_SHADER, shader_main_vertex))
 		return ReportError("shader", "main_vertex");
-
 	if (!CreateShader(out_data.shader_main_fragment_color, GL_FRAGMENT_SHADER, shader_main_fragment_color))
 		return ReportError("shader", "main_fragment_color");
-
 	if (!CreateShader(out_data.shader_main_fragment_texture, GL_FRAGMENT_SHADER, shader_main_fragment_texture))
 		return ReportError("shader", "main_fragment_texture");
 
-	if (!CreateShader(out_data.shader_postprocess_vertex, GL_VERTEX_SHADER, shader_postprocess_vertex))
-		return ReportError("shader", "postprocess_vertex");
-
-	if (!CreateShader(out_data.shader_postprocess_fragment, GL_FRAGMENT_SHADER, shader_postprocess_fragment))
-		return ReportError("shader", "postprocess_fragment");
-
 	if (!CreateProgram(out_data.program_color, out_data.shader_main_vertex, out_data.shader_main_fragment_color))
 		return ReportError("program", "color");
-
 	if (!CreateProgram(out_data.program_texture, out_data.shader_main_vertex, out_data.shader_main_fragment_texture))
 		return ReportError("program", "texture");
 
+	// Postprocess
+	if (!CreateShader(out_data.shader_postprocess_vertex, GL_VERTEX_SHADER, shader_postprocess_vertex))
+		return ReportError("shader", "postprocess_vertex");
+	if (!CreateShader(out_data.shader_postprocess_fragment, GL_FRAGMENT_SHADER, shader_postprocess_fragment))
+		return ReportError("shader", "postprocess_fragment");
+	if (!CreateShader(out_data.shader_sepia_fragment, GL_FRAGMENT_SHADER, shader_postprocess_fragment_sepia, shader_postprocess_fragment_pre,
+			shader_postprocess_fragment_post))
+		return ReportError("shader", "sepia_fragment");
+	if (!CreateShader(out_data.shader_gray_fragment, GL_FRAGMENT_SHADER, shader_postprocess_fragment_gray, shader_postprocess_fragment_pre,
+			shader_postprocess_fragment_post))
+		return ReportError("shader", "gray_fragment");
+
 	if (!CreateProgram(out_data.program_postprocess, out_data.shader_postprocess_vertex, out_data.shader_postprocess_fragment))
 		return ReportError("program", "postprocess");
+	if (!CreateProgram(out_data.program_sepia, out_data.shader_postprocess_vertex, out_data.shader_sepia_fragment))
+		return ReportError("program", "sepia");
+	if (!CreateProgram(out_data.program_gray, out_data.shader_postprocess_vertex, out_data.shader_gray_fragment))
+		return ReportError("program", "gray");
+
+	// Blur
+	if (!CreateShader(out_data.shader_blur_vertex, GL_VERTEX_SHADER, shader_blur_vertex))
+		return ReportError("shader", "blur_vertex");
+	if (!CreateShader(out_data.shader_blur_fragment, GL_FRAGMENT_SHADER, shader_blur_fragment))
+		return ReportError("shader", "blur_fragment");
+
+	if (!CreateProgram(out_data.program_blur, out_data.shader_blur_vertex, out_data.shader_blur_fragment))
+		return ReportError("program", "blur");
 
 	return true;
+}
+
+static void DestroyShaders(ShadersData& shaders)
+{
+	glDeleteProgram(shaders.program_color.id);
+	glDeleteProgram(shaders.program_texture.id);
+	glDeleteShader(shaders.shader_main_vertex);
+	glDeleteShader(shaders.shader_main_fragment_color);
+	glDeleteShader(shaders.shader_main_fragment_texture);
+
+	glDeleteProgram(shaders.program_postprocess.id);
+	glDeleteProgram(shaders.program_sepia.id);
+	glDeleteProgram(shaders.program_gray.id);
+	glDeleteShader(shaders.shader_postprocess_vertex);
+	glDeleteShader(shaders.shader_postprocess_fragment);
+	glDeleteShader(shaders.shader_sepia_fragment);
+	glDeleteShader(shaders.shader_gray_fragment);
+
+	glDeleteShader(shaders.shader_blur_vertex);
+	glDeleteShader(shaders.shader_blur_fragment);
+	glDeleteProgram(shaders.program_blur.id);
+
+	shaders = {};
 }
 
 static void DrawFullscreenQuad()
@@ -440,21 +566,6 @@ static void DrawFullscreenQuad()
 	int indices[6];
 	Rml::GeometryUtilities::GenerateQuad(vertices, indices, Rml::Vector2f(-1), Rml::Vector2f(2), {});
 	render_interface->RenderGeometry(vertices, 4, indices, 6, RenderInterface_GL3::TexturePostprocess, {});
-}
-
-static void DestroyShaders(ShadersData& shaders)
-{
-	glDeleteProgram(shaders.program_color.id);
-	glDeleteProgram(shaders.program_texture.id);
-	glDeleteProgram(shaders.program_postprocess.id);
-
-	glDeleteShader(shaders.shader_main_vertex);
-	glDeleteShader(shaders.shader_main_fragment_color);
-	glDeleteShader(shaders.shader_main_fragment_texture);
-	glDeleteShader(shaders.shader_postprocess_vertex);
-	glDeleteShader(shaders.shader_postprocess_fragment);
-
-	shaders = {};
 }
 
 } // namespace Gfx
@@ -827,8 +938,9 @@ public:
 		return fb_stack[fb_stack_size - 1];
 	}
 
-	const Gfx::FramebufferData& GetPostprocessMain() const { return fb_postprocess_main; }
+	const Gfx::FramebufferData& GetPostprocessPrimary() const { return fb_postprocess_primary; }
 	const Gfx::FramebufferData& GetPostprocessSecondary() const { return fb_postprocess_secondary; }
+	void SwapPostprocessPrimarySecondary() { std::swap(fb_postprocess_primary, fb_postprocess_secondary); }
 
 	void BeginFrame(int new_width, int new_height)
 	{
@@ -840,7 +952,7 @@ public:
 			height = new_height;
 
 			DestroyFramebuffers();
-			Gfx::CreateFramebuffer(fb_postprocess_main, width, height, 0, Gfx::FramebufferAttachment::None, 0);
+			Gfx::CreateFramebuffer(fb_postprocess_primary, width, height, 0, Gfx::FramebufferAttachment::None, 0);
 			Gfx::CreateFramebuffer(fb_postprocess_secondary, width, height, 0, Gfx::FramebufferAttachment::None, 0);
 		}
 
@@ -865,7 +977,7 @@ private:
 
 		fb_stack.clear();
 
-		Gfx::DestroyFramebuffer(fb_postprocess_main);
+		Gfx::DestroyFramebuffer(fb_postprocess_primary);
 		Gfx::DestroyFramebuffer(fb_postprocess_secondary);
 	}
 
@@ -874,7 +986,7 @@ private:
 	int fb_stack_size = 0;
 	Rml::Vector<Gfx::FramebufferData> fb_stack;
 
-	Gfx::FramebufferData fb_postprocess_main = {};
+	Gfx::FramebufferData fb_postprocess_primary = {};
 	Gfx::FramebufferData fb_postprocess_secondary = {};
 };
 
@@ -903,7 +1015,7 @@ Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand 
 		EnableScissorRegion(false);
 
 		const Gfx::FramebufferData& source = render_state.GetActiveFramebuffer();
-		const Gfx::FramebufferData& destination = render_state.GetPostprocessMain();
+		const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
 
@@ -932,7 +1044,7 @@ Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand 
 		SetScissorRegion(offset.x, offset.y, dimensions.x, dimensions.y);
 
 		const Gfx::FramebufferData& source = render_state.GetActiveFramebuffer();
-		const Gfx::FramebufferData& destination = render_state.GetPostprocessMain();
+		const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
 		glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, destination.width, destination.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
@@ -940,7 +1052,7 @@ Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand 
 	break;
 	case Rml::RenderCommand::FilterToStack:
 	{
-		const Gfx::FramebufferData& source = render_state.GetPostprocessMain();
+		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
 		const Gfx::FramebufferData& destination = render_state.GetActiveFramebuffer();
 
 		glActiveTexture(GL_TEXTURE0);
@@ -960,18 +1072,316 @@ Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand 
 	return texture_handle;
 }
 
+enum class EffectType { Invalid = 0, Basic, Blur, DropShadow, LinearGradient };
+struct CompiledEffect {
+	EffectType type;
+
+	// Basic
+	Gfx::ProgramData* program;
+	bool has_value_uniform;
+	float value;
+	float blend_factor = -1.f;
+
+	// Blur
+	float sigma;
+
+	// Drop shadow
+	Rml::Vector2f offset;
+	Rml::Colourb color;
+
+	// Linear gradient
+	float angle;
+	Rml::Vector2f p0, p1;
+	Rml::ColorStopList color_stop_list;
+};
+
 Rml::CompiledEffectHandle RenderInterface_GL3::CompileEffect(const Rml::String& name, const Rml::Dictionary& parameters)
 {
-	return Rml::CompiledEffectHandle();
+	if (name == "blur")
+	{
+		CompiledEffect effect = {};
+		effect.type = EffectType::Blur;
+		effect.sigma = 0.5f * Rml::Get(parameters, "radius", 0.0f);
+		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(effect));
+	}
+	else if (name == "drop-shadow")
+	{
+		CompiledEffect effect = {};
+		effect.type = EffectType::DropShadow;
+		effect.sigma = Rml::Get(parameters, "sigma", 0.f);
+		effect.color = Rml::Get(parameters, "color", Rml::Colourb());
+		effect.offset = Rml::Get(parameters, "offset", Rml::Vector2f(0.f));
+		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+	}
+	else if (name == "linear-gradient")
+	{
+		CompiledEffect effect = {};
+		effect.type = EffectType::LinearGradient;
+		effect.angle = Rml::Get(parameters, "angle", 0.f);
+		effect.p0 = Rml::Get(parameters, "p0", Rml::Vector2f(0.f));
+		effect.p1 = Rml::Get(parameters, "p1", Rml::Vector2f(0.f));
+		effect.color_stop_list = Rml::Get<Rml::ColorStopList>(parameters, "color_stop_list", {});
+		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+	}
+	else if (name == "opacity")
+	{
+		CompiledEffect effect = {};
+		effect.type = EffectType::Basic;
+		effect.program = &Gfx::shaders_data.program_postprocess;
+		effect.blend_factor = Rml::Get(parameters, "value", 1.0f);
+		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+	}
+	else if (name == "grayscale")
+	{
+		CompiledEffect effect = {};
+		effect.type = EffectType::Basic;
+		effect.program = &Gfx::shaders_data.program_gray;
+		effect.has_value_uniform = true;
+		effect.value = Rml::Get(parameters, "value", 1.0f);
+		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+	}
+	else if (name == "sepia")
+	{
+		CompiledEffect effect = {};
+		effect.type = EffectType::Basic;
+		effect.program = &Gfx::shaders_data.program_sepia;
+		effect.has_value_uniform = true;
+		effect.value = Rml::Get(parameters, "value", 1.0f);
+		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+	}
+	else if (name == "brightness")
+	{
+		CompiledEffect effect = {};
+		effect.type = EffectType::Basic;
+		effect.program = nullptr; // TODO
+		effect.has_value_uniform = true;
+		effect.value = Rml::Get(parameters, "value", 1.0f);
+		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+	}
+	else if (name == "contrast")
+	{
+		CompiledEffect effect = {};
+		effect.type = EffectType::Basic;
+		effect.program = nullptr; // TODO
+		effect.has_value_uniform = true;
+		effect.value = Rml::Get(parameters, "value", 1.0f);
+		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+	}
+
+	return Rml::CompiledEffectHandle(0);
 }
 
-Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle effect, Rml::CompiledGeometryHandle geometry,
+static void SigmaToParameters(const float desired_sigma, int& out_pass_level, float& out_sigma)
+{
+	constexpr int max_num_passes = 16;
+	static_assert(max_num_passes < 31, "");
+
+	constexpr float max_single_pass_sigma = 2.0f;
+	out_pass_level = Rml::Math::Clamp(Rml::Math::Log2(int(desired_sigma * (2.f / max_single_pass_sigma))), 0, max_num_passes);
+	out_sigma = Rml::Math::Clamp(desired_sigma / float(1 << out_pass_level), 0.0f, 2.f);
+}
+
+static void SetBlurWeights(float sigma)
+{
+	float weights[num_weights];
+	float normalization = 0.0f;
+	for (int i = 0; i < num_weights; i++)
+	{
+		if (Rml::Math::AbsoluteValue(sigma) < 0.1f)
+			weights[i] = float(i == 0);
+		else
+			weights[i] = Rml::Math::Exp(-float(i * i) / (2.0f * sigma * sigma)) / (Rml::Math::SquareRoot(2.f * Rml::Math::RMLUI_PI) * sigma);
+
+		normalization += (i == 0 ? 1.f : 2.0f) * weights[i];
+	}
+	for (int i = 0; i < num_weights; i++)
+		weights[i] /= normalization;
+
+	glUniform1fv(Gfx::shaders_data.program_blur.uniform_locations[(int)Gfx::ProgramUniform::Weights], (GLsizei)num_weights, &weights[0]);
+}
+
+static void RenderBlurPass(const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp)
+{
+	auto SetTexelOffset = [](Rml::Vector2f blur_direction, int texture_dimension) {
+		const Rml::Vector2f texel_offset = blur_direction * (1.0f / float(texture_dimension));
+		glUniform2f(Gfx::shaders_data.program_blur.uniform_locations[(int)Gfx::ProgramUniform::TexelOffset], texel_offset.x, texel_offset.y);
+	};
+
+	// Vertical
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(source_destination.tex_color_target, source_destination.tex_color_buffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, temp.framebuffer);
+	SetTexelOffset({0.f, 1.f}, source_destination.height);
+	Gfx::DrawFullscreenQuad();
+
+	// Horizontal
+	glBindTexture(temp.tex_color_target, temp.tex_color_buffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, source_destination.framebuffer);
+	SetTexelOffset({1.f, 0.f}, temp.width);
+	Gfx::DrawFullscreenQuad();
+}
+
+static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp, Rml::Vector4i scissor_region)
+{
+	RMLUI_ASSERT(&source_destination != &temp && source_destination.width == temp.width && source_destination.height == temp.height);
+
+	if (scissor_region == Rml::Vector4i())
+	{
+		// Blur the entire framebuffer. Prefer to avoid this for performance reasons.
+		scissor_region.w = source_destination.width;
+		scissor_region.z = source_destination.height;
+	}
+
+	int pass_level = 0;
+	SigmaToParameters(sigma, pass_level, sigma);
+
+	const int downscale_factor = (1 << pass_level);
+
+	// Clear
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, source_destination.framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, temp.framebuffer);
+	Gfx::render_interface->EnableScissorRegion(false);
+	glClearColor(0, 0, 0, 0);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	// Downsize first so that we can do the blur pass at a reduced resolution for large sigma.
+	int vp_w = scissor_region.z;
+	int vp_h = scissor_region.w;
+	int vp_x = scissor_region.x;
+	int vp_y = source_destination.height - (scissor_region.y + vp_h);
+
+	const Rml::Vector2i size_full = {vp_w, vp_h};
+	const Rml::Vector2i size_small = size_full / downscale_factor;
+
+	glBlitFramebuffer(vp_x, vp_y, vp_x + vp_w, vp_y + vp_h, 0, 0, size_small.x, size_small.y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, source_destination.framebuffer);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	Gfx::render_interface->EnableScissorRegion(true);
+	glScissor(0, 0, size_small.x, size_small.y);
+
+	// Set up uniforms.
+	glUseProgram(Gfx::shaders_data.program_blur.id);
+	SetBlurWeights(sigma);
+	const float blending_magnitude = 1.f;
+	glUniform1f(Gfx::shaders_data.program_blur.uniform_locations[(int)Gfx::ProgramUniform::Value], blending_magnitude);
+
+	// Now do the actual render pass.
+	RenderBlurPass(temp, source_destination);
+
+	Gfx::render_interface->EnableScissorRegion(false);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, temp.framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, source_destination.framebuffer);
+	glBlitFramebuffer(0, 0, size_small.x, size_small.y, vp_x, vp_y, vp_x + vp_w, vp_y + vp_h, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+}
+
+Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle effect_handle, Rml::CompiledGeometryHandle geometry,
 	Rml::Vector2f translation)
 {
-	return Rml::TextureHandle();
+	const CompiledEffect& effect = *reinterpret_cast<CompiledEffect*>(effect_handle);
+
+	const EffectType type = effect.type;
+	Rml::TextureHandle texture_handle_result = {};
+
+	switch (type)
+	{
+	case EffectType::Blur:
+	{
+		ScissorState original_scissor_state = scissor_state;
+		glDisable(GL_BLEND);
+
+		const Gfx::FramebufferData& source_destination = render_state.GetPostprocessPrimary();
+		const Gfx::FramebufferData& temp = render_state.GetPostprocessSecondary();
+
+		// Draw the blur
+		RenderBlur(effect.sigma, source_destination, temp,
+			Rml::Vector4i(scissor_state.x, scissor_state.y, scissor_state.width, scissor_state.height));
+
+		// Restore state
+		glEnable(GL_BLEND);
+		EnableScissorRegion(original_scissor_state.enabled);
+		SetScissorRegion(original_scissor_state.x, original_scissor_state.y, original_scissor_state.width, original_scissor_state.height);
+	}
+	break;
+	case EffectType::LinearGradient:
+	{
+	}
+	break;
+	case EffectType::DropShadow:
+	{
+		{
+			Rml::Colourf color;
+			color.red = (1.f / 255.f) * (float)effect.color.red;
+			color.green = (1.f / 255.f) * (float)effect.color.green;
+			color.blue = (1.f / 255.f) * (float)effect.color.blue;
+			color.alpha = (1.f / 255.f) * (float)effect.color.alpha;
+			glUniform4fv(effect.program->uniform_locations[(int)Gfx::ProgramUniform::Color], 1, &color.red);
+		}
+	}
+	break;
+	case EffectType::Basic:
+	{
+		if (!effect.program)
+			break;
+
+		glUseProgram(effect.program->id);
+
+		if (effect.has_value_uniform)
+			glUniform1fv(effect.program->uniform_locations[(int)Gfx::ProgramUniform::Value], 1, &effect.value);
+
+		if (effect.blend_factor >= 0.f)
+		{
+			glBlendFunc(GL_CONSTANT_ALPHA, GL_ZERO);
+			glBlendColor(0.0f, 0.0f, 0.0f, effect.blend_factor);
+		}
+		else
+		{
+			glDisable(GL_BLEND);
+		}
+
+		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
+		const Gfx::FramebufferData& destination = render_state.GetPostprocessSecondary();
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(source.tex_color_target, source.tex_color_buffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
+
+		Gfx::DrawFullscreenQuad();
+
+		render_state.SwapPostprocessPrimarySecondary();
+
+		// Restore state
+		if (effect.blend_factor >= 0.f)
+		{
+#if RMLUI_PREMULTIPLIED_ALPHA
+			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+#else
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+#endif
+		}
+		else
+		{
+			glEnable(GL_BLEND);
+		}
+
+		Gfx::CheckGLError("RenderEffectBasic");
+	}
+	break;
+	case EffectType::Invalid:
+	default:
+	{
+		Rml::Log::Message(Rml::Log::LT_WARNING, "Unhandled render effect %d.", (int)type);
+	}
+	break;
+	}
+
+	return texture_handle_result;
 }
 
-void RenderInterface_GL3::ReleaseCompiledEffect(Rml::CompiledEffectHandle effect) {}
+void RenderInterface_GL3::ReleaseCompiledEffect(Rml::CompiledEffectHandle effect_handle)
+{
+	delete reinterpret_cast<CompiledEffect*>(effect_handle);
+}
 
 void RenderInterface_GL3::SubmitTransformUniform(ProgramId program_id, int uniform_location)
 {
@@ -1060,14 +1470,13 @@ void RmlGL3::BeginFrame()
 void RmlGL3::EndFrame()
 {
 	const Gfx::FramebufferData& fb_active = render_state.GetActiveFramebuffer();
-	const Gfx::FramebufferData& fb_postprocess_main = render_state.GetPostprocessMain();
+	const Gfx::FramebufferData& fb_postprocess = render_state.GetPostprocessPrimary();
 
 	// Resolve MSAA to postprocess framebuffer.
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, fb_active.framebuffer);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_postprocess_main.framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fb_postprocess.framebuffer);
 
-	glBlitFramebuffer(0, 0, fb_active.width, fb_active.height, 0, 0, fb_postprocess_main.width, fb_postprocess_main.height, GL_COLOR_BUFFER_BIT,
-		GL_NEAREST);
+	glBlitFramebuffer(0, 0, fb_active.width, fb_active.height, 0, 0, fb_postprocess.width, fb_postprocess.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 	// Draw to backbuffer
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1077,7 +1486,7 @@ void RmlGL3::EndFrame()
 	// Assuming we have an opaque background, we can just write to it with the premultiplied alpha blend mode and we'll get the correct result.
 	// Instead, if we had a transparent destination that didn't use pre-multiplied alpha, we would have to perform a manual un-premultiplication step.
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(fb_postprocess_main.tex_color_target, fb_postprocess_main.tex_color_buffer);
+	glBindTexture(fb_postprocess.tex_color_target, fb_postprocess.tex_color_buffer);
 	glUseProgram(Gfx::shaders_data.program_postprocess.id);
 	Gfx::DrawFullscreenQuad();
 
