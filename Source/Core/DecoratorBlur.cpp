@@ -75,8 +75,9 @@ void DecoratorBlur::RenderElement(Element* /*element*/, DecoratorDataHandle hand
 
 void DecoratorBlur::GetClipExtension(Vector2f& top_left, Vector2f& bottom_right) const
 {
-	top_left = Vector2f(radius);
-	bottom_right = Vector2f(radius);
+	const float blur_radius = Math::Max(2.f * radius, 3.f);
+	top_left = Vector2f(blur_radius);
+	bottom_right = Vector2f(blur_radius);
 }
 
 DecoratorBlurInstancer::DecoratorBlurInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)
