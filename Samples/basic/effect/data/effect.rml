@@ -37,6 +37,19 @@ h1
 	text-align: left;
 	background-color: #619158;
 }
+handle.size {
+	position: absolute;
+	bottom: 0;
+	right: 0;
+	width: 18dp;
+	height: 18dp;
+	background-color: #def6f766;
+	border-top-left-radius: 5dp;
+	cursor: resize;
+}
+handle.size:hover {
+	background-color: #def6f7;
+}
 .gradient-wrap {
 	overflow: scroll;	
 	width: 600dp;
@@ -71,7 +84,7 @@ h1
 /* .box > * { filter: drop-shadow(#cc5f 3px 5px 3px); } */
 
 .dropshadow { filter: drop-shadow(#f33f 430px 220px 3px); } 
-.blur { filter: blur(14px); }
+.blur { filter: blur(15px); }
 .back_blur { backdrop-filter: blur(35px);  }
 .sepia { filter: sepia(60%); }
 .grayscale { filter: grayscale(0.9); }
@@ -105,6 +118,7 @@ h1
 	filter: sepia(80%);
 	filter: brightness(100%);
 	filter: contrast(120%);
+	filter: blur(5px);
 	filter: drop-shadow(#111b 10px 10px 8px);
 	filter: opacity(0.7);
 	filter: grayscale(1), drop-shadow(#f11b 10px 10px 8px);
@@ -115,7 +129,8 @@ h1
 </head>
 
 <body class="filter">
-<h1>Effect Sample</h1>
+<handle move_target="#document"><h1>Effect Sample</h1></handle>
+<handle class="size" size_target="#document"/>
 
 <div class="box blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <!--
