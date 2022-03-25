@@ -330,7 +330,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		shadow_geometry = render_interface->CompileGeometry(vertices, 4, indices, 6, shadow_texture);
 
 		ElementUtilities::ApplyTransform(render_interface, render_state, active_element_transform);
-		ElementUtilities::SetClippingRegion(element);
+		ElementUtilities::ApplyActiveClipRegion(render_interface, render_state);
 	}
 }
 
