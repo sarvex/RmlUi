@@ -31,14 +31,24 @@
 #include <Shell.h>
 
 Rml::Context* context = nullptr;
+Rml::ElementDocument* document = nullptr;
 
 void GameLoop()
 {
+	static uint32_t frame = 0;
+
+	if (document && (frame == 0 || frame == 1))
+	{
+		document->SetProperty("top", frame == 0 ? "33px" : "34px");
+	}
+
 	context->Update();
 
 	Shell::BeginFrame();
 	context->Render();
 	Shell::PresentFrame();
+
+	frame += 1;
 }
 
 #if defined RMLUI_PLATFORM_WIN32
@@ -75,7 +85,7 @@ int main(int /*argc*/, char** /*argv*/)
 	Shell::LoadFonts();
 
 	// Load and show the tutorial document.
-	if (Rml::ElementDocument* document = context->LoadDocument("basic/effect/data/effect.rml"))
+	if (document = context->LoadDocument("basic/effect/data/effect.rml"))
 		document->Show();
 
 	Shell::EventLoop(GameLoop);

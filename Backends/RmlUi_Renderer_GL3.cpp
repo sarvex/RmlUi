@@ -151,6 +151,9 @@ static const char* shader_postprocess_fragment_gray = R"(
 	float gray = 0.2126 * texColor.r + 0.7152 * texColor.g + 0.0722 * texColor.b;
 	texColor.rgb = mix(texColor.rgb, vec3(gray), _value);
 )";
+static const char* shader_postprocess_fragment_dropshadow = R"(
+	texColor = texColor.a * _color;
+)";
 
 #define BLUR_SIZE 7
 #define NUM_WEIGHTS ((BLUR_SIZE + 1) / 2)
@@ -175,7 +178,6 @@ void main() {
     gl_Position = vec4(inPosition, 1.0);
 }
 )";
-
 static const char* shader_blur_fragment = RMLUI_SHADER_BLUR_HEADER R"(
 uniform sampler2D _tex;
 uniform float _weights[NUM_WEIGHTS];
@@ -187,7 +189,7 @@ out vec4 finalColor;
 void main() {    
 	vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
 	for(int i = 0; i < BLUR_SIZE; i++)
-		 color += texture(_tex, fragTexCoord[i]) * _weights[abs(i - NUM_WEIGHTS + 1)];
+		color += texture(_tex, fragTexCoord[i]) * _weights[abs(i - NUM_WEIGHTS + 1)];
 	finalColor = color * _value;
 }
 )";
@@ -222,6 +224,7 @@ struct ShadersData {
 	GLuint shader_passthrough_fragment;
 	GLuint shader_sepia_fragment;
 	GLuint shader_gray_fragment;
+	GLuint shader_dropshadow_fragment;
 	GLuint shader_blur_vertex;
 	GLuint shader_blur_fragment;
 	ProgramData program_color;
@@ -229,6 +232,7 @@ struct ShadersData {
 	ProgramData program_passthrough;
 	ProgramData program_sepia;
 	ProgramData program_gray;
+	ProgramData program_dropshadow;
 	ProgramData program_blur;
 };
 
@@ -510,6 +514,9 @@ static bool CreateShaders(ShadersData& out_data)
 	if (!CreateShader(out_data.shader_gray_fragment, GL_FRAGMENT_SHADER, shader_postprocess_fragment_gray, shader_postprocess_fragment_pre,
 			shader_postprocess_fragment_post))
 		return ReportError("shader", "gray_fragment");
+	if (!CreateShader(out_data.shader_dropshadow_fragment, GL_FRAGMENT_SHADER, shader_postprocess_fragment_dropshadow,
+			shader_postprocess_fragment_pre, shader_postprocess_fragment_post))
+		return ReportError("shader", "dropshadow_fragment");
 
 	if (!CreateProgram(out_data.program_passthrough, out_data.shader_postprocess_vertex, out_data.shader_passthrough_fragment))
 		return ReportError("program", "passthrough");
@@ -517,6 +524,8 @@ static bool CreateShaders(ShadersData& out_data)
 		return ReportError("program", "sepia");
 	if (!CreateProgram(out_data.program_gray, out_data.shader_postprocess_vertex, out_data.shader_gray_fragment))
 		return ReportError("program", "gray");
+	if (!CreateProgram(out_data.program_dropshadow, out_data.shader_postprocess_vertex, out_data.shader_dropshadow_fragment))
+		return ReportError("program", "dropshadow");
 
 	// Blur
 	if (!CreateShader(out_data.shader_blur_vertex, GL_VERTEX_SHADER, shader_blur_vertex))
@@ -553,12 +562,18 @@ static void DestroyShaders(ShadersData& shaders)
 	shaders = {};
 }
 
-static void DrawFullscreenQuad()
+static void DrawFullscreenQuad(Rml::Vector2f uv_offset = {}, Rml::Vector2f uv_scaling = Rml::Vector2f(1.f))
 {
 	// Draw a fullscreen quad.
 	Rml::Vertex vertices[4];
 	int indices[6];
 	Rml::GeometryUtilities::GenerateQuad(vertices, indices, Rml::Vector2f(-1), Rml::Vector2f(2), {});
+	if (uv_offset != Rml::Vector2f() || uv_scaling != Rml::Vector2f(1.f))
+	{
+		for (Rml::Vertex& vertex : vertices)
+			vertex.tex_coord = (vertex.tex_coord * uv_scaling) + uv_offset;
+	}
+
 	render_interface->RenderGeometry(vertices, 4, indices, 6, RenderInterface_GL3::TexturePostprocess, {});
 }
 
@@ -934,6 +949,13 @@ public:
 
 	const Gfx::FramebufferData& GetPostprocessPrimary() const { return fb_postprocess_primary; }
 	const Gfx::FramebufferData& GetPostprocessSecondary() const { return fb_postprocess_secondary; }
+	const Gfx::FramebufferData& GetPostprocessTertiary()
+	{
+		// This one is more rarily used, so we create it on demand.
+		if (!fb_postprocess_tertiary.framebuffer)
+			Gfx::CreateFramebuffer(fb_postprocess_tertiary, width, height, 0, Gfx::FramebufferAttachment::None, 0);
+		return fb_postprocess_tertiary;
+	}
 	void SwapPostprocessPrimarySecondary() { std::swap(fb_postprocess_primary, fb_postprocess_secondary); }
 
 	void BeginFrame(int new_width, int new_height)
@@ -973,6 +995,7 @@ private:
 
 		Gfx::DestroyFramebuffer(fb_postprocess_primary);
 		Gfx::DestroyFramebuffer(fb_postprocess_secondary);
+		Gfx::DestroyFramebuffer(fb_postprocess_tertiary);
 	}
 
 	int width = 0, height = 0;
@@ -982,6 +1005,7 @@ private:
 
 	Gfx::FramebufferData fb_postprocess_primary = {};
 	Gfx::FramebufferData fb_postprocess_secondary = {};
+	Gfx::FramebufferData fb_postprocess_tertiary = {};
 };
 
 static RenderState render_state;
@@ -1178,9 +1202,8 @@ Rml::CompiledEffectHandle RenderInterface_GL3::CompileEffect(const Rml::String& 
 
 static void SigmaToParameters(const float desired_sigma, int& out_pass_level, float& out_sigma)
 {
-	constexpr int max_num_passes = 16;
+	constexpr int max_num_passes = 10;
 	static_assert(max_num_passes < 31, "");
-
 	constexpr float max_single_pass_sigma = 2.0f;
 	out_pass_level = Rml::Math::Clamp(Rml::Math::Log2(int(desired_sigma * (2.f / max_single_pass_sigma))), 0, max_num_passes);
 	out_sigma = Rml::Math::Clamp(desired_sigma / float(1 << out_pass_level), 0.0f, max_single_pass_sigma);
@@ -1241,7 +1264,6 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	Rml::Vector2i size)
 {
 	RMLUI_ASSERT(&source_destination != &temp && source_destination.width == temp.width && source_destination.height == temp.height);
-	RMLUI_ASSERT(size != Rml::Vector2i(0));
 
 	int pass_level = 0;
 	SigmaToParameters(sigma, pass_level, sigma);
@@ -1255,40 +1277,66 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	glClearColor(0, 0, 0, 0);
 #endif
 
-	// Downsize first so that we can do the blur pass at a reduced resolution for large sigma.
-	Rml::Vector2i scissor_min = Rml::Math::Max(position, Rml::Vector2i(0));
-	Rml::Vector2i scissor_max = Rml::Math::Min(position + size, Rml::Vector2i(source_destination.width, source_destination.height));
+	// Intersect the blur area with the framebuffer dimensions.
+	{
+		const Rml::Vector2i min = Rml::Math::Max(position, Rml::Vector2i(0));
+		const Rml::Vector2i max = Rml::Math::Min(position + size, Rml::Vector2i(source_destination.width, source_destination.height));
+		position = min;
+		size = Rml::Math::Max(max - min, Rml::Vector2i(0));
+	}
 
-	auto SubmitScissor = [&scissor_min, &scissor_max]() {
-		const Rml::Vector2i size = Rml::Math::Max(scissor_max - scissor_min, Rml::Vector2i(0));
-		glScissor(scissor_min.x, scissor_min.y, size.x, size.y);
-	};
+	// Begin by downscale so that the blur pass can be done at a reduced resolution for large sigma.
+	Rml::Vector2i scissor_min = position;
+	Rml::Vector2i scissor_size = size;
+
+	auto SubmitScissor = [&scissor_min, &scissor_size]() { glScissor(scissor_min.x, scissor_min.y, scissor_size.x, scissor_size.y); };
 
 	glUseProgram(Gfx::shaders_data.program_passthrough.id);
 	Gfx::render_interface->EnableScissorRegion(true);
 	SubmitScissor();
 
-	// Downscale by iterative bilinear half-scaling, to reduce aliasing.
+	// Downscale by iterative half-scaling with bilinear filtering, to reduce aliasing.
 	glViewport(0, 0, source_destination.width / 2, source_destination.height / 2);
+
+	// Scale UVs if we have even dimensions, such that texture fetches align perfectly between texels, thereby producing a 50% blend of
+	// neighboring texels.
+	const Rml::Vector2f uv_scaling = {(source_destination.width % 2 == 1) ? (1.f - 1.f / float(source_destination.width)) : 1.f,
+		(source_destination.height % 2 == 1) ? (1.f - 1.f / float(source_destination.height)) : 1.f};
+
+	auto ClearWithMargin = [&]() {
+		constexpr int radius = (blur_size + 1) / 2;
+		const Rml::Vector2i min = scissor_min - Rml::Vector2i(radius);
+		const Rml::Vector2i size = Rml::Math::Max(scissor_size + Rml::Vector2i(2 * radius), Rml::Vector2i(0));
+		glScissor(min.x, min.y, size.x, size.y);
+		glClear(GL_COLOR_BUFFER_BIT);
+		SubmitScissor();
+	};
+
+	// Move the texture data to the temp buffer if the last downscaling end up at the source_destination buffer.
+	const bool transfer_to_temp_buffer = (pass_level % 2 == 0);
 
 	for (int i = 0; i < pass_level; i++)
 	{
 		scissor_min = (scissor_min + Rml::Vector2i(1)) / 2;
-		scissor_max = scissor_max / 2;
+		scissor_size = scissor_size / 2;
 		const bool from_source = (i % 2 == 0);
 		glBindTexture(GL_TEXTURE_2D, (from_source ? source_destination : temp).tex_color_buffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, (from_source ? temp : source_destination).framebuffer);
 		SubmitScissor();
-		Gfx::DrawFullscreenQuad();
+
+		if (i == pass_level - 1 && !transfer_to_temp_buffer)
+			ClearWithMargin();
+
+		Gfx::DrawFullscreenQuad({}, uv_scaling);
 	}
 
 	glViewport(0, 0, source_destination.width, source_destination.height);
 
-	// Move the texture data to the temp buffer if we last drew to the source_destination buffer.
-	if (pass_level % 2 == 0)
+	if (transfer_to_temp_buffer)
 	{
 		glBindTexture(GL_TEXTURE_2D, source_destination.tex_color_buffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, temp.framebuffer);
+		ClearWithMargin();
 		Gfx::DrawFullscreenQuad();
 	}
 
@@ -1304,15 +1352,7 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 
 	// Zero out the region around the blur.
 	glBindFramebuffer(GL_FRAMEBUFFER, source_destination.framebuffer);
-	glClear(GL_COLOR_BUFFER_BIT);
-
-	const Rml::Vector2i blit_min = scissor_min;
-	const Rml::Vector2i blit_max = scissor_max;
-
-	constexpr int radius = (blur_size - 1) / 2;
-	scissor_min = scissor_min + Rml::Vector2i(radius);
-	scissor_max = scissor_max - Rml::Vector2i(radius);
-	SubmitScissor();
+	ClearWithMargin();
 
 	// Set up uniforms.
 	glUseProgram(Gfx::shaders_data.program_blur.id);
@@ -1323,11 +1363,20 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	// Now do the actual render pass.
 	RenderBlurPass(temp, source_destination);
 
-	Gfx::render_interface->EnableScissorRegion(false);
+	// Blit with a one pixel black border so that edges fade to zero.
+	const Rml::Vector2i blit_min = scissor_min - Rml::Vector2i(1);
+	const Rml::Vector2i blit_max = scissor_min + scissor_size + Rml::Vector2i(1);
+	const Rml::Vector2i blit_target_min = blit_min * (1 << pass_level);
+	const Rml::Vector2i blit_target_max = blit_max * (1 << pass_level);
+
+	glScissor(position.x, position.y, size.x, size.y);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, temp.framebuffer);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, source_destination.framebuffer);
-	glBlitFramebuffer(blit_min.x, blit_min.y, blit_max.x, blit_max.y, position.x, position.y, position.x + size.x, position.y + size.y,
+	glClear(GL_COLOR_BUFFER_BIT);
+	glBlitFramebuffer(blit_min.x, blit_min.y, blit_max.x, blit_max.y, blit_target_min.x, blit_target_min.y, blit_target_max.x, blit_target_max.y,
 		GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+	Gfx::render_interface->EnableScissorRegion(false);
 }
 
 Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle effect_handle, Rml::CompiledGeometryHandle geometry,
@@ -1367,15 +1416,49 @@ Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle e
 	break;
 	case EffectType::DropShadow:
 	{
-		if (false)
+		ScissorState original_scissor_state = scissor_state;
+		glUseProgram(Gfx::shaders_data.program_dropshadow.id);
+		glDisable(GL_BLEND);
+
+		Rml::Colourf color;
+		color.red = (1.f / 255.f) * (float)effect.color.red;
+		color.green = (1.f / 255.f) * (float)effect.color.green;
+		color.blue = (1.f / 255.f) * (float)effect.color.blue;
+		color.alpha = (1.f / 255.f) * (float)effect.color.alpha;
+		glUniform4fv(Gfx::shaders_data.program_dropshadow.uniform_locations[(int)Gfx::ProgramUniform::Color], 1, &color[0]);
+
+		const Gfx::FramebufferData& primary = render_state.GetPostprocessPrimary();
+		const Gfx::FramebufferData& secondary = render_state.GetPostprocessSecondary();
+		const Gfx::FramebufferData& tertiary = render_state.GetPostprocessTertiary();
+		glBindTexture(primary.tex_color_target, primary.tex_color_buffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, secondary.framebuffer);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		ScissorState new_scissor_state = scissor_state;
+		new_scissor_state.x += Rml::Math::Max((int)effect.offset.x, 0);
+		new_scissor_state.y += Rml::Math::Max((int)effect.offset.y, 0);
+		new_scissor_state.width -= std::abs((int)effect.offset.x);
+		new_scissor_state.height -= std::abs((int)effect.offset.y);
+		SetScissorRegion(new_scissor_state.x, new_scissor_state.y, new_scissor_state.width, new_scissor_state.height);
+
+		const Rml::Vector2f uv_offset = effect.offset / Rml::Vector2f(-(float)viewport_width, (float)viewport_height);
+		Gfx::DrawFullscreenQuad(uv_offset);
+
+		if (effect.sigma >= 0.5f)
 		{
-			Rml::Colourf color;
-			color.red = (1.f / 255.f) * (float)effect.color.red;
-			color.green = (1.f / 255.f) * (float)effect.color.green;
-			color.blue = (1.f / 255.f) * (float)effect.color.blue;
-			color.alpha = (1.f / 255.f) * (float)effect.color.alpha;
-			glUniform4fv(effect.program->uniform_locations[(int)Gfx::ProgramUniform::Color], 1, &color.red);
+			const Rml::Vector2i position = {scissor_state.x, primary.height - (scissor_state.y + scissor_state.height)};
+			const Rml::Vector2i size = {scissor_state.width, scissor_state.height};
+			RenderBlur(effect.sigma, secondary, tertiary, position, size);
 		}
+
+		EnableScissorRegion(original_scissor_state.enabled);
+		SetScissorRegion(original_scissor_state.x, original_scissor_state.y, original_scissor_state.width, original_scissor_state.height);
+		glUseProgram(Gfx::shaders_data.program_passthrough.id);
+		glBindTexture(primary.tex_color_target, primary.tex_color_buffer);
+		glEnable(GL_BLEND);
+		Gfx::DrawFullscreenQuad();
+
+		render_state.SwapPostprocessPrimarySecondary();
 	}
 	break;
 	case EffectType::Basic:
@@ -1400,7 +1483,6 @@ Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle e
 
 		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
 		const Gfx::FramebufferData& destination = render_state.GetPostprocessSecondary();
-		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(source.tex_color_target, source.tex_color_buffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
 
