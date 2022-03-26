@@ -91,7 +91,7 @@ handle.size:hover, handle.size:active {
 	height: 40dp;
 	background: #fff8;
 	border: 2dp #def6f7;
-	margin: 10dp auto 0 auto;
+	margin: 10dp auto;
 	padding: 15dp;
 	border-radius: 30dp 8dp;
 }
@@ -112,18 +112,20 @@ handle.size:hover, handle.size:active {
 }
 
 
-/*.dropshadow { filter: drop-shadow(#f33f 430px 220px 3px); } */
 .dropshadow { filter: drop-shadow(#f33f 30px 20px 5px); } 
 
 .blur { filter: blur(25px); }
-/*
-*/
-
 .back_blur { backdrop-filter: blur(15px);  }
 .sepia { filter: sepia(80%); }
+
+.brightness { filter: brightness(0.5); }
+.contrast { filter: contrast(0.5); }
+.sepia { filter: sepia(80%); }
 .grayscale { filter: grayscale(0.9); }
+
 .opacity_one { filter: opacity(1); }
 .opacity_low { filter: opacity(0.2); }
+
 .boxshadow {
 	box-shadow:
 		#f66 30px  30px 0px 0px,
@@ -133,11 +135,9 @@ handle.size:hover, handle.size:active {
 		;
 	margin-bottom: 100px;
 }
-.inset{
-	box-shadow: #ffa8 10px 5px 5px 3px inset;
-}
+.inset { box-shadow: #f4fd 10px 5px 5px 3px inset; }
 .boxshadow_blur {
-	margin-top: 200px;
+	margin-top: 100px;
 	box-shadow: 
 		#f00f  40px  30px 25px 0px,
 		#00ff -40px -30px 45px 0px,
@@ -151,10 +151,10 @@ handle.size:hover, handle.size:active {
 	/*
 	filter: blur(55px);
 	filter: sepia(80%);
-	filter: brightness(100%);
-	filter: contrast(120%);
-	filter: drop-shadow(#111b 10px 10px 8px);
+	filter: brightness(70%);
+	filter: contrast(60%);
 	filter: opacity(0.7);
+	filter: drop-shadow(#ffc8 10px 10px 8px);
 	filter: grayscale(1), drop-shadow(#f11b 10px 10px 8px);
 	backdrop-filter: sepia(1);
 	*/
@@ -167,14 +167,16 @@ handle.size:hover, handle.size:active {
 <handle class="size" size_target="#document"/>
 
 <div class="box blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
-
+<div class="box brightness"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box contrast"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box dropshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box boxshadow_blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+
+<div class="box inset"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <!--
 <div class="box window sepia" id="sepia" style="bottom: 150dp"><handle move_target="sepia"/><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box window back_blur" id="back_blur"><handle move_target="back_blur"/><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 
-<div class="box inset"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box boxshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box grayscale"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box opacity_low"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
