@@ -40,7 +40,7 @@ namespace Rml {
 class Context;
 
 enum class StencilCommand { None, Clear, WriteValue, WriteIncrement, WriteDisable, TestEqual, TestDisable };
-enum class RenderCommand { None, StackPush, StackPop, StackToTexture, StackToFilter, FilterToStack };
+enum class RenderCommand { None, StackPush, StackPop, StackToTexture, StackToFilter, FilterToStack, StackToMask };
 
 
 /**

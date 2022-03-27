@@ -165,9 +165,10 @@ inline bool operator!=(const Shadow& a, const Shadow& b)
 }
 enum class DecoratorClasses {
 	Invalid = 0,
-	Background = 1,
-	Filter = 2,
-	BackdropFilter = 4,
+	Background = 1 << 0,
+	Filter = 1 << 1,
+	BackdropFilter = 1 << 2,
+	MaskImage = 1 << 3,
 };
 inline DecoratorClasses operator|(DecoratorClasses a, DecoratorClasses b)
 {

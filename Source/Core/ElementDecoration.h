@@ -87,6 +87,7 @@ private:
 	int num_backgrounds = 0;
 	int num_backdrop_filters = 0;
 	int num_filters = 0;
+	int num_mask_images = 0;
 
 	// If set, a full reload is necessary.
 	bool decorators_dirty = false;

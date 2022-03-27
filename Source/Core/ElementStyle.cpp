@@ -885,6 +885,9 @@ PropertyIdSet ElementStyle::ComputeValues(Style::ComputedValues& values, const S
 		case PropertyId::BackdropFilter:
 			values.has_backdrop_filter(p->unit == Property::DECORATOR);
 			break;
+		case PropertyId::MaskImage:
+			values.has_mask_image(p->unit == Property::DECORATOR);
+			break;
 		case PropertyId::BoxShadow:
 			values.has_box_shadow(p->unit == Property::SHADOWLIST);
 			break;

@@ -429,6 +429,7 @@ void StyleSheetSpecification::RegisterDefaultProperties()
 	
 	RegisterProperty(PropertyId::Filter, "filter", "", false, false).AddParser("decorator", "filter");
 	RegisterProperty(PropertyId::BackdropFilter, "backdrop-filter", "", false, false).AddParser("decorator", "backdrop-filter");
+	RegisterProperty(PropertyId::MaskImage, "mask-image", "", false, false).AddParser("decorator", "mask-image");
 
 	RegisterProperty(PropertyId::BoxShadow, "box-shadow", "none", false, false).AddParser("shadow");
 

@@ -66,13 +66,14 @@ void ElementDecoration::ReloadDecorators()
 	num_backgrounds = 0;
 	num_filters = 0;
 	num_backdrop_filters = 0;
+	num_mask_images = 0;
 
 	const ComputedValues& computed = element->GetComputedValues();
 
-	if (!computed.has_decorator() && !computed.has_filter() && !computed.has_backdrop_filter())
+	if (!computed.has_decorator() && !computed.has_filter() && !computed.has_backdrop_filter() && !computed.has_mask_image())
 		return;
 
-	for (const PropertyId id : {PropertyId::Decorator, PropertyId::BackdropFilter, PropertyId::Filter})
+	for (const PropertyId id : {PropertyId::Decorator, PropertyId::BackdropFilter, PropertyId::Filter, PropertyId::MaskImage})
 	{
 		const Property* property = element->GetLocalProperty(id);
 		if (!property || property->unit != Property::DECORATOR)
@@ -107,6 +108,8 @@ void ElementDecoration::ReloadDecorators()
 			num_filters = list_size;
 		else if (id == PropertyId::BackdropFilter)
 			num_backdrop_filters = list_size;
+		else if (id == PropertyId::MaskImage)
+			num_mask_images = list_size;
 
 		for (const SharedPtr<const Decorator>& decorator : decorator_list)
 		{
@@ -156,7 +159,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 	InstanceDecorators();
 	ReloadDecoratorsData();
 
-	RMLUI_ASSERT(num_backgrounds + num_filters + num_backdrop_filters == (int)decorators.size());
+	RMLUI_ASSERT(num_backgrounds + num_filters + num_backdrop_filters + num_mask_images == (int)decorators.size());
 
 	if (num_backgrounds > 0)
 	{
@@ -172,7 +175,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 		}
 	}
 
-	if (!num_backdrop_filters && !num_filters)
+	if (!num_backdrop_filters && !num_filters && !num_mask_images)
 		return;
 
 	Context* context = element->GetContext();
@@ -204,7 +207,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 		}
 	}
 
-	if (num_filters > 0)
+	if (num_filters > 0 || num_mask_images > 0)
 	{
 		if (render_stage == RenderStage::Enter)
 		{
@@ -239,8 +242,23 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			}
 
 			render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
-			render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
+			
+			if (num_mask_images > 0)
+			{
+				render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
 
+				const int i0_mask = num_backgrounds + num_backdrop_filters + num_filters;
+				for (int i = i0_mask; i < i0_mask + num_mask_images; i++) {
+					DecoratorHandle& decorator = decorators[i];
+					decorator.decorator->RenderElement(element, decorator.decorator_data);
+				}
+
+				render_interface->ExecuteRenderCommand(RenderCommand::StackToMask, Vector2i(filter_origin), Vector2i(filter_size));
+				render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
+			}
+
+
+			render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
 			ElementUtilities::ApplyActiveClipRegion(render_interface, context->GetRenderState());
 		}
 	}

@@ -155,7 +155,7 @@ namespace Style {
 
 			vertical_align_type(VerticalAlign::Baseline), drag(Drag::None), tab_index(TabIndex::None),
 			
-			has_box_shadow(false), has_filter(false), has_backdrop_filter(false)
+			has_box_shadow(false), has_filter(false), has_backdrop_filter(false), has_mask_image(false)
 		{}
 
 		LengthPercentage::Type min_width_type : 1, max_width_type : 1;
@@ -174,6 +174,7 @@ namespace Style {
 		bool has_box_shadow : 1;
 		bool has_filter : 1;
 		bool has_backdrop_filter : 1;
+		bool has_mask_image : 1;
 
 		Clip clip;
 
@@ -295,6 +296,7 @@ namespace Style {
 		bool              has_box_shadow()             const { return rare.has_box_shadow; }
 		bool              has_filter()                 const { return rare.has_filter; }
 		bool              has_backdrop_filter()        const { return rare.has_backdrop_filter; }
+		bool              has_mask_image()             const { return rare.has_mask_image; }
 		
 		// -- Assignment --
 		// Common
@@ -374,6 +376,7 @@ namespace Style {
 		void has_box_shadow            (bool value)              { rare.has_box_shadow             = value; }
 		void has_filter                (bool value)              { rare.has_filter                 = value; }
 		void has_backdrop_filter       (bool value)              { rare.has_backdrop_filter        = value; }
+		void has_mask_image            (bool value)              { rare.has_mask_image             = value; }
 
 		// clang-format on
 
