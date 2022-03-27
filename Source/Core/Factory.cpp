@@ -170,6 +170,7 @@ struct DefaultInstancers {
 	DecoratorBlurInstancer decorator_blur;
 	DecoratorDropShadowInstancer decorator_drop_shadow;
 	DecoratorLinearGradientInstancer decorator_linear_gradient;
+	DecoratorBasicFilterInstancer decorator_hue_rotate = {DecoratorBasicFilterInstancer::ValueType::Angle};
 	DecoratorBasicFilterInstancer decorator_basic_filter;
 
 	// Font effects
@@ -267,6 +268,7 @@ bool Factory::Initialise()
 	RegisterDecoratorInstancer("blur", &default_instancers->decorator_blur);
 	RegisterDecoratorInstancer("drop-shadow", &default_instancers->decorator_drop_shadow);
 	RegisterDecoratorInstancer("linear-gradient", &default_instancers->decorator_linear_gradient);
+	RegisterDecoratorInstancer("hue-rotate", &default_instancers->decorator_hue_rotate);
 	
 	// Basic filters
 	RegisterDecoratorInstancer("brightness", &default_instancers->decorator_basic_filter);

@@ -79,9 +79,19 @@ void DecoratorBasicFilter::RenderElement(Element* /*element*/, DecoratorDataHand
 	element_data->render_interface->RenderEffect(element_data->effect);
 }
 
-DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)
+DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer(ValueType value_type) :
+	DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter), ids{}
 {
-	ids.value = RegisterProperty("value", "1").AddParser("number_percent").GetId();
+	switch (value_type)
+	{
+	case ValueType::NumberPercent:
+		ids.value = RegisterProperty("value", "1").AddParser("number_percent").GetId();
+		break;
+	case ValueType::Angle:
+		ids.value = RegisterProperty("value", "0rad").AddParser("angle").GetId();
+		break;
+	}
+
 	RegisterShorthand("decorator", "value", ShorthandType::FallThrough);
 }
 
@@ -97,6 +107,8 @@ SharedPtr<Decorator> DecoratorBasicFilterInstancer::InstanceDecorator(const Stri
 	float value = p_value->Get<float>();
 	if (p_value->unit == Property::PERCENT)
 		value *= 0.01f;
+	else if (p_value->unit == Property::DEG)
+		value = Rml::Math::DegreesToRadians(value);
 
 	auto decorator = MakeShared<DecoratorBasicFilter>();
 	if (decorator->Initialise(name, value))
