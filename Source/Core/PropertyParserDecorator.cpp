@@ -59,6 +59,20 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 
 	RMLUI_ZoneScoped;
 
+	static const SmallUnorderedMap<String, DecoratorClasses> decorator_class_map = {
+		{"background", DecoratorClasses::Background},
+		{"filter", DecoratorClasses::Filter},
+		{"backdrop-filter", DecoratorClasses::BackdropFilter},
+		{"mask-image", DecoratorClasses::MaskImage},
+	};
+	auto it = decorator_class_map.find(parameters.empty() ? String("background") : parameters.begin()->first);
+	if (it == decorator_class_map.end())
+	{
+		RMLUI_ERRORMSG("Invalid decorator parser parameter.");
+		return false;
+	}
+	const DecoratorClasses decorator_class = it->second;
+
 	DecoratorDeclarationList decorators;
 
 	// Make sure we don't split inside the parenthesis since they may appear in decorator shorthands.
@@ -71,10 +85,6 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 	// Get or instance each decorator in the comma-separated string list
 	for (const String& decorator_string : decorator_string_list)
 	{
-		const DecoratorClasses decorator_class =
-			(parameters.size() == 1 ? (parameters.begin()->first == "filter" ? DecoratorClasses::Filter : DecoratorClasses::BackdropFilter)
-									: DecoratorClasses::Background);
-
 		const size_t shorthand_open = decorator_string.find('(');
 		const size_t shorthand_close = decorator_string.rfind(')');
 		const bool invalid_parenthesis = (shorthand_open == String::npos || shorthand_close == String::npos || shorthand_open >= shorthand_close);

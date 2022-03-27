@@ -1738,7 +1738,8 @@ void Element::OnPropertyChange(const PropertyIdSet& changed_properties)
 		changed_properties.Contains(PropertyId::BorderBottomRightRadius) ||
 		changed_properties.Contains(PropertyId::BorderBottomLeftRadius)
 	);
-	const bool filter_changed = (changed_properties.Contains(PropertyId::Filter) || changed_properties.Contains(PropertyId::BackdropFilter));
+	const bool filter_or_mask_changed = (changed_properties.Contains(PropertyId::Filter) || changed_properties.Contains(PropertyId::BackdropFilter) ||
+		changed_properties.Contains(PropertyId::MaskImage));
 
 	// Update the visibility.
 	if (changed_properties.Contains(PropertyId::Visibility) ||
@@ -1779,13 +1780,13 @@ void Element::OnPropertyChange(const PropertyIdSet& changed_properties)
 	}
 
 	// Update the z-index and stacking context.
-	if (changed_properties.Contains(PropertyId::ZIndex) || filter_changed)
+	if (changed_properties.Contains(PropertyId::ZIndex) || filter_or_mask_changed)
 	{
 		const Style::ZIndex z_index_property = meta->computed_values.z_index();
 
 		const float new_z_index = (z_index_property.type == Style::ZIndex::Auto ? 0.f : z_index_property.value);
 		const bool enable_local_stacking_context = (z_index_property.type != Style::ZIndex::Auto || local_stacking_context_forced ||
-			meta->computed_values.has_filter() || meta->computed_values.has_backdrop_filter());
+			meta->computed_values.has_filter() || meta->computed_values.has_backdrop_filter() || meta->computed_values.has_mask_image());
 
 		if (z_index != new_z_index || local_stacking_context != enable_local_stacking_context)
 		{
@@ -1833,7 +1834,7 @@ void Element::OnPropertyChange(const PropertyIdSet& changed_properties)
 	}
 	
 	// Dirty the decoration if it's changed.
-	if (changed_properties.Contains(PropertyId::Decorator) || filter_changed)
+	if (changed_properties.Contains(PropertyId::Decorator) || filter_or_mask_changed)
 	{
 		meta->decoration.DirtyDecorators();
 	}
