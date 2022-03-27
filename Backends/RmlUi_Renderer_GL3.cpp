@@ -161,6 +161,24 @@ static const char* shader_frag_contrast = R"(
 	vec3 gray = vec3(0.5 * texColor.a);
 	texColor.rgb = mix(gray, texColor.rgb, _value);
 )";
+static const char* shader_frag_invert = R"(
+	vec3 inverted = vec3(texColor.a) - texColor.rgb;
+	texColor.rgb = mix(texColor.rgb, inverted, _value);
+)";
+// Hue-rotation and saturation values based on: https://www.w3.org/TR/filter-effects-1/#attr-valuedef-type-huerotate
+static const char* shader_frag_hue_rotate = R"(
+	mat3 G = mat3(vec3(0.213), vec3(0.715), vec3(0.072));
+	mat3 C = mat3(vec3(0.787, -0.213, -0.213), vec3(-0.715, 0.285, -0.715), vec3(-0.072, -0.072, 0.928));
+	mat3 S = mat3(vec3(-0.213, 0.143, -0.787), vec3(-0.715, 0.140, 0.715), vec3(0.928, -0.283, 0.072));
+	mat3 A = G + C * cos(_value) + S * sin(_value);
+	texColor.rgb = A * texColor.rgb;
+)";
+static const char* shader_frag_saturate = R"(
+	mat3 G = mat3(vec3(0.213), vec3(0.715), vec3(0.072));
+	mat3 C = mat3(vec3(0.787, -0.213, -0.213), vec3(-0.715, 0.285, -0.715), vec3(-0.072, -0.072, 0.928));
+	mat3 A = G + C * _value;
+	texColor.rgb = A * texColor.rgb;
+)";
 
 #define BLUR_SIZE 7
 #define NUM_WEIGHTS ((BLUR_SIZE + 1) / 2)
@@ -227,9 +245,12 @@ struct Shaders {
 	GLuint frag_passthrough;
 	GLuint frag_brightness;
 	GLuint frag_contrast;
+	GLuint frag_invert;
 	GLuint frag_sepia;
 	GLuint frag_gray;
 	GLuint frag_dropshadow;
+	GLuint frag_hue_rotate;
+	GLuint frag_saturate;
 
 	GLuint vert_blur;
 	GLuint frag_blur;
@@ -246,9 +267,12 @@ struct Programs {
 	ProgramData passthrough;
 	ProgramData brightness;
 	ProgramData contrast;
+	ProgramData invert;
 	ProgramData sepia;
 	ProgramData gray;
 	ProgramData dropshadow;
+	ProgramData hue_rotate;
+	ProgramData saturate;
 
 	ProgramData blur;
 };
@@ -508,11 +532,11 @@ static bool CreateShaders(Shaders& out_shaders, Programs& out_programs)
 
 	// Main shaders
 	if (!CreateShader(out_shaders.vert_main, GL_VERTEX_SHADER, shader_vert_main))
-		return ReportError("shader", "main_vertex");
+		return ReportError("shader", "vert_main");
 	if (!CreateShader(out_shaders.frag_main_color, GL_FRAGMENT_SHADER, shader_frag_main_color))
-		return ReportError("shader", "main_fragment_color");
+		return ReportError("shader", "frag_main_color");
 	if (!CreateShader(out_shaders.frag_main_texture, GL_FRAGMENT_SHADER, shader_frag_main_texture))
-		return ReportError("shader", "main_fragment_texture");
+		return ReportError("shader", "frag_main_texture");
 
 	if (!CreateProgram(out_programs.main_color, out_shaders.vert_main, out_shaders.frag_main_color))
 		return ReportError("program", "main_color");
@@ -521,19 +545,25 @@ static bool CreateShaders(Shaders& out_shaders, Programs& out_programs)
 
 	// Effects
 	if (!CreateShader(out_shaders.vert_passthrough, GL_VERTEX_SHADER, shader_vert_passthrough))
-		return ReportError("shader", "postprocess_vertex");
+		return ReportError("shader", "vert_passthrough");
 	if (!CreateShader(out_shaders.frag_passthrough, GL_FRAGMENT_SHADER, shader_frag_passthrough, shader_frag_effect_pre, shader_frag_effect_post))
-		return ReportError("shader", "passthrough_fragment");
+		return ReportError("shader", "frag_passthrough");
 	if (!CreateShader(out_shaders.frag_brightness, GL_FRAGMENT_SHADER, shader_frag_brightness, shader_frag_effect_pre, shader_frag_effect_post))
 		return ReportError("shader", "frag_brightness");
 	if (!CreateShader(out_shaders.frag_contrast, GL_FRAGMENT_SHADER, shader_frag_contrast, shader_frag_effect_pre, shader_frag_effect_post))
 		return ReportError("shader", "frag_contrast");
+	if (!CreateShader(out_shaders.frag_invert, GL_FRAGMENT_SHADER, shader_frag_invert, shader_frag_effect_pre, shader_frag_effect_post))
+		return ReportError("shader", "frag_invert");
 	if (!CreateShader(out_shaders.frag_sepia, GL_FRAGMENT_SHADER, shader_frag_sepia, shader_frag_effect_pre, shader_frag_effect_post))
-		return ReportError("shader", "sepia_fragment");
+		return ReportError("shader", "frag_sepia");
 	if (!CreateShader(out_shaders.frag_gray, GL_FRAGMENT_SHADER, shader_frag_gray, shader_frag_effect_pre, shader_frag_effect_post))
-		return ReportError("shader", "gray_fragment");
+		return ReportError("shader", "frag_gray");
 	if (!CreateShader(out_shaders.frag_dropshadow, GL_FRAGMENT_SHADER, shader_frag_dropshadow, shader_frag_effect_pre, shader_frag_effect_post))
-		return ReportError("shader", "dropshadow_fragment");
+		return ReportError("shader", "frag_dropshadow");
+	if (!CreateShader(out_shaders.frag_hue_rotate, GL_FRAGMENT_SHADER, shader_frag_hue_rotate, shader_frag_effect_pre, shader_frag_effect_post))
+		return ReportError("shader", "frag_hue_rotate");
+	if (!CreateShader(out_shaders.frag_saturate, GL_FRAGMENT_SHADER, shader_frag_saturate, shader_frag_effect_pre, shader_frag_effect_post))
+		return ReportError("shader", "frag_saturate");
 
 	if (!CreateProgram(out_programs.passthrough, out_shaders.vert_passthrough, out_shaders.frag_passthrough))
 		return ReportError("program", "passthrough");
@@ -541,12 +571,18 @@ static bool CreateShaders(Shaders& out_shaders, Programs& out_programs)
 		return ReportError("program", "brightness");
 	if (!CreateProgram(out_programs.contrast, out_shaders.vert_passthrough, out_shaders.frag_contrast))
 		return ReportError("program", "contrast");
+	if (!CreateProgram(out_programs.invert, out_shaders.vert_passthrough, out_shaders.frag_invert))
+		return ReportError("program", "invert");
 	if (!CreateProgram(out_programs.sepia, out_shaders.vert_passthrough, out_shaders.frag_sepia))
 		return ReportError("program", "sepia");
 	if (!CreateProgram(out_programs.gray, out_shaders.vert_passthrough, out_shaders.frag_gray))
 		return ReportError("program", "gray");
 	if (!CreateProgram(out_programs.dropshadow, out_shaders.vert_passthrough, out_shaders.frag_dropshadow))
 		return ReportError("program", "dropshadow");
+	if (!CreateProgram(out_programs.hue_rotate, out_shaders.vert_passthrough, out_shaders.frag_hue_rotate))
+		return ReportError("program", "hue_rotate");
+	if (!CreateProgram(out_programs.saturate, out_shaders.vert_passthrough, out_shaders.frag_saturate))
+		return ReportError("program", "saturate");
 
 	// Blur
 	if (!CreateShader(out_shaders.vert_blur, GL_VERTEX_SHADER, vert_blur))
@@ -571,12 +607,14 @@ static void DestroyShaders()
 	glDeleteProgram(programs.passthrough.id);
 	glDeleteProgram(programs.brightness.id);
 	glDeleteProgram(programs.contrast.id);
+	glDeleteProgram(programs.invert.id);
 	glDeleteProgram(programs.sepia.id);
 	glDeleteProgram(programs.gray.id);
 	glDeleteShader(shaders.vert_passthrough);
 	glDeleteShader(shaders.frag_passthrough);
 	glDeleteShader(shaders.frag_brightness);
 	glDeleteShader(shaders.frag_contrast);
+	glDeleteShader(shaders.frag_invert);
 	glDeleteShader(shaders.frag_sepia);
 	glDeleteShader(shaders.frag_gray);
 
@@ -1110,6 +1148,7 @@ Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand 
 		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
 		const Gfx::FramebufferData& destination = render_state.GetActiveFramebuffer();
 
+
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(source.tex_color_target, source.tex_color_buffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
@@ -1118,6 +1157,7 @@ Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand 
 
 		EnableScissorRegion(pre_filter_scissor_state.enabled);
 		SetScissorRegion(pre_filter_scissor_state.x, pre_filter_scissor_state.y, pre_filter_scissor_state.width, pre_filter_scissor_state.height);
+		pre_filter_scissor_state = {};
 	}
 	break;
 	case Rml::RenderCommand::None:
@@ -1204,6 +1244,15 @@ Rml::CompiledEffectHandle RenderInterface_GL3::CompileEffect(const Rml::String& 
 		effect.value = Rml::Get(parameters, "value", 1.0f);
 		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
 	}
+	else if (name == "invert")
+	{
+		CompiledEffect effect = {};
+		effect.type = EffectType::Basic;
+		effect.program = &Gfx::programs.invert;
+		effect.has_value_uniform = true;
+		effect.value = Rml::Math::Clamp(Rml::Get(parameters, "value", 1.0f), 0.f, 1.f);
+		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+	}
 	else if (name == "grayscale")
 	{
 		CompiledEffect effect = {};
@@ -1218,6 +1267,24 @@ Rml::CompiledEffectHandle RenderInterface_GL3::CompileEffect(const Rml::String& 
 		CompiledEffect effect = {};
 		effect.type = EffectType::Basic;
 		effect.program = &Gfx::programs.sepia;
+		effect.has_value_uniform = true;
+		effect.value = Rml::Get(parameters, "value", 1.0f);
+		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+	}
+	else if (name == "hue-rotate")
+	{
+		CompiledEffect effect = {};
+		effect.type = EffectType::Basic;
+		effect.program = &Gfx::programs.hue_rotate;
+		effect.has_value_uniform = true;
+		effect.value = Rml::Get(parameters, "value", 1.0f);
+		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+	}
+	else if (name == "saturate")
+	{
+		CompiledEffect effect = {};
+		effect.type = EffectType::Basic;
+		effect.program = &Gfx::programs.saturate;
 		effect.has_value_uniform = true;
 		effect.value = Rml::Get(parameters, "value", 1.0f);
 		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
