@@ -161,7 +161,7 @@ inline bool operator!=(const Shadow& a, const Shadow& b)
 {
 	return !(a == b);
 }
-enum class DecoratorClasses {
+enum class DecoratorClasses : byte {
 	Invalid = 0,
 	Background = 1 << 0,
 	Filter = 1 << 1,
@@ -170,11 +170,11 @@ enum class DecoratorClasses {
 };
 inline DecoratorClasses operator|(DecoratorClasses a, DecoratorClasses b)
 {
-	return DecoratorClasses(int(a) | int(b));
+	return DecoratorClasses(byte(a) | byte(b));
 }
 inline DecoratorClasses operator&(DecoratorClasses a, DecoratorClasses b)
 {
-	return DecoratorClasses(int(a) & int(b));
+	return DecoratorClasses(byte(a) & byte(b));
 }
 
 // Additional smart pointers
