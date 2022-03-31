@@ -102,14 +102,30 @@ void ElementDecoration::ReloadDecorators()
 		const auto& decorator_list = style_sheet->InstanceDecorators(*decorators_ptr, source);
 
 		const int list_size = (int)decorator_list.size();
-		if (id == PropertyId::Decorator)
+
+		DecoratorClasses decorator_class = DecoratorClasses::Invalid;
+		switch (id)
+		{
+		case PropertyId::Decorator:
+			decorator_class = DecoratorClasses::Background;
 			num_backgrounds = list_size;
-		else if (id == PropertyId::Filter)
+			break;
+		case PropertyId::Filter:
+			decorator_class = DecoratorClasses::Filter;
 			num_filters = list_size;
-		else if (id == PropertyId::BackdropFilter)
+			break;
+		case PropertyId::BackdropFilter:
+			decorator_class = DecoratorClasses::BackdropFilter;
 			num_backdrop_filters = list_size;
-		else if (id == PropertyId::MaskImage)
+			break;
+		case PropertyId::MaskImage:
+			decorator_class = DecoratorClasses::MaskImage;
 			num_mask_images = list_size;
+			break;
+		default:
+			RMLUI_ERROR;
+			break;
+		}
 
 		for (const SharedPtr<const Decorator>& decorator : decorator_list)
 		{
@@ -117,6 +133,7 @@ void ElementDecoration::ReloadDecorators()
 			{
 				DecoratorHandle decorator_handle;
 				decorator_handle.decorator_data = 0;
+				decorator_handle.decorator_class = decorator_class;
 				decorator_handle.decorator = decorator;
 
 				decorators.push_back(std::move(decorator_handle));
@@ -137,7 +154,10 @@ void ElementDecoration::ReloadDecoratorsData()
 			if (decorator.decorator_data)
 				decorator.decorator->ReleaseElementData(decorator.decorator_data);
 
-			decorator.decorator_data = decorator.decorator->GenerateElementData(element);
+			const DecoratorPaintingArea painting_area =
+				(decorator.decorator_class == DecoratorClasses::Background ? DecoratorPaintingArea::PaddingBox : DecoratorPaintingArea::BorderBox);
+
+			decorator.decorator_data = decorator.decorator->GenerateElementData(element, painting_area);
 		}
 	}
 }
@@ -242,13 +262,14 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			}
 
 			render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
-			
+
 			if (num_mask_images > 0)
 			{
 				render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
 
 				const int i0_mask = num_backgrounds + num_backdrop_filters + num_filters;
-				for (int i = i0_mask; i < i0_mask + num_mask_images; i++) {
+				for (int i = i0_mask; i < i0_mask + num_mask_images; i++)
+				{
 					DecoratorHandle& decorator = decorators[i];
 					decorator.decorator->RenderElement(element, decorator.decorator_data);
 				}
