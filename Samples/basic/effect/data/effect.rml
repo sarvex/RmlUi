@@ -110,7 +110,19 @@ handle.size:hover, handle.size:active {
 	top: 0; right: 0; bottom: 0; left: 0;
 	display: block;
 }
+.box.big {
+	width: 500dp;
+	height: 260dp;
+	max-width: 100%;
+	box-sizing: border-box;
+	border-color: #333;
+}
 
+.mask {
+	decorator: gradient(horizontal #f00 #ff0);
+	mask-image: image("/assets/rmlui.tga" scale-down left), gradient(horizontal #0000 #000f);
+	padding-left: 200dp;
+}
 
 .dropshadow { filter: drop-shadow(#f33f 30px 20px 5px); } 
 
@@ -122,6 +134,10 @@ handle.size:hover, handle.size:active {
 .contrast { filter: contrast(0.5); }
 .sepia { filter: sepia(80%); }
 .grayscale { filter: grayscale(0.9); }
+
+.saturate { filter: saturate(200%); }
+.hue_rotate { filter: hue-rotate(260deg); }
+.invert { filter: invert(100%); }
 
 .opacity_one { filter: opacity(1); }
 .opacity_low { filter: opacity(0.2); }
@@ -149,6 +165,7 @@ handle.size:hover, handle.size:active {
 }
 .filter {
 	/*
+	filter: invert(100%);
 	filter: blur(55px);
 	filter: sepia(80%);
 	filter: brightness(70%);
@@ -166,6 +183,13 @@ handle.size:hover, handle.size:active {
 <handle move_target="#document"><h1>Effect Sample</h1></handle>
 <handle class="size" size_target="#document"/>
 
+<div class="box"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box big mask"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<!--
+<div class="box hue_rotate"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box big hue_rotate"><img src="/assets/rmlui.tga"/>Hello, do you feel the funk?</div>
+<div class="box saturate"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box invert"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box brightness"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box contrast"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
@@ -173,7 +197,6 @@ handle.size:hover, handle.size:active {
 <div class="box boxshadow_blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 
 <div class="box inset"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
-<!--
 <div class="box window sepia" id="sepia" style="bottom: 150dp"><handle move_target="sepia"/><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box window back_blur" id="back_blur"><handle move_target="back_blur"/><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 

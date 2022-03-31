@@ -73,8 +73,9 @@ private:
 		bool enabled;
 		int x, y, width, height;
 	};
-	ScissorState scissor_state = {}; 
-	ScissorState pre_filter_scissor_state = {}; 
+	ScissorState scissor_state = {};
+	ScissorState pre_filter_scissor_state = {};
+	bool has_mask = false;
 };
 
 namespace RmlGL3 {
