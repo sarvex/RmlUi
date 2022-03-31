@@ -179,6 +179,19 @@ static const char* shader_frag_saturate = R"(
 	mat3 A = G + C * _value;
 	texColor.rgb = A * texColor.rgb;
 )";
+static const char* shader_frag_blend_mask = RMLUI_SHADER_HEADER R"(
+uniform sampler2D _tex;
+uniform sampler2D _texMask;
+
+in vec2 fragTexCoord;
+out vec4 finalColor;
+
+void main() {
+	vec4 texColor = texture(_tex, fragTexCoord);
+	float maskAlpha = texture(_texMask, fragTexCoord).a;
+	finalColor = texColor * maskAlpha;
+}
+)";
 
 #define BLUR_SIZE 7
 #define NUM_WEIGHTS ((BLUR_SIZE + 1) / 2)
@@ -221,9 +234,9 @@ void main() {
 
 namespace Gfx {
 
-enum class ProgramUniform { Translate, Transform, Tex, Value, Color, TexelOffset, Weights, Count };
+enum class ProgramUniform { Translate, Transform, Tex, Value, Color, TexelOffset, Weights, TexMask, Count };
 static const char* const program_uniform_names[(size_t)ProgramUniform::Count] = {"_translate", "_transform", "_tex", "_value", "_color",
-	"_texelOffset", "_weights[0]"};
+	"_texelOffset", "_weights[0]", "_texMask"};
 
 enum class VertexAttribute { Position, Color0, TexCoord0, Count };
 static const char* const vertex_attribute_names[(size_t)VertexAttribute::Count] = {"inPosition", "inColor0", "inTexCoord0"};
@@ -252,6 +265,8 @@ struct Shaders {
 	GLuint frag_hue_rotate;
 	GLuint frag_saturate;
 
+	GLuint frag_blend_mask;
+
 	GLuint vert_blur;
 	GLuint frag_blur;
 };
@@ -273,6 +288,8 @@ struct Programs {
 	ProgramData dropshadow;
 	ProgramData hue_rotate;
 	ProgramData saturate;
+
+	ProgramData blend_mask;
 
 	ProgramData blur;
 };
@@ -583,6 +600,12 @@ static bool CreateShaders(Shaders& out_shaders, Programs& out_programs)
 		return ReportError("program", "hue_rotate");
 	if (!CreateProgram(out_programs.saturate, out_shaders.vert_passthrough, out_shaders.frag_saturate))
 		return ReportError("program", "saturate");
+
+	// Blend mask
+	if (!CreateShader(out_shaders.frag_blend_mask, GL_FRAGMENT_SHADER, shader_frag_blend_mask))
+		return ReportError("shader", "frag_blend_mask");
+	if (!CreateProgram(out_programs.blend_mask, out_shaders.vert_passthrough, out_shaders.frag_blend_mask))
+		return ReportError("program", "blend_mask");
 
 	// Blur
 	if (!CreateShader(out_shaders.vert_blur, GL_VERTEX_SHADER, vert_blur))
@@ -1141,6 +1164,7 @@ Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand 
 #endif
 
 		glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, destination.width, destination.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		has_mask = false;
 	}
 	break;
 	case Rml::RenderCommand::FilterToStack:
@@ -1148,16 +1172,48 @@ Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand 
 		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
 		const Gfx::FramebufferData& destination = render_state.GetActiveFramebuffer();
 
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(source.tex_color_target, source.tex_color_buffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
-		glUseProgram(Gfx::programs.passthrough.id);
+		glBindTexture(source.tex_color_target, source.tex_color_buffer);
+
+		if (!has_mask)
+		{
+			glUseProgram(Gfx::programs.passthrough.id);
+		}
+		else
+		{
+			const Gfx::FramebufferData& mask = render_state.GetPostprocessSecondary();
+			glUseProgram(Gfx::programs.blend_mask.id);
+			glUniform1i(Gfx::programs.blend_mask.uniform_locations[(int)Gfx::ProgramUniform::TexMask], 1);
+
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(mask.tex_color_target, mask.tex_color_buffer);
+			glActiveTexture(GL_TEXTURE0);
+		}
 		Gfx::DrawFullscreenQuad();
 
 		EnableScissorRegion(pre_filter_scissor_state.enabled);
 		SetScissorRegion(pre_filter_scissor_state.x, pre_filter_scissor_state.y, pre_filter_scissor_state.width, pre_filter_scissor_state.height);
 		pre_filter_scissor_state = {};
+		has_mask = false;
+	}
+	break;
+	case Rml::RenderCommand::StackToMask:
+	{
+		ScissorState scissor_state_initial = scissor_state;
+		const Rml::Vector2i scissor_size = (dimensions == Rml::Vector2i(0) ? Rml::Vector2i(viewport_width, viewport_height) : dimensions);
+		EnableScissorRegion(true);
+		SetScissorRegion(offset.x, offset.y, scissor_size.x, scissor_size.y);
+
+		const Gfx::FramebufferData& source = render_state.GetActiveFramebuffer();
+		const Gfx::FramebufferData& destination = render_state.GetPostprocessSecondary();
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
+
+		glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, destination.width, destination.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+		EnableScissorRegion(scissor_state_initial.enabled);
+		SetScissorRegion(scissor_state_initial.x, scissor_state_initial.y, scissor_state_initial.width, scissor_state_initial.height);
+		has_mask = true;
 	}
 	break;
 	case Rml::RenderCommand::None:
@@ -1297,7 +1353,7 @@ static void SigmaToParameters(const float desired_sigma, int& out_pass_level, fl
 {
 	constexpr int max_num_passes = 10;
 	static_assert(max_num_passes < 31, "");
-	constexpr float max_single_pass_sigma = 2.0f;
+	constexpr float max_single_pass_sigma = 3.0f;
 	out_pass_level = Rml::Math::Clamp(Rml::Math::Log2(int(desired_sigma * (2.f / max_single_pass_sigma))), 0, max_num_passes);
 	out_sigma = Rml::Math::Clamp(desired_sigma / float(1 << out_pass_level), 0.0f, max_single_pass_sigma);
 }
