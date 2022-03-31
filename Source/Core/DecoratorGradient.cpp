@@ -62,10 +62,11 @@ bool DecoratorGradient::Initialise(const Direction dir_, const Colourb start_, c
 	return true;
 }
 
-DecoratorDataHandle DecoratorGradient::GenerateElementData(Element* element) const
+DecoratorDataHandle DecoratorGradient::GenerateElementData(Element* element, DecoratorPaintingArea painting_area) const
 {
 	Geometry* geometry = new Geometry(element);
 	const Box& box = element->GetBox();
+	const Box::Area box_area = (painting_area == DecoratorPaintingArea::PaddingBox ? Box::PADDING : Box::BORDER);
 
 	const ComputedValues& computed = element->GetComputedValues();
 	const float opacity = computed.opacity();
@@ -76,7 +77,9 @@ DecoratorDataHandle DecoratorGradient::GenerateElementData(Element* element) con
 		computed.border_bottom_right_radius(),
 		computed.border_bottom_left_radius(),
 	};
-	GeometryUtilities::GenerateBackgroundBorder(geometry, element->GetBox(), Vector2f(0), border_radius, Colourb());
+	const Colourb border_colors[4];
+	GeometryUtilities::GenerateBackgroundBorder(geometry, element->GetBox(), Vector2f(0), border_radius, Colourb(),
+		(painting_area == DecoratorPaintingArea::PaddingBox ? nullptr : border_colors));
 
 	// Apply opacity
 	Colourb colour_start = start;
@@ -84,8 +87,8 @@ DecoratorDataHandle DecoratorGradient::GenerateElementData(Element* element) con
 	Colourb colour_stop = stop;
 	colour_stop.alpha = (byte)(opacity * (float)colour_stop.alpha);
 
-	const Vector2f padding_offset = box.GetPosition(Box::PADDING);
-	const Vector2f padding_size = box.GetSize(Box::PADDING);
+	const Vector2f padding_offset = box.GetPosition(box_area);
+	const Vector2f padding_size = box.GetSize(box_area);
 
 	Vector<Vertex>& vertices = geometry->GetVertices();
 
@@ -302,8 +305,7 @@ void DecoratorLinearGradient::RenderElement(Element* element, DecoratorDataHandl
 	element_data->render_interface->RenderEffect(element_data->effect, element_data->geometry, element->GetAbsoluteOffset(Box::PADDING));
 }
 
-DecoratorLinearGradientInstancer::DecoratorLinearGradientInstancer() :
-	DecoratorInstancer(DecoratorClasses::Background | DecoratorClasses::MaskImage)
+DecoratorLinearGradientInstancer::DecoratorLinearGradientInstancer() : DecoratorInstancer(DecoratorClasses::Background | DecoratorClasses::MaskImage)
 {
 	ids.angle = RegisterProperty("angle", "180deg").AddParser("angle").GetId();
 	ids.color_stop_list = RegisterProperty("color-stops", "").AddParser("color_stop_list").GetId();
