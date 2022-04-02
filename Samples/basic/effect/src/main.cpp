@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -31,24 +31,14 @@
 #include <Shell.h>
 
 Rml::Context* context = nullptr;
-Rml::ElementDocument* document = nullptr;
 
 void GameLoop()
 {
-	static uint32_t frame = 0;
-
-	if (document && (frame == 0 || frame == 1))
-	{
-		document->SetProperty("top", frame == 0 ? "33px" : "34px");
-	}
-
 	context->Update();
 
 	Shell::BeginFrame();
 	context->Render();
 	Shell::PresentFrame();
-
-	frame += 1;
 }
 
 #if defined RMLUI_PLATFORM_WIN32
@@ -85,7 +75,7 @@ int main(int /*argc*/, char** /*argv*/)
 	Shell::LoadFonts();
 
 	// Load and show the tutorial document.
-	if (document = context->LoadDocument("basic/effect/data/effect.rml"))
+	if (Rml::ElementDocument* document = context->LoadDocument("basic/effect/data/effect.rml"))
 		document->Show();
 
 	Shell::EventLoop(GameLoop);
