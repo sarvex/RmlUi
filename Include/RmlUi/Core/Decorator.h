@@ -35,10 +35,7 @@
 
 namespace Rml {
 
-class DecoratorInstancer;
 class Element;
-class PropertyDictionary;
-class Property;
 struct Texture;
 
 enum class DecoratorPaintingArea { PaddingBox, BorderBox };
@@ -59,14 +56,14 @@ public:
 	/// @param[in] element The newly decorated element.
 	/// @param[in] painting_area Determines the element's area to be painted by the decorator.
 	/// @return A handle to a decorator-defined data handle, or nullptr if none is needed for the element.
-	virtual DecoratorDataHandle GenerateElementData(Element* element, DecoratorPaintingArea painting_area) const
+	virtual DecoratorDataHandle GenerateElementData(Element* element, DecoratorPaintingArea /*painting_area*/) const
 	{
 		// For backward compatibility
 		return GenerateElementData(element);
 	}
 
-	/// Deprecated, use GenerateElementData(Element*, DecoratorClasses) instead.
-	virtual DecoratorDataHandle GenerateElementData(Element* element) const
+	/// Deprecated, use GenerateElementData(Element*, DecoratorPaintingArea) instead.
+	virtual DecoratorDataHandle GenerateElementData(Element* /*element*/) const
 	{
 		RMLUI_ERROR;
 		return INVALID_DECORATORDATAHANDLE;
