@@ -671,6 +671,10 @@ RenderInterface_GL3::RenderInterface_GL3()
 	RMLUI_ASSERT(!Gfx::render_interface);
 	Gfx::render_interface = this;
 }
+RenderInterface_GL3::~RenderInterface_GL3()
+{
+	Gfx::render_interface = nullptr;
+}
 
 void RenderInterface_GL3::RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices, const Rml::TextureHandle texture,
 	const Rml::Vector2f& translation)
@@ -1097,6 +1101,25 @@ private:
 
 static RenderState render_state;
 
+struct Rectangle2i {
+	Rectangle2i() = default;
+	Rectangle2i(Rml::Vector2i pos, Rml::Vector2i size) : pos(pos), size(size) {}
+	Rectangle2i(int x, int y, int w, int h) : pos(x, y), size(w, h) {}
+	Rml::Vector2i pos, size;
+};
+
+static Rectangle2i RectangleIntersection(Rectangle2i a, Rectangle2i b)
+{
+	const Rml::Vector2i a_max = a.pos + a.size;
+	const Rml::Vector2i b_max = b.pos + b.size;
+
+	Rectangle2i result;
+	result.pos = Rml::Math::Max(a.pos, b.pos);
+	result.size = Rml::Math::Max(Rml::Math::Min(a_max, b_max) - result.pos, Rml::Vector2i(0));
+
+	return result;
+}
+
 Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand command, Rml::Vector2i offset, Rml::Vector2i dimensions)
 {
 	Rml::TextureHandle texture_handle = {};
@@ -1145,9 +1168,16 @@ Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand 
 	case Rml::RenderCommand::StackToFilter:
 	{
 		pre_filter_scissor_state = scissor_state;
-		const Rml::Vector2i scissor_size = (dimensions == Rml::Vector2i(0) ? Rml::Vector2i(viewport_width, viewport_height) : dimensions);
+		const Rml::Vector2i filter_size = (dimensions == Rml::Vector2i(0) ? Rml::Vector2i(viewport_width, viewport_height) : dimensions);
+
+		// Set the scissor region during filtering to the intersection of the destination scissor (equivalent to the current scissor state) and the
+		// filtering region provided by the function arguments.
+		const Rectangle2i rect_filter = {offset, filter_size};
+		const Rectangle2i rect_scissor_state = {scissor_state.x, scissor_state.y, scissor_state.width, scissor_state.height};
+		const Rectangle2i rect_new_scissor = scissor_state.enabled ? RectangleIntersection(rect_filter, rect_scissor_state) : rect_filter;
+
 		EnableScissorRegion(true);
-		SetScissorRegion(offset.x, offset.y, scissor_size.x, scissor_size.y);
+		SetScissorRegion(rect_new_scissor.pos.x, rect_new_scissor.pos.y, rect_new_scissor.size.x, rect_new_scissor.size.y);
 
 		const Gfx::FramebufferData& source = render_state.GetActiveFramebuffer();
 		const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
@@ -1189,6 +1219,7 @@ Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand 
 			glBindTexture(mask.tex_color_target, mask.tex_color_buffer);
 			glActiveTexture(GL_TEXTURE0);
 		}
+
 		Gfx::DrawFullscreenQuad();
 
 		EnableScissorRegion(pre_filter_scissor_state.enabled);
@@ -1428,21 +1459,19 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 
 	// Intersect the blur area with the framebuffer dimensions.
 	{
-		const Rml::Vector2i min = Rml::Math::Max(position, Rml::Vector2i(0));
-		const Rml::Vector2i max = Rml::Math::Min(position + size, Rml::Vector2i(source_destination.width, source_destination.height));
-		position = min;
-		size = Rml::Math::Max(max - min, Rml::Vector2i(0));
+		const Rml::Vector2i framebuffer_size = {source_destination.width, source_destination.height};
+		const Rectangle2i rect = RectangleIntersection({position, size}, {Rml::Vector2i(0), framebuffer_size});
+		position = rect.pos;
+		size = rect.size;
 	}
 
 	// Begin by downscale so that the blur pass can be done at a reduced resolution for large sigma.
 	Rml::Vector2i scissor_min = position;
 	Rml::Vector2i scissor_size = size;
 
-	auto SubmitScissor = [&scissor_min, &scissor_size]() { glScissor(scissor_min.x, scissor_min.y, scissor_size.x, scissor_size.y); };
-
 	glUseProgram(Gfx::programs.passthrough.id);
 	Gfx::render_interface->EnableScissorRegion(true);
-	SubmitScissor();
+	glScissor(scissor_min.x, scissor_min.y, scissor_size.x, scissor_size.y);
 
 	// Downscale by iterative half-scaling with bilinear filtering, to reduce aliasing.
 	glViewport(0, 0, source_destination.width / 2, source_destination.height / 2);
@@ -1458,7 +1487,7 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 		const Rml::Vector2i size = Rml::Math::Max(scissor_size + Rml::Vector2i(2 * radius), Rml::Vector2i(0));
 		glScissor(min.x, min.y, size.x, size.y);
 		glClear(GL_COLOR_BUFFER_BIT);
-		SubmitScissor();
+		glScissor(scissor_min.x, scissor_min.y, scissor_size.x, scissor_size.y);
 	};
 
 	// Move the texture data to the temp buffer if the last downscaling end up at the source_destination buffer.
@@ -1471,7 +1500,7 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 		const bool from_source = (i % 2 == 0);
 		glBindTexture(GL_TEXTURE_2D, (from_source ? source_destination : temp).tex_color_buffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, (from_source ? temp : source_destination).framebuffer);
-		SubmitScissor();
+		glScissor(scissor_min.x, scissor_min.y, scissor_size.x, scissor_size.y);
 
 		if (i == pass_level - 1 && !transfer_to_temp_buffer)
 			ClearWithMargin();
@@ -1586,8 +1615,8 @@ Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle e
 		ScissorState new_scissor_state = scissor_state;
 		new_scissor_state.x += Rml::Math::Max((int)effect.offset.x, 0);
 		new_scissor_state.y += Rml::Math::Max((int)effect.offset.y, 0);
-		new_scissor_state.width -= std::abs((int)effect.offset.x);
-		new_scissor_state.height -= std::abs((int)effect.offset.y);
+		new_scissor_state.width = Rml::Math::Max(new_scissor_state.width - std::abs((int)effect.offset.x), 0);
+		new_scissor_state.height = Rml::Math::Max(new_scissor_state.height - std::abs((int)effect.offset.y), 0);
 		SetScissorRegion(new_scissor_state.x, new_scissor_state.y, new_scissor_state.width, new_scissor_state.height);
 
 		const Rml::Vector2f uv_offset = effect.offset / Rml::Vector2f(-(float)viewport_width, (float)viewport_height);

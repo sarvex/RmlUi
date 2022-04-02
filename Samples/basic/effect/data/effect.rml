@@ -104,6 +104,7 @@ handle.size:hover, handle.size:active {
 	bottom: 50dp;
 	left: 50dp;
 	margin: 0;
+	cursor: move;
 }
 .box.window handle {
 	position: absolute;
@@ -185,7 +186,7 @@ handle.size:hover, handle.size:active {
 
 <div class="box"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box big mask"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
-<!--
+
 <div class="box hue_rotate"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box big hue_rotate"><img src="/assets/rmlui.tga"/>Hello, do you feel the funk?</div>
 <div class="box saturate"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
@@ -203,6 +204,7 @@ handle.size:hover, handle.size:active {
 <div class="box boxshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box grayscale"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box opacity_low"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<!--
 
 <div class="gradient-wrap">
 	<div id="gradient"/>

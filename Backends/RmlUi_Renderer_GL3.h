@@ -34,6 +34,7 @@
 class RenderInterface_GL3 : public Rml::RenderInterface {
 public:
 	RenderInterface_GL3();
+	~RenderInterface_GL3();
 
 	void RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices, Rml::TextureHandle texture,
 		const Rml::Vector2f& translation) override;
