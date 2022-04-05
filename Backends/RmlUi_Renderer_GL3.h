@@ -64,7 +64,7 @@ public:
 	static const Rml::TextureHandle TexturePostprocess = Rml::TextureHandle(-2);
 
 private:
-	enum class ProgramId { None, Texture = 1, Color = 2, All = (Texture | Color) };
+	enum class ProgramId { None, Texture = 1, Color = 2, LinearGradient = 4, All = (Texture | Color | LinearGradient) };
 	void SubmitTransformUniform(ProgramId program_id, int uniform_location);
 
 	Rml::Matrix4f transform;
