@@ -42,27 +42,32 @@
 #endif
 
 #if defined RMLUI_PLATFORM_EMSCRIPTEN
-	#define RMLUI_SHADER_HEADER_PRE "#version 300 es\nprecision highp float;\n"
+	#define RMLUI_SHADER_HEADER_VERSION "#version 300 es\nprecision highp float;\n"
 	#include <GLES3/gl3.h>
 #else
-	#define RMLUI_SHADER_HEADER_PRE "#version 330\n"
+	#define RMLUI_SHADER_HEADER_VERSION "#version 330\n"
 	#define GLAD_GL_IMPLEMENTATION
 	#include "RmlUi_Include_GL3.h"
 #endif
 
 #define RMLUI_PREMULTIPLIED_ALPHA 1
 
-#if RMLUI_PREMULTIPLIED_ALPHA
-	#define RMLUI_SHADER_HEADER RMLUI_SHADER_HEADER_PRE "#define RMLUI_PREMULTIPLIED_ALPHA 1 "
-#else
-	#define RMLUI_SHADER_HEADER RMLUI_SHADER_HEADER_PRE "#define RMLUI_PREMULTIPLIED_ALPHA 0 "
-#endif
+#define MAX_NUM_STOPS 16
+#define BLUR_SIZE 7
+#define NUM_WEIGHTS ((BLUR_SIZE + 1) / 2)
 
-#define STRINGIFY_MACRO_IMPL(x) #x
-#define STRINGIFY_MACRO(x) STRINGIFY_MACRO_IMPL(x)
+#define RMLUI_STRINGIFY_IMPL(x) #x
+#define RMLUI_STRINGIFY(x) RMLUI_STRINGIFY_IMPL(x)
+
+#define RMLUI_SHADER_HEADER     \
+	RMLUI_SHADER_HEADER_VERSION \
+	"#define RMLUI_PREMULTIPLIED_ALPHA " RMLUI_STRINGIFY(RMLUI_PREMULTIPLIED_ALPHA) "\n#define MAX_NUM_STOPS " RMLUI_STRINGIFY(MAX_NUM_STOPS) "\n"
 
 static int viewport_width = 0;
 static int viewport_height = 0;
+
+static constexpr int blur_size = BLUR_SIZE;
+static constexpr int num_weights = NUM_WEIGHTS;
 
 static const char* shader_vert_main = RMLUI_SHADER_HEADER R"(
 uniform vec2 _translate;
@@ -110,6 +115,38 @@ out vec4 finalColor;
 
 void main() {
 	finalColor = fragColor;
+}
+)";
+static const char* shader_frag_main_linear_gradient = RMLUI_SHADER_HEADER R"(
+uniform vec2 _p0;
+uniform vec2 _p1;
+uniform vec4 _stop_colors[MAX_NUM_STOPS];
+uniform float _stop_positions[MAX_NUM_STOPS]; // normalized, 0 -> p0, 1 -> p1.
+uniform int _num_stops;
+
+in vec2 fragTexCoord;
+in vec4 fragColor;
+
+out vec4 finalColor;
+
+vec4 mix_stop_colors(float t) {
+	t = clamp(t, 0.0, 1.0);
+	vec4 color = _stop_colors[0];
+
+	for (int i = 1; i < _num_stops; i++) {
+		color = mix(color, _stop_colors[i], smoothstep(_stop_positions[i-1], _stop_positions[i], t));
+	}
+	return color;
+}
+
+void main() {
+	vec2 v = _p1 - _p0;
+	float d_square = dot(v, v);
+
+	vec2 V = fragTexCoord - _p0;
+	float t = dot(v, V) / d_square;
+
+	finalColor = fragColor * mix_stop_colors(t);
 }
 )";
 
@@ -193,14 +230,8 @@ void main() {
 }
 )";
 
-#define BLUR_SIZE 7
-#define NUM_WEIGHTS ((BLUR_SIZE + 1) / 2)
-
-static constexpr int blur_size = BLUR_SIZE;
-static constexpr int num_weights = NUM_WEIGHTS;
-
 #define RMLUI_SHADER_BLUR_HEADER \
-	RMLUI_SHADER_HEADER "\n#define BLUR_SIZE " STRINGIFY_MACRO(BLUR_SIZE) "\n#define NUM_WEIGHTS " STRINGIFY_MACRO(NUM_WEIGHTS)
+	RMLUI_SHADER_HEADER "\n#define BLUR_SIZE " RMLUI_STRINGIFY(BLUR_SIZE) "\n#define NUM_WEIGHTS " RMLUI_STRINGIFY(NUM_WEIGHTS)
 
 static const char* vert_blur = RMLUI_SHADER_BLUR_HEADER R"(
 uniform vec2 _texelOffset;
@@ -234,9 +265,24 @@ void main() {
 
 namespace Gfx {
 
-enum class ProgramUniform { Translate, Transform, Tex, Value, Color, TexelOffset, Weights, TexMask, Count };
+enum class ProgramUniform {
+	Translate,
+	Transform,
+	Tex,
+	Value,
+	Color,
+	TexelOffset,
+	Weights,
+	TexMask,
+	P0,
+	P1,
+	StopColors,
+	StopPositions,
+	NumStops,
+	Count
+};
 static const char* const program_uniform_names[(size_t)ProgramUniform::Count] = {"_translate", "_transform", "_tex", "_value", "_color",
-	"_texelOffset", "_weights[0]", "_texMask"};
+	"_texelOffset", "_weights[0]", "_texMask", "_p0", "_p1", "_stop_colors[0]", "_stop_positions[0]", "_num_stops"};
 
 enum class VertexAttribute { Position, Color0, TexCoord0, Count };
 static const char* const vertex_attribute_names[(size_t)VertexAttribute::Count] = {"inPosition", "inColor0", "inTexCoord0"};
@@ -253,6 +299,7 @@ struct Shaders {
 	GLuint vert_main;
 	GLuint frag_main_color;
 	GLuint frag_main_texture;
+	GLuint frag_main_linear_gradient;
 
 	GLuint vert_passthrough;
 	GLuint frag_passthrough;
@@ -278,6 +325,7 @@ struct ProgramData {
 struct Programs {
 	ProgramData main_color;
 	ProgramData main_texture;
+	ProgramData main_linear_gradient;
 
 	ProgramData passthrough;
 	ProgramData brightness;
@@ -554,11 +602,15 @@ static bool CreateShaders(Shaders& out_shaders, Programs& out_programs)
 		return ReportError("shader", "frag_main_color");
 	if (!CreateShader(out_shaders.frag_main_texture, GL_FRAGMENT_SHADER, shader_frag_main_texture))
 		return ReportError("shader", "frag_main_texture");
+	if (!CreateShader(out_shaders.frag_main_linear_gradient, GL_FRAGMENT_SHADER, shader_frag_main_linear_gradient))
+		return ReportError("shader", "frag_main_linear_gradient");
 
 	if (!CreateProgram(out_programs.main_color, out_shaders.vert_main, out_shaders.frag_main_color))
 		return ReportError("program", "main_color");
 	if (!CreateProgram(out_programs.main_texture, out_shaders.vert_main, out_shaders.frag_main_texture))
 		return ReportError("program", "main_texture");
+	if (!CreateProgram(out_programs.main_linear_gradient, out_shaders.vert_main, out_shaders.frag_main_linear_gradient))
+		return ReportError("program", "main_linear_gradient");
 
 	// Effects
 	if (!CreateShader(out_shaders.vert_passthrough, GL_VERTEX_SHADER, shader_vert_passthrough))
@@ -623,9 +675,11 @@ static void DestroyShaders()
 {
 	glDeleteProgram(programs.main_color.id);
 	glDeleteProgram(programs.main_texture.id);
+	glDeleteProgram(programs.main_linear_gradient.id);
 	glDeleteShader(shaders.vert_main);
 	glDeleteShader(shaders.frag_main_color);
 	glDeleteShader(shaders.frag_main_texture);
+	glDeleteShader(shaders.frag_main_linear_gradient);
 
 	glDeleteProgram(programs.passthrough.id);
 	glDeleteProgram(programs.brightness.id);
@@ -1557,8 +1611,8 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	Gfx::render_interface->EnableScissorRegion(false);
 }
 
-Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle effect_handle, Rml::CompiledGeometryHandle geometry,
-	Rml::Vector2f translation)
+Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle effect_handle, Rml::CompiledGeometryHandle geometry_handle,
+	Rml::Vector2f geometry_translation)
 {
 	const CompiledEffect& effect = *reinterpret_cast<CompiledEffect*>(effect_handle);
 
@@ -1590,6 +1644,37 @@ Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle e
 	break;
 	case EffectType::LinearGradient:
 	{
+		const int num_stops = Rml::Math::Min((int)effect.color_stop_list.size(), MAX_NUM_STOPS);
+		float stop_positions[MAX_NUM_STOPS];
+		Rml::Colourf stop_colors[MAX_NUM_STOPS];
+
+		// @performance: Generate this data on CompileEffect().
+		for (int i = 0; i < num_stops; i++)
+		{
+			const Rml::ColorStop& stop = effect.color_stop_list[i];
+			RMLUI_ASSERT(stop.position == Rml::ColorStop::Position::Number);
+			stop_positions[i] = stop.position_value;
+			for (int j = 0; j < 4; j++)
+				stop_colors[i][j] = float(stop.color[j]) * (1.f / 255.f);
+			for (int j = 0; j < 3; j++)
+				stop_colors[i][j] *= stop_colors[i].alpha; // Pre-multiply alpha.
+		}
+
+		const auto& locations = Gfx::programs.main_linear_gradient.uniform_locations;
+		
+		glUseProgram(Gfx::programs.main_linear_gradient.id);
+		glUniform2fv(locations[(int)Gfx::ProgramUniform::P0], 1, &effect.p0.x);
+		glUniform2fv(locations[(int)Gfx::ProgramUniform::P1], 1, &effect.p1.x);
+		glUniform1i(locations[(int)Gfx::ProgramUniform::NumStops], num_stops);
+		glUniform1fv(locations[(int)Gfx::ProgramUniform::StopPositions], num_stops, stop_positions);
+		glUniform4fv(locations[(int)Gfx::ProgramUniform::StopColors], num_stops, stop_colors[0]);
+
+		glUniform2fv(locations[(int)Gfx::ProgramUniform::Translate], 1, &geometry_translation.x);
+		SubmitTransformUniform(ProgramId::LinearGradient, locations[(int)Gfx::ProgramUniform::Transform]);
+		
+		const Gfx::CompiledGeometryData* geometry = (Gfx::CompiledGeometryData*)geometry_handle;
+		glBindVertexArray(geometry->vao);
+		glDrawElements(GL_TRIANGLES, geometry->draw_count, GL_UNSIGNED_INT, (const GLvoid*)0);
 	}
 	break;
 	case EffectType::DropShadow:
