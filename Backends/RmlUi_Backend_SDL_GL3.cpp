@@ -38,7 +38,9 @@
 #include <SDL.h>
 #include <SDL_image.h>
 
-#if !defined RMLUI_PLATFORM_EMSCRIPTEN
+#if defined RMLUI_PLATFORM_EMSCRIPTEN
+	#include <emscripten.h>
+#else
 	#if !(SDL_VIDEO_RENDER_OGL)
 		#error "Only the OpenGL SDL backend is supported."
 	#endif
@@ -152,11 +154,19 @@ bool Backend::OpenWindow(const char* name, int width, int height, bool allow_res
 	if (!RmlSDL::Initialize())
 		return false;
 
+#if defined RMLUI_PLATFORM_EMSCRIPTEN
+	// GLES 3.0 (WebGL 2.0)
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#else
 	// GL 3.3 Core
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+#endif
 
 	// Request stencil buffer of at least 8-bit size to supporting clipping on transformed elements.
 	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
@@ -209,41 +219,54 @@ void Backend::CloseWindow()
 	RmlSDL::Shutdown();
 }
 
+static void EventLoopIteration(void* idle_function_ptr)
+{
+	ShellIdleFunction idle_function = (ShellIdleFunction)idle_function_ptr;
+	SDL_Event event;
+
+	while (SDL_PollEvent(&event))
+	{
+		switch (event.type)
+		{
+		case SDL_QUIT:
+			running = false;
+			break;
+		case SDL_KEYDOWN:
+			// Intercept keydown events to handle global sample shortcuts.
+			ProcessKeyDown(event, RmlSDL::ConvertKey(event.key.keysym.sym), RmlSDL::GetKeyModifierState());
+			break;
+		case SDL_WINDOWEVENT:
+			switch (event.window.event)
+			{
+			case SDL_WINDOWEVENT_SIZE_CHANGED:
+				UpdateWindowDimensions(event.window.data1, event.window.data2);
+				break;
+			}
+			break;
+		default:
+			RmlSDL::EventHandler(event);
+			break;
+		}
+	}
+
+	idle_function();
+}
+
 void Backend::EventLoop(ShellIdleFunction idle_function)
 {
 	running = true;
 
+#if defined RMLUI_PLATFORM_EMSCRIPTEN
+
+	// Hand over control of the main loop to the WebAssembly runtime.
+	emscripten_set_main_loop_arg(EventLoopIteration, (void*)idle_function, 0, true);
+
+#else
+
 	while (running)
-	{
-		SDL_Event event;
+		EventLoopIteration((void*)idle_function);
 
-		while (SDL_PollEvent(&event))
-		{
-			switch (event.type)
-			{
-			case SDL_QUIT:
-				running = false;
-				break;
-			case SDL_KEYDOWN:
-				// Intercept keydown events to handle global sample shortcuts.
-				ProcessKeyDown(event, RmlSDL::ConvertKey(event.key.keysym.sym), RmlSDL::GetKeyModifierState());
-				break;
-			case SDL_WINDOWEVENT:
-				switch (event.window.event)
-				{
-				case SDL_WINDOWEVENT_SIZE_CHANGED:
-					UpdateWindowDimensions(event.window.data1, event.window.data2);
-					break;
-				}
-				break;
-			default:
-				RmlSDL::EventHandler(event);
-				break;
-			}
-		}
-
-		idle_function();
-	}
+#endif
 }
 
 void Backend::RequestExit()

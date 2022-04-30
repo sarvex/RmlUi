@@ -40,10 +40,14 @@
 	#pragma warning(disable : 4505)
 #endif
 
-#define GLAD_GL_IMPLEMENTATION
-#include "RmlUi_Include_GL3.h"
-
-#define RMLUI_SHADER_HEADER "#version 330\n"
+#if defined RMLUI_PLATFORM_EMSCRIPTEN
+	#define RMLUI_SHADER_HEADER "#version 300 es\nprecision highp float;\n"
+	#include <GLES3/gl3.h>
+#else
+	#define RMLUI_SHADER_HEADER "#version 330\n"
+	#define GLAD_GL_IMPLEMENTATION
+	#include "RmlUi_Include_GL3.h"
+#endif
 
 static int viewport_width = 0;
 static int viewport_height = 0;
@@ -147,6 +151,7 @@ static void CheckGLError(const char* operation_name)
 		Rml::Log::Message(Rml::Log::LT_ERROR, "OpenGL error during %s. Error code 0x%x (%s).", operation_name, error_code, error_str);
 	}
 #endif
+	(void)operation_name;
 }
 
 // Create the shader, 'shader_type' is either GL_VERTEX_SHADER or GL_FRAGMENT_SHADER.
@@ -352,15 +357,15 @@ Rml::CompiledGeometryHandle RenderInterface_GL3::CompileGeometry(Rml::Vertex* ve
 
 	glEnableVertexAttribArray((GLuint)Gfx::VertexAttribute::Position);
 	glVertexAttribPointer((GLuint)Gfx::VertexAttribute::Position, 2, GL_FLOAT, GL_FALSE, sizeof(Rml::Vertex),
-		(const GLvoid*)(offsetof(Rml::Vertex, Rml::Vertex::position)));
+		(const GLvoid*)(offsetof(Rml::Vertex, position)));
 
 	glEnableVertexAttribArray((GLuint)Gfx::VertexAttribute::Color0);
 	glVertexAttribPointer((GLuint)Gfx::VertexAttribute::Color0, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(Rml::Vertex),
-		(const GLvoid*)(offsetof(Rml::Vertex, Rml::Vertex::colour)));
+		(const GLvoid*)(offsetof(Rml::Vertex, colour)));
 
 	glEnableVertexAttribArray((GLuint)Gfx::VertexAttribute::TexCoord0);
 	glVertexAttribPointer((GLuint)Gfx::VertexAttribute::TexCoord0, 2, GL_FLOAT, GL_FALSE, sizeof(Rml::Vertex),
-		(const GLvoid*)(offsetof(Rml::Vertex, Rml::Vertex::tex_coord)));
+		(const GLvoid*)(offsetof(Rml::Vertex, tex_coord)));
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(int) * num_indices, (const void*)indices, draw_usage);
@@ -588,6 +593,9 @@ void RenderInterface_GL3::SubmitTransformUniform(ProgramId program_id, int unifo
 
 bool RmlGL3::Initialize()
 {
+#if defined RMLUI_PLATFORM_EMSCRIPTEN
+	Rml::Log::Message(Rml::Log::LT_INFO, "Initializing Emscripten WebGL renderer.");
+#else
 	const int gl_version = gladLoaderLoadGL();
 
 	if (gl_version == 0)
@@ -597,6 +605,7 @@ bool RmlGL3::Initialize()
 	}
 
 	Rml::Log::Message(Rml::Log::LT_INFO, "Loaded OpenGL %d.%d.", GLAD_VERSION_MAJOR(gl_version), GLAD_VERSION_MINOR(gl_version));
+#endif
 
 	if (!Gfx::CreateShaders(Gfx::shaders_data))
 		return false;
@@ -608,7 +617,9 @@ void RmlGL3::Shutdown()
 {
 	Gfx::DestroyShaders(Gfx::shaders_data);
 
+#if !defined RMLUI_PLATFORM_EMSCRIPTEN
 	gladLoaderUnloadGL();
+#endif
 
 	viewport_width = 0;
 	viewport_height = 0;
