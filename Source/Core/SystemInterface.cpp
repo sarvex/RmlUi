@@ -70,7 +70,11 @@ bool SystemInterface::LogMessage(Log::Type logtype, const String& message)
 #else
 bool SystemInterface::LogMessage(Log::Type /*logtype*/, const String& message)
 {
-	fprintf(stderr,"%s\n", message.c_str());
+#ifdef RMLUI_PLATFORM_EMSCRIPTEN
+	printf("%s\n", message.c_str());
+#else
+	fprintf(stderr, "%s\n", message.c_str());
+#endif
 	return true;
 }
 #endif	
