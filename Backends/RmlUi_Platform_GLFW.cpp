@@ -32,6 +32,7 @@
 #include <RmlUi/Core/Log.h>
 #include <RmlUi/Core/SystemInterface.h>
 #include <GLFW/glfw3.h>
+#include <string.h>
 
 static GLFWwindow* window = nullptr;
 
