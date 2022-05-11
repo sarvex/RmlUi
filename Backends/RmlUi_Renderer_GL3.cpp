@@ -32,6 +32,7 @@
 #include <RmlUi/Core/GeometryUtilities.h>
 #include <RmlUi/Core/Log.h>
 #include <RmlUi/Core/Platform.h>
+#include <RmlUi/Core/SystemInterface.h>
 #include <string.h>
 
 #if defined(RMLUI_PLATFORM_WIN32) && !defined(__MINGW32__)
@@ -147,6 +148,31 @@ void main() {
 	float t = dot(v, V) / d_square;
 
 	finalColor = fragColor * mix_stop_colors(t);
+}
+)";
+// "Creation" by Danilo Guanabara, based on: https://www.shadertoy.com/view/XsXXDn
+static const char* shader_frag_main_creation = RMLUI_SHADER_HEADER R"(
+uniform float _value;
+uniform vec2 _dimensions;
+
+in vec2 fragTexCoord;
+out vec4 finalColor;
+
+void main() {    
+	float t = _value;
+	vec3 c;
+	float l;
+	for (int i = 0; i < 3; i++) {
+		vec2 p = fragTexCoord;
+		vec2 uv = p;
+		p -= .5;
+		p.x *= _dimensions.x / _dimensions.y;
+		float z = t + float(i) * .07;
+		l = length(p);
+		uv += p / l * (sin(z) + 1.) * abs(sin(l * 9. - z - z));
+		c[i] = .01 / length(mod(uv, 1.) - .5);
+	}
+	finalColor = vec4(c / l, t);
 }
 )";
 
@@ -279,10 +305,11 @@ enum class ProgramUniform {
 	StopColors,
 	StopPositions,
 	NumStops,
+	Dimensions,
 	Count
 };
 static const char* const program_uniform_names[(size_t)ProgramUniform::Count] = {"_translate", "_transform", "_tex", "_value", "_color",
-	"_texelOffset", "_weights[0]", "_texMask", "_p0", "_p1", "_stop_colors[0]", "_stop_positions[0]", "_num_stops"};
+	"_texelOffset", "_weights[0]", "_texMask", "_p0", "_p1", "_stop_colors[0]", "_stop_positions[0]", "_num_stops", "_dimensions"};
 
 enum class VertexAttribute { Position, Color0, TexCoord0, Count };
 static const char* const vertex_attribute_names[(size_t)VertexAttribute::Count] = {"inPosition", "inColor0", "inTexCoord0"};
@@ -300,6 +327,7 @@ struct Shaders {
 	GLuint frag_main_color;
 	GLuint frag_main_texture;
 	GLuint frag_main_linear_gradient;
+	GLuint frag_main_creation;
 
 	GLuint vert_passthrough;
 	GLuint frag_passthrough;
@@ -326,6 +354,7 @@ struct Programs {
 	ProgramData main_color;
 	ProgramData main_texture;
 	ProgramData main_linear_gradient;
+	ProgramData main_creation;
 
 	ProgramData passthrough;
 	ProgramData brightness;
@@ -629,6 +658,8 @@ static bool CreateShaders(Shaders& out_shaders, Programs& out_programs)
 		return ReportError("shader", "frag_main_texture");
 	if (!CreateShader(out_shaders.frag_main_linear_gradient, GL_FRAGMENT_SHADER, shader_frag_main_linear_gradient))
 		return ReportError("shader", "frag_main_linear_gradient");
+	if (!CreateShader(out_shaders.frag_main_creation, GL_FRAGMENT_SHADER, shader_frag_main_creation))
+		return ReportError("shader", "frag_main_creation");
 
 	if (!CreateProgram(out_programs.main_color, out_shaders.vert_main, out_shaders.frag_main_color))
 		return ReportError("program", "main_color");
@@ -636,6 +667,8 @@ static bool CreateShaders(Shaders& out_shaders, Programs& out_programs)
 		return ReportError("program", "main_texture");
 	if (!CreateProgram(out_programs.main_linear_gradient, out_shaders.vert_main, out_shaders.frag_main_linear_gradient))
 		return ReportError("program", "main_linear_gradient");
+	if (!CreateProgram(out_programs.main_creation, out_shaders.vert_main, out_shaders.frag_main_creation))
+		return ReportError("program", "main_creation");
 
 	// Effects
 	if (!CreateShader(out_shaders.vert_passthrough, GL_VERTEX_SHADER, shader_vert_passthrough))
@@ -1333,7 +1366,7 @@ Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand 
 	return texture_handle;
 }
 
-enum class EffectType { Invalid = 0, Basic, Blur, DropShadow, LinearGradient };
+enum class EffectType { Invalid = 0, Basic, Blur, DropShadow, LinearGradient, Creation };
 struct CompiledEffect {
 	EffectType type;
 
@@ -1354,6 +1387,9 @@ struct CompiledEffect {
 	float angle;
 	Rml::Vector2f p0, p1;
 	Rml::ColorStopList color_stop_list;
+
+	// Shader
+	Rml::Vector2f dimensions;
 };
 
 Rml::CompiledEffectHandle RenderInterface_GL3::CompileEffect(const Rml::String& name, const Rml::Dictionary& parameters)
@@ -1454,6 +1490,18 @@ Rml::CompiledEffectHandle RenderInterface_GL3::CompileEffect(const Rml::String& 
 		effect.has_value_uniform = true;
 		effect.value = Rml::Get(parameters, "value", 1.0f);
 		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+	}
+	else if (name == "shader")
+	{
+		const Rml::String value = Rml::Get(parameters, "value", Rml::String());
+		if (value == "creation")
+		{
+			CompiledEffect effect = {};
+			effect.type = EffectType::Creation;
+			effect.program = &Gfx::programs.main_creation;
+			effect.dimensions = Rml::Get(parameters, "dimensions", Rml::Vector2f(0.f));
+			return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+		}
 	}
 
 	return Rml::CompiledEffectHandle(0);
@@ -1793,6 +1841,24 @@ Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle e
 		}
 
 		Gfx::CheckGLError("RenderEffectBasic");
+	}
+	break;
+	case EffectType::Creation:
+	{
+		const auto& locations = Gfx::programs.main_creation.uniform_locations;
+		const double time = Rml::GetSystemInterface()->GetElapsedTime();
+
+		glUseProgram(Gfx::programs.main_creation.id);
+		glUniform1f(locations[(int)Gfx::ProgramUniform::Value], (float)time);
+		glUniform2fv(locations[(int)Gfx::ProgramUniform::Dimensions], 1, &effect.dimensions.x);
+		glUniform2fv(locations[(int)Gfx::ProgramUniform::Translate], 1, &geometry_translation.x);
+		SubmitTransformUniform(ProgramId::Creation, locations[(int)Gfx::ProgramUniform::Transform]);
+
+		const Gfx::CompiledGeometryData* geometry = (Gfx::CompiledGeometryData*)geometry_handle;
+		glBindVertexArray(geometry->vao);
+		glDrawElements(GL_TRIANGLES, geometry->draw_count, GL_UNSIGNED_INT, (const GLvoid*)0);
+
+		Gfx::CheckGLError("RenderEffectCreation");
 	}
 	break;
 	case EffectType::Invalid:

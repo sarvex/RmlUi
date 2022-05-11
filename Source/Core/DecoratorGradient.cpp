@@ -280,6 +280,8 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 		Dictionary{{"angle", Variant(angle)}, {"p0", Variant(gradient_points.p0)}, {"p1", Variant(gradient_points.p1)},
 			{"length", Variant(gradient_points.length)}, {"color_stop_list", Variant(std::move(stops))}});
 
+
+	// TODO: Background geometry with radius (geometry caching in element background?)
 	Vertex vertices[4];
 	int indices[6];
 	GeometryUtilities::GenerateQuad(vertices, indices, Vector2f(), dimensions, Colourb(255), Vector2f(), dimensions);
