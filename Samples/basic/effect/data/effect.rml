@@ -69,9 +69,7 @@ handle.size {
 handle.size:hover, handle.size:active {
 	background-color: #d3e9ea;
 }
-.gradient {
-	decorator: linear-gradient(110deg, #fff3, #fff 10%, #c33 50%, #3c3, #33c, #000 90%, #0003);
-}
+
 .box {
 	color: black;
 	font-size: 18dp;
@@ -83,6 +81,7 @@ handle.size:hover, handle.size:active {
 	padding: 15dp;
 	border-radius: 30dp 8dp;
 	box-sizing: border-box;
+	position: relative;
 }
 .box img, .box .placeholder {
 	float: left;
@@ -91,6 +90,13 @@ handle.size:hover, handle.size:active {
 .box .placeholder {
 	width: 51dp;
 	height: 39dp;
+}
+.box .label {
+	color: #bbba;
+	position: absolute;
+	font-size: 0.75em;
+	bottom: 0.1em;
+	right: 0.6em;
 }
 	
 .box.window {
@@ -115,13 +121,15 @@ handle.size:hover, handle.size:active {
 .mask {
 	decorator: gradient(horizontal #f00 #ff0);
 	mask-image: image(icon-invader scale-none 15px 50%), gradient(horizontal #0000 #000f);
-	/*padding-left: 38dp;*/
+	padding-left: 38dp;
 }
 .big.mask {
 	decorator: gradient(horizontal #f00 #ff0);
 	mask-image: image("/assets/rmlui.tga" scale-down left), gradient(horizontal #0000 #000f);
 	padding-left: 200dp;
 }
+
+.gradient { decorator: linear-gradient(110deg, #fff3, #fff 10%, #c33 50%, #3c3, #33c, #000 90%, #0003); }
 
 .dropshadow { filter: drop-shadow(#f33f 30px 20px 5px); } 
 
@@ -137,6 +145,8 @@ handle.size:hover, handle.size:active {
 .saturate { filter: saturate(200%); }
 .hue_rotate { filter: hue-rotate(260deg); }
 .invert { filter: invert(100%); }
+
+.shader { decorator: shader(padding-box "creation"); }
 
 .opacity_one { filter: opacity(1); }
 .opacity_low { filter: opacity(0.2); }
@@ -183,6 +193,7 @@ handle.size:hover, handle.size:active {
 <handle class="size" size_target="#document"/>
 
 <div class="box"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box big shader"><div class="label">"Creation" (Danilo Guanabara)</div></div>
 <div class="box big gradient"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box mask"><div class="placeholder"/>Hello, do you feel the funk?</div>
 <div class="box big mask"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
@@ -204,11 +215,6 @@ handle.size:hover, handle.size:active {
 <div class="box boxshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box grayscale"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box opacity_low"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
-<!--
 
-<div class="gradient-wrap">
-	<div id="gradient"/>
-</div>
--->
 </body>
 </rml>
