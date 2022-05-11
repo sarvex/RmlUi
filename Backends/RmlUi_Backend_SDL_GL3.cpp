@@ -168,28 +168,14 @@ bool Backend::OpenWindow(const char* name, int width, int height, bool allow_res
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
 #endif
 
-	// Request stencil buffer of at least 8-bit size to supporting clipping on transformed elements.
-	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-
-	// Enable linear filtering and MSAA for better-looking visuals, especially when transforms are applied.
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
-	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-	SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 2);
+	// As opposed to the GL2 renderer we don't need to specify any GL window attributes, because here we use our own frame buffers for rendering.
 
 	const Uint32 window_flags = SDL_WINDOW_OPENGL;
 	window = nullptr;
 	if (!RmlSDL::CreateWindow(name, width, height, allow_resize, window_flags, window))
 	{
-		// Try again on low-quality settings.
-		SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
-		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 0);
-		SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 0);
-
-		if (!RmlSDL::CreateWindow(name, width, height, allow_resize, window_flags, window))
-		{
-			fprintf(stderr, "SDL error on create window: %s\n", SDL_GetError());
-			return false;
-		}
+		fprintf(stderr, "SDL error on create window: %s\n", SDL_GetError());
+		return false;
 	}
 
 	glcontext = SDL_GL_CreateContext(window);
