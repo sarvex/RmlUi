@@ -280,12 +280,27 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 		Dictionary{{"angle", Variant(angle)}, {"p0", Variant(gradient_points.p0)}, {"p1", Variant(gradient_points.p1)},
 			{"length", Variant(gradient_points.length)}, {"color_stop_list", Variant(std::move(stops))}});
 
+	CompiledGeometryHandle geometry_handle = 0;
 
-	// TODO: Background geometry with radius (geometry caching in element background?)
-	Vertex vertices[4];
-	int indices[6];
-	GeometryUtilities::GenerateQuad(vertices, indices, Vector2f(), dimensions, Colourb(255), Vector2f(), dimensions);
-	CompiledGeometryHandle geometry_handle = render_interface->CompileGeometry(vertices, 4, indices, 6, TextureHandle{});
+	{
+		// TODO: Geometry caching in element background?
+		// TODO: Add a generalization to the geometry generation for common tasks, eg: custom area, UV, maybe non-Geometry.
+		const ComputedValues& computed = element->GetComputedValues();
+		const Vector4f radii(computed.border_top_left_radius(), computed.border_top_right_radius(), computed.border_bottom_right_radius(),
+			computed.border_bottom_left_radius());
+
+		const Colourb background_color(255);
+		Geometry geometry;
+		const Box& box = element->GetBox();
+		GeometryUtilities::GenerateBackgroundBorder(&geometry, box, Vector2f(), radii, background_color, nullptr);
+
+		const Vector2f padding_pos = box.GetPosition(Box::PADDING);
+		for (Vertex& vertex : geometry.GetVertices())
+			vertex.tex_coord = vertex.position - padding_pos;
+
+		geometry_handle = render_interface->CompileGeometry(geometry.GetVertices().data(), (int)geometry.GetVertices().size(),
+			geometry.GetIndices().data(), (int)geometry.GetIndices().size(), TextureHandle{});
+	}
 
 	BasicEffectElementData* element_data = GetBasicEffectElementDataPool().AllocateAndConstruct(render_interface, effect_handle, geometry_handle);
 	return reinterpret_cast<DecoratorDataHandle>(element_data);
@@ -304,7 +319,7 @@ void DecoratorLinearGradient::ReleaseElementData(DecoratorDataHandle handle) con
 void DecoratorLinearGradient::RenderElement(Element* element, DecoratorDataHandle handle) const
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
-	element_data->render_interface->RenderEffect(element_data->effect, element_data->geometry, element->GetAbsoluteOffset(Box::PADDING));
+	element_data->render_interface->RenderEffect(element_data->effect, element_data->geometry, element->GetAbsoluteOffset(Box::BORDER));
 }
 
 DecoratorLinearGradientInstancer::DecoratorLinearGradientInstancer() : DecoratorInstancer(DecoratorClasses::Background | DecoratorClasses::MaskImage)

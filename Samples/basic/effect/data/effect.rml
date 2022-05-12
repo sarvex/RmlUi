@@ -96,7 +96,7 @@ handle.size:hover, handle.size:active {
 	position: absolute;
 	font-size: 0.75em;
 	bottom: 0.1em;
-	right: 0.6em;
+	right: 1.5em;
 }
 	
 .box.window {
