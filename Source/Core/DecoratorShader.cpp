@@ -27,7 +27,9 @@
  */
 
 #include "DecoratorShader.h"
+#include "../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../Include/RmlUi/Core/Element.h"
+#include "../../Include/RmlUi/Core/Geometry.h"
 #include "../../Include/RmlUi/Core/GeometryUtilities.h"
 #include "../../Include/RmlUi/Core/Math.h"
 #include "../../Include/RmlUi/Core/PropertyDefinition.h"
@@ -57,11 +59,30 @@ DecoratorDataHandle DecoratorShader::GenerateElementData(Element* element) const
 	CompiledEffectHandle effect_handle =
 		render_interface->CompileEffect("shader", Dictionary{{"value", Variant(value)}, {"dimensions", Variant(dimensions)}});
 
-	// TODO: Background geometry with radius (geometry caching in element background?)
-	Vertex vertices[4];
-	int indices[6];
-	GeometryUtilities::GenerateQuad(vertices, indices, Vector2f(), dimensions, Colourb(255), Vector2f(), Vector2f(1));
-	CompiledGeometryHandle geometry_handle = render_interface->CompileGeometry(vertices, 4, indices, 6, TextureHandle{});
+	CompiledGeometryHandle geometry_handle = 0;
+
+	{
+		// TODO: Geometry caching in element background?
+		const ComputedValues& computed = element->GetComputedValues();
+		const Vector4f radii(computed.border_top_left_radius(), computed.border_top_right_radius(), computed.border_bottom_right_radius(),
+			computed.border_bottom_left_radius());
+
+		const Colourb background_color(255);
+		const Colourb border_color[4] = {Colourb(255), Colourb(255), Colourb(255), Colourb(255)};
+		Geometry geometry;
+		const Box& box = element->GetBox();
+		GeometryUtilities::GenerateBackgroundBorder(&geometry, box, Vector2f(), radii, background_color,
+			render_area == Box::BORDER ? border_color : nullptr);
+
+		const Vector2f padding_pos = box.GetPosition(render_area);
+		const Vector2f border_size = box.GetSize(Box::BORDER);
+		for (Vertex& vertex : geometry.GetVertices())
+			vertex.tex_coord = (vertex.position - padding_pos) / border_size;
+
+		geometry_handle = render_interface->CompileGeometry(geometry.GetVertices().data(), (int)geometry.GetVertices().size(),
+			geometry.GetIndices().data(), (int)geometry.GetIndices().size(), TextureHandle{});
+	}
+
 	BasicEffectElementData* element_data = GetBasicEffectElementDataPool().AllocateAndConstruct(render_interface, effect_handle, geometry_handle);
 
 	return reinterpret_cast<DecoratorDataHandle>(element_data);
@@ -81,7 +102,7 @@ void DecoratorShader::ReleaseElementData(DecoratorDataHandle handle) const
 void DecoratorShader::RenderElement(Element* element, DecoratorDataHandle handle) const
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
-	element_data->render_interface->RenderEffect(element_data->effect, element_data->geometry, element->GetAbsoluteOffset(render_area));
+	element_data->render_interface->RenderEffect(element_data->effect, element_data->geometry, element->GetAbsoluteOffset(Box::BORDER));
 }
 
 DecoratorShaderInstancer::DecoratorShaderInstancer() : DecoratorInstancer(DecoratorClasses::Background), ids{}
