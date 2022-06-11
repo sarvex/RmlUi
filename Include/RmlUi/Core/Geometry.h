@@ -69,6 +69,8 @@ public:
 	/// @param[in] translation The translation of the geometry.
 	void Render(Vector2f translation);
 
+	CompiledGeometryHandle GetCompiledHandle();
+
 	/// Returns the geometry's vertices. If these are written to, Release() should be called to force a recompile.
 	/// @return The geometry's vertex array.
 	Vector< Vertex >& GetVertices();

@@ -212,7 +212,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 
 			Vector2f filter_origin, filter_size;
 			ElementUtilities::GetElementRegionInWindowSpace(filter_origin, filter_size, element, Box::BORDER);
-			render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter, Vector2i(filter_origin), Vector2i(filter_size));
+			// @performance Shrink scissor region to element region
 
 			const int i0 = num_backgrounds;
 			for (int i = i0; i < i0 + num_backdrop_filters; i++)
@@ -222,7 +222,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			}
 
 			// ElementUtilities::ForceClippingRegion(element, Box::BORDER);
-			render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
+			render_interface->StackApply(BlitDestination::Stack, Vector2i(filter_origin), Vector2i(filter_size));
 			ElementUtilities::SetClippingRegion(element);
 		}
 	}
@@ -231,7 +231,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 	{
 		if (render_stage == RenderStage::Enter)
 		{
-			render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
+			render_interface->StackPush();
 		}
 		else if (render_stage == RenderStage::Exit)
 		{
@@ -253,19 +253,15 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			Vector2f filter_origin, filter_size;
 			ElementUtilities::GetElementRegionInWindowSpace(filter_origin, filter_size, element, Box::BORDER, max_top_left, max_bottom_right);
 
-			render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter, Vector2i(filter_origin), Vector2i(filter_size));
-
 			for (int i = i0; i < i0 + num_filters; i++)
 			{
 				DecoratorHandle& decorator = decorators[i];
 				decorator.decorator->RenderElement(element, decorator.decorator_data);
 			}
 
-			render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
-
 			if (num_mask_images > 0)
 			{
-				render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
+				render_interface->StackPush();
 
 				const int i0_mask = num_backgrounds + num_backdrop_filters + num_filters;
 				for (int i = i0_mask; i < i0_mask + num_mask_images; i++)
@@ -274,11 +270,12 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 					decorator.decorator->RenderElement(element, decorator.decorator_data);
 				}
 
-				render_interface->ExecuteRenderCommand(RenderCommand::StackToMask, Vector2i(filter_origin), Vector2i(filter_size));
-				render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
+				render_interface->AttachMask(Vector2i(filter_origin), Vector2i(filter_size));
+				render_interface->StackPop();
 			}
 
-			render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
+			render_interface->StackApply(BlitDestination::StackBelow, Vector2i(filter_origin), Vector2i(filter_size));
+			render_interface->StackPop();
 		}
 	}
 }

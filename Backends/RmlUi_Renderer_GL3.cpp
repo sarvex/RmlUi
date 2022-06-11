@@ -228,6 +228,7 @@ static const char* shader_frag_invert = R"(
 	vec3 inverted = vec3(texColor.a) - texColor.rgb;
 	texColor.rgb = mix(texColor.rgb, inverted, _value);
 )";
+// TODO: Generate final matrix on CPU side, combine color matrix shaders.
 // Hue-rotation and saturation values based on: https://www.w3.org/TR/filter-effects-1/#attr-valuedef-type-huerotate
 static const char* shader_frag_hue_rotate = R"(
 	mat3 G = mat3(vec3(0.213), vec3(0.715), vec3(0.072));
@@ -906,58 +907,69 @@ void RenderInterface_GL3::SetScissorRegion(int x, int y, int width, int height)
 	scissor_state.height = height;
 }
 
-bool RenderInterface_GL3::ExecuteStencilCommand(Rml::StencilCommand command, int value, int mask)
+bool RenderInterface_GL3::EnableClipMask(bool enable)
 {
-	RMLUI_ASSERT(value >= 0 && value <= 255 && mask >= 0 && mask <= 255);
-	using Rml::StencilCommand;
-
-	switch (command)
+	if (enable)
 	{
-	case StencilCommand::Clear:
-	{
-		RMLUI_ASSERT(value == 0);
 		glEnable(GL_STENCIL_TEST);
-		glStencilMask(GLuint(mask));
-		glClear(GL_STENCIL_BUFFER_BIT);
 	}
-	break;
-	case StencilCommand::WriteValue:
+	else
 	{
-		glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-		glStencilFunc(GL_ALWAYS, GLint(value), GLuint(-1));
-		glStencilMask(GLuint(mask));
-		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-	}
-	break;
-	case StencilCommand::WriteIncrement:
-	{
-		glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-		glStencilMask(GLuint(mask));
-		glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
-	}
-	break;
-	case StencilCommand::WriteDisable:
-	{
-		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-		glStencilMask(0);
-		glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-	}
-	break;
-	case StencilCommand::TestEqual:
-	{
-		glStencilFunc(GL_EQUAL, GLint(value), GLuint(mask));
-	}
-	break;
-	case StencilCommand::TestDisable:
-	{
-		glStencilFunc(GL_ALWAYS, GLint(value), GLuint(mask));
-	}
-	break;
-	case StencilCommand::None:
-		break;
+		glDisable(GL_STENCIL_TEST);
 	}
 
 	return true;
+}
+
+void RenderInterface_GL3::SetClipMask(Rml::ClipMask clip_mask, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation)
+{
+	using Rml::ClipMask;
+
+	EnableClipMask(true);
+
+	const bool clear_stencil = (clip_mask == ClipMask::Clip || clip_mask == ClipMask::ClipOut);
+	if (clear_stencil)
+	{
+		// @performance We can be smarter about this and increment the reference value instead of clearing each time.
+		glEnable(GL_STENCIL_TEST);
+		glClear(GL_STENCIL_BUFFER_BIT);
+	}
+
+	GLint stencil_test_value = 0;
+	glGetIntegerv(GL_STENCIL_REF, &stencil_test_value);
+
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+	glStencilFunc(GL_ALWAYS, GLint(1), GLuint(-1));
+
+	switch (clip_mask)
+	{
+	case ClipMask::Clip:
+	{
+		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+		stencil_test_value = 1;
+	}
+	break;
+	case ClipMask::ClipIntersect:
+	{
+		glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
+		stencil_test_value += 1;
+	}
+	break;
+	case ClipMask::ClipOut:
+	{
+		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+		stencil_test_value = 0;
+	}
+	break;
+	}
+
+	RenderCompiledGeometry(geometry, translation);
+
+	// Restore state
+	// @performance Cache state so we don't toggle it unnecessarily.
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+	glStencilFunc(GL_EQUAL, stencil_test_value, GLuint(-1));
 }
 
 // Set to byte packing, or the compiler will expand our struct, which means it won't read correctly from file
@@ -1116,7 +1128,7 @@ void RenderInterface_GL3::SetTransform(const Rml::Matrix4f* new_transform)
 
 class RenderState {
 public:
-	void PushStack()
+	void StackPush()
 	{
 		if (fb_stack_size == (int)fb_stack.size())
 		{
@@ -1138,16 +1150,21 @@ public:
 		glClear(GL_COLOR_BUFFER_BIT);
 	}
 
-	void PopStack()
+	void StackPop()
 	{
 		RMLUI_ASSERT(fb_stack_size > 0);
 		fb_stack_size -= 1;
 	}
 
-	const Gfx::FramebufferData& GetActiveFramebuffer() const
+	const Gfx::FramebufferData& GetStackTop() const
 	{
 		RMLUI_ASSERT(fb_stack_size > 0);
 		return fb_stack[fb_stack_size - 1];
+	}
+	const Gfx::FramebufferData& GetStackBelow() const
+	{
+		RMLUI_ASSERT(fb_stack_size > 1);
+		return fb_stack[fb_stack_size - 2];
 	}
 
 	const Gfx::FramebufferData& GetPostprocessPrimary() const { return fb_postprocess_primary; }
@@ -1158,6 +1175,15 @@ public:
 		if (!fb_postprocess_tertiary.framebuffer)
 			Gfx::CreateFramebuffer(fb_postprocess_tertiary, width, height, 0, Gfx::FramebufferAttachment::None, 0);
 		return fb_postprocess_tertiary;
+	}
+	const Gfx::FramebufferData& GetMask()
+	{
+		// This one too we create on demand.
+		// @performance We could try to assign this to e.g. Secondary and then move it to a new buffer if that one is used. Or more generally make a
+		// system to allocate and deallocate framebuffers as necessary.
+		if (!fb_mask.framebuffer)
+			Gfx::CreateFramebuffer(fb_mask, width, height, 0, Gfx::FramebufferAttachment::None, 0);
+		return fb_mask;
 	}
 	void SwapPostprocessPrimarySecondary() { std::swap(fb_postprocess_primary, fb_postprocess_secondary); }
 
@@ -1175,13 +1201,13 @@ public:
 			Gfx::CreateFramebuffer(fb_postprocess_secondary, width, height, 0, Gfx::FramebufferAttachment::None, 0);
 		}
 
-		PushStack();
+		StackPush();
 	}
 
 	void EndFrame()
 	{
 		RMLUI_ASSERT(fb_stack_size == 1);
-		PopStack();
+		StackPop();
 	}
 
 	void Shutdown() { DestroyFramebuffers(); }
@@ -1199,6 +1225,7 @@ private:
 		Gfx::DestroyFramebuffer(fb_postprocess_primary);
 		Gfx::DestroyFramebuffer(fb_postprocess_secondary);
 		Gfx::DestroyFramebuffer(fb_postprocess_tertiary);
+		Gfx::DestroyFramebuffer(fb_mask);
 	}
 
 	int width = 0, height = 0;
@@ -1209,6 +1236,7 @@ private:
 	Gfx::FramebufferData fb_postprocess_primary = {};
 	Gfx::FramebufferData fb_postprocess_secondary = {};
 	Gfx::FramebufferData fb_postprocess_tertiary = {};
+	Gfx::FramebufferData fb_mask = {};
 };
 
 static RenderState render_state;
@@ -1232,156 +1260,12 @@ static Rectangle2i RectangleIntersection(Rectangle2i a, Rectangle2i b)
 	return result;
 }
 
-Rml::TextureHandle RenderInterface_GL3::ExecuteRenderCommand(Rml::RenderCommand command, Rml::Vector2i offset, Rml::Vector2i dimensions)
-{
-	Rml::TextureHandle texture_handle = {};
-
-	switch (command)
-	{
-	case Rml::RenderCommand::StackPush:
-	{
-		render_state.PushStack();
-	}
-	break;
-	case Rml::RenderCommand::StackPop:
-	{
-		render_state.PopStack();
-		glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetActiveFramebuffer().framebuffer);
-	}
-	break;
-	case Rml::RenderCommand::StackToTexture:
-	{
-		const bool scissor_initially_enabled = scissor_state.enabled;
-		EnableScissorRegion(false);
-
-		const Gfx::FramebufferData& source = render_state.GetActiveFramebuffer();
-		const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
-
-		// Blit the desired stack region to the postprocess framebuffer to resolve MSAA. Also flip the image vertically since that convention is used
-		// for textures.
-		glBlitFramebuffer(offset.x, source.height - offset.y, offset.x + dimensions.x, source.height - (offset.y + dimensions.y), 0, 0, dimensions.x,
-			dimensions.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
-		if (GenerateTexture(texture_handle, nullptr, dimensions))
-		{
-			glBindTexture(GL_TEXTURE_2D, (GLuint)texture_handle);
-
-			glBindFramebuffer(GL_READ_FRAMEBUFFER, destination.framebuffer);
-			glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, dimensions.x, dimensions.y);
-		}
-
-		Gfx::CheckGLError("StackToTexture");
-
-		EnableScissorRegion(scissor_initially_enabled);
-	}
-	break;
-	case Rml::RenderCommand::StackToFilter:
-	{
-		pre_filter_scissor_state = scissor_state;
-		const Rml::Vector2i filter_size = (dimensions == Rml::Vector2i(0) ? Rml::Vector2i(viewport_width, viewport_height) : dimensions);
-
-		// Set the scissor region during filtering to the intersection of the destination scissor (equivalent to the current scissor state) and the
-		// filtering region provided by the function arguments.
-		const Rectangle2i rect_filter = {offset, filter_size};
-		const Rectangle2i rect_scissor_state = {scissor_state.x, scissor_state.y, scissor_state.width, scissor_state.height};
-		const Rectangle2i rect_new_scissor = scissor_state.enabled ? RectangleIntersection(rect_filter, rect_scissor_state) : rect_filter;
-
-		EnableScissorRegion(true);
-		SetScissorRegion(rect_new_scissor.pos.x, rect_new_scissor.pos.y, rect_new_scissor.size.x, rect_new_scissor.size.y);
-
-		const Gfx::FramebufferData& source = render_state.GetActiveFramebuffer();
-		const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
-
-#if 0
-		// Debug clear
-		EnableScissorRegion(false);
-		glClearColor(0, 1, 0, 1);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glClearColor(0, 0, 0, 0);
-		EnableScissorRegion(true);
-#endif
-
-		glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, destination.width, destination.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-		has_mask = false;
-	}
-	break;
-	case Rml::RenderCommand::FilterToStack:
-	{
-		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
-		const Gfx::FramebufferData& destination = render_state.GetActiveFramebuffer();
-
-		glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
-		Gfx::BindTexture(source);
-
-		if (!has_mask)
-		{
-			glUseProgram(Gfx::programs.passthrough.id);
-		}
-		else
-		{
-			const Gfx::FramebufferData& mask = render_state.GetPostprocessSecondary();
-			glUseProgram(Gfx::programs.blend_mask.id);
-			glUniform1i(Gfx::programs.blend_mask.uniform_locations[(int)Gfx::ProgramUniform::TexMask], 1);
-
-			glActiveTexture(GL_TEXTURE1);
-			Gfx::BindTexture(mask);
-			glActiveTexture(GL_TEXTURE0);
-		}
-
-		Gfx::DrawFullscreenQuad();
-
-		EnableScissorRegion(pre_filter_scissor_state.enabled);
-		SetScissorRegion(pre_filter_scissor_state.x, pre_filter_scissor_state.y, pre_filter_scissor_state.width, pre_filter_scissor_state.height);
-		pre_filter_scissor_state = {};
-		has_mask = false;
-	}
-	break;
-	case Rml::RenderCommand::StackToMask:
-	{
-		ScissorState scissor_state_initial = scissor_state;
-		const Rml::Vector2i scissor_size = (dimensions == Rml::Vector2i(0) ? Rml::Vector2i(viewport_width, viewport_height) : dimensions);
-		EnableScissorRegion(true);
-		SetScissorRegion(offset.x, offset.y, scissor_size.x, scissor_size.y);
-
-		const Gfx::FramebufferData& source = render_state.GetActiveFramebuffer();
-		const Gfx::FramebufferData& destination = render_state.GetPostprocessSecondary();
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
-
-		glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, destination.width, destination.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
-		EnableScissorRegion(scissor_state_initial.enabled);
-		SetScissorRegion(scissor_state_initial.x, scissor_state_initial.y, scissor_state_initial.width, scissor_state_initial.height);
-		has_mask = true;
-	}
-	break;
-	case Rml::RenderCommand::None:
-		break;
-	}
-
-	return texture_handle;
-}
-
-enum class EffectType { Invalid = 0, Basic, Blur, DropShadow, LinearGradient, Creation };
+enum class EffectType { Invalid = 0, LinearGradient, Creation };
 struct CompiledEffect {
 	EffectType type;
 
 	// Basic
 	Gfx::ProgramData* program;
-	bool has_value_uniform;
-	float value;
-	float blend_factor = -1.f;
-
-	// Blur
-	float sigma;
-
-	// Drop shadow
-	Rml::Vector2f offset;
-	Rml::Colourb color;
 
 	// Linear gradient
 	float angle;
@@ -1394,117 +1278,32 @@ struct CompiledEffect {
 
 Rml::CompiledEffectHandle RenderInterface_GL3::CompileEffect(const Rml::String& name, const Rml::Dictionary& parameters)
 {
-	if (name == "blur")
+	CompiledEffect effect = {};
+
+	if (name == "linear-gradient")
 	{
-		CompiledEffect effect = {};
-		effect.type = EffectType::Blur;
-		effect.sigma = 0.5f * Rml::Get(parameters, "radius", 0.0f);
-		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(effect));
-	}
-	else if (name == "drop-shadow")
-	{
-		CompiledEffect effect = {};
-		effect.type = EffectType::DropShadow;
-		effect.sigma = Rml::Get(parameters, "sigma", 0.f);
-		effect.color = Rml::Get(parameters, "color", Rml::Colourb());
-		effect.offset = Rml::Get(parameters, "offset", Rml::Vector2f(0.f));
-		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
-	}
-	else if (name == "linear-gradient")
-	{
-		CompiledEffect effect = {};
 		effect.type = EffectType::LinearGradient;
 		effect.angle = Rml::Get(parameters, "angle", 0.f);
 		effect.p0 = Rml::Get(parameters, "p0", Rml::Vector2f(0.f));
 		effect.p1 = Rml::Get(parameters, "p1", Rml::Vector2f(0.f));
 		effect.color_stop_list = Rml::Get<Rml::ColorStopList>(parameters, "color_stop_list", {});
-		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
-	}
-	else if (name == "opacity")
-	{
-		CompiledEffect effect = {};
-		effect.type = EffectType::Basic;
-		effect.program = &Gfx::programs.passthrough;
-		effect.blend_factor = Rml::Get(parameters, "value", 1.0f);
-		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
-	}
-	else if (name == "brightness")
-	{
-		CompiledEffect effect = {};
-		effect.type = EffectType::Basic;
-		effect.program = &Gfx::programs.brightness;
-		effect.has_value_uniform = true;
-		effect.value = Rml::Get(parameters, "value", 1.0f);
-		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
-	}
-	else if (name == "contrast")
-	{
-		CompiledEffect effect = {};
-		effect.type = EffectType::Basic;
-		effect.program = &Gfx::programs.contrast;
-		effect.has_value_uniform = true;
-		effect.value = Rml::Get(parameters, "value", 1.0f);
-		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
-	}
-	else if (name == "invert")
-	{
-		CompiledEffect effect = {};
-		effect.type = EffectType::Basic;
-		effect.program = &Gfx::programs.invert;
-		effect.has_value_uniform = true;
-		effect.value = Rml::Math::Clamp(Rml::Get(parameters, "value", 1.0f), 0.f, 1.f);
-		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
-	}
-	else if (name == "grayscale")
-	{
-		CompiledEffect effect = {};
-		effect.type = EffectType::Basic;
-		effect.program = &Gfx::programs.gray;
-		effect.has_value_uniform = true;
-		effect.value = Rml::Get(parameters, "value", 1.0f);
-		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
-	}
-	else if (name == "sepia")
-	{
-		CompiledEffect effect = {};
-		effect.type = EffectType::Basic;
-		effect.program = &Gfx::programs.sepia;
-		effect.has_value_uniform = true;
-		effect.value = Rml::Get(parameters, "value", 1.0f);
-		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
-	}
-	else if (name == "hue-rotate")
-	{
-		CompiledEffect effect = {};
-		effect.type = EffectType::Basic;
-		effect.program = &Gfx::programs.hue_rotate;
-		effect.has_value_uniform = true;
-		effect.value = Rml::Get(parameters, "value", 1.0f);
-		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
-	}
-	else if (name == "saturate")
-	{
-		CompiledEffect effect = {};
-		effect.type = EffectType::Basic;
-		effect.program = &Gfx::programs.saturate;
-		effect.has_value_uniform = true;
-		effect.value = Rml::Get(parameters, "value", 1.0f);
-		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
 	}
 	else if (name == "shader")
 	{
 		const Rml::String value = Rml::Get(parameters, "value", Rml::String());
 		if (value == "creation")
 		{
-			CompiledEffect effect = {};
 			effect.type = EffectType::Creation;
 			effect.program = &Gfx::programs.main_creation;
 			effect.dimensions = Rml::Get(parameters, "dimensions", Rml::Vector2f(0.f));
-			return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
 		}
 	}
 
-	return Rml::CompiledEffectHandle(0);
+	if (effect.type != EffectType::Invalid)
+		return reinterpret_cast<Rml::CompiledEffectHandle>(new CompiledEffect(std::move(effect)));
+
+	Rml::Log::Message(Rml::Log::LT_WARNING, "Unsupported effect type '%s'.", name.c_str());
+	return {};
 }
 
 static void SigmaToParameters(const float desired_sigma, int& out_pass_level, float& out_sigma)
@@ -1684,37 +1483,14 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	Gfx::render_interface->EnableScissorRegion(false);
 }
 
-Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle effect_handle, Rml::CompiledGeometryHandle geometry_handle,
+void RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle effect_handle, Rml::CompiledGeometryHandle geometry_handle,
 	Rml::Vector2f geometry_translation)
 {
 	const CompiledEffect& effect = *reinterpret_cast<CompiledEffect*>(effect_handle);
-
 	const EffectType type = effect.type;
-	Rml::TextureHandle texture_handle_result = {};
 
 	switch (type)
 	{
-	case EffectType::Blur:
-	{
-		ScissorState original_scissor_state = scissor_state;
-		glDisable(GL_BLEND);
-
-		const Gfx::FramebufferData& source_destination = render_state.GetPostprocessPrimary();
-		const Gfx::FramebufferData& temp = render_state.GetPostprocessSecondary();
-
-		// Draw the blur
-		const Rml::Vector2i position = {scissor_state.x, source_destination.height - (scissor_state.y + scissor_state.height)};
-		const Rml::Vector2i size = {scissor_state.width, scissor_state.height};
-
-		RenderBlur(effect.sigma, source_destination, temp, position, size);
-
-		// Restore state
-		glEnable(GL_BLEND);
-		glViewport(0, 0, viewport_width, viewport_height);
-		EnableScissorRegion(original_scissor_state.enabled);
-		SetScissorRegion(original_scissor_state.x, original_scissor_state.y, original_scissor_state.width, original_scissor_state.height);
-	}
-	break;
 	case EffectType::LinearGradient:
 	{
 		const int num_stops = Rml::Math::Min((int)effect.color_stop_list.size(), MAX_NUM_STOPS);
@@ -1750,99 +1526,6 @@ Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle e
 		glDrawElements(GL_TRIANGLES, geometry->draw_count, GL_UNSIGNED_INT, (const GLvoid*)0);
 	}
 	break;
-	case EffectType::DropShadow:
-	{
-		ScissorState original_scissor_state = scissor_state;
-		glUseProgram(Gfx::programs.dropshadow.id);
-		glDisable(GL_BLEND);
-
-		Rml::Colourf color;
-		color.red = (1.f / 255.f) * (float)effect.color.red;
-		color.green = (1.f / 255.f) * (float)effect.color.green;
-		color.blue = (1.f / 255.f) * (float)effect.color.blue;
-		color.alpha = (1.f / 255.f) * (float)effect.color.alpha;
-		glUniform4fv(Gfx::programs.dropshadow.uniform_locations[(int)Gfx::ProgramUniform::Color], 1, &color[0]);
-
-		const Gfx::FramebufferData& primary = render_state.GetPostprocessPrimary();
-		const Gfx::FramebufferData& secondary = render_state.GetPostprocessSecondary();
-		const Gfx::FramebufferData& tertiary = render_state.GetPostprocessTertiary();
-		Gfx::BindTexture(primary);
-		glBindFramebuffer(GL_FRAMEBUFFER, secondary.framebuffer);
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		ScissorState new_scissor_state = scissor_state;
-		new_scissor_state.x += Rml::Math::Max((int)effect.offset.x, 0);
-		new_scissor_state.y += Rml::Math::Max((int)effect.offset.y, 0);
-		new_scissor_state.width = Rml::Math::Max(new_scissor_state.width - std::abs((int)effect.offset.x), 0);
-		new_scissor_state.height = Rml::Math::Max(new_scissor_state.height - std::abs((int)effect.offset.y), 0);
-		SetScissorRegion(new_scissor_state.x, new_scissor_state.y, new_scissor_state.width, new_scissor_state.height);
-
-		const Rml::Vector2f uv_offset = effect.offset / Rml::Vector2f(-(float)viewport_width, (float)viewport_height);
-		Gfx::DrawFullscreenQuad(uv_offset);
-
-		if (effect.sigma >= 0.5f)
-		{
-			const Rml::Vector2i position = {scissor_state.x, primary.height - (scissor_state.y + scissor_state.height)};
-			const Rml::Vector2i size = {scissor_state.width, scissor_state.height};
-			RenderBlur(effect.sigma, secondary, tertiary, position, size);
-		}
-
-		EnableScissorRegion(original_scissor_state.enabled);
-		SetScissorRegion(original_scissor_state.x, original_scissor_state.y, original_scissor_state.width, original_scissor_state.height);
-		glUseProgram(Gfx::programs.passthrough.id);
-		Gfx::BindTexture(primary);
-		glEnable(GL_BLEND);
-		Gfx::DrawFullscreenQuad();
-
-		render_state.SwapPostprocessPrimarySecondary();
-	}
-	break;
-	case EffectType::Basic:
-	{
-		if (!effect.program)
-			break;
-
-		glUseProgram(effect.program->id);
-
-		if (effect.has_value_uniform)
-			glUniform1fv(effect.program->uniform_locations[(int)Gfx::ProgramUniform::Value], 1, &effect.value);
-
-		if (effect.blend_factor >= 0.f)
-		{
-			glBlendFunc(GL_CONSTANT_ALPHA, GL_ZERO);
-			glBlendColor(0.0f, 0.0f, 0.0f, effect.blend_factor);
-		}
-		else
-		{
-			glDisable(GL_BLEND);
-		}
-
-		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
-		const Gfx::FramebufferData& destination = render_state.GetPostprocessSecondary();
-		Gfx::BindTexture(source);
-		glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
-
-		Gfx::DrawFullscreenQuad();
-
-		render_state.SwapPostprocessPrimarySecondary();
-
-		// Restore state
-		if (effect.blend_factor >= 0.f)
-		{
-#if RMLUI_PREMULTIPLIED_ALPHA
-			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-#else
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-#endif
-		}
-		else
-		{
-			glEnable(GL_BLEND);
-		}
-
-		Gfx::CheckGLError("RenderEffectBasic");
-	}
-	break;
 	case EffectType::Creation:
 	{
 		const auto& locations = Gfx::programs.main_creation.uniform_locations;
@@ -1862,19 +1545,394 @@ Rml::TextureHandle RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle e
 	}
 	break;
 	case EffectType::Invalid:
-	default:
 	{
 		Rml::Log::Message(Rml::Log::LT_WARNING, "Unhandled render effect %d.", (int)type);
 	}
 	break;
 	}
-
-	return texture_handle_result;
 }
 
 void RenderInterface_GL3::ReleaseCompiledEffect(Rml::CompiledEffectHandle effect_handle)
 {
 	delete reinterpret_cast<CompiledEffect*>(effect_handle);
+}
+
+enum class FilterType { Invalid = 0, Basic, Blur, DropShadow };
+struct CompiledFilter {
+	FilterType type;
+
+	// Basic
+	Gfx::ProgramData* program;
+	bool has_value_uniform;
+	float value;
+	float blend_factor = -1.f;
+
+	// Blur
+	float sigma;
+
+	// Drop shadow
+	Rml::Vector2f offset;
+	Rml::Colourb color;
+};
+
+Rml::CompiledFilterHandle RenderInterface_GL3::CompileFilter(const Rml::String& name, const Rml::Dictionary& parameters)
+{
+	CompiledFilter filter = {};
+
+	if (name == "blur")
+	{
+		filter.type = FilterType::Blur;
+		filter.sigma = 0.5f * Rml::Get(parameters, "radius", 0.0f);
+	}
+	else if (name == "drop-shadow")
+	{
+		filter.type = FilterType::DropShadow;
+		filter.sigma = Rml::Get(parameters, "sigma", 0.f);
+		filter.color = Rml::Get(parameters, "color", Rml::Colourb());
+		filter.offset = Rml::Get(parameters, "offset", Rml::Vector2f(0.f));
+	}
+	else if (name == "opacity")
+	{
+		filter.type = FilterType::Basic;
+		filter.program = &Gfx::programs.passthrough;
+		filter.blend_factor = Rml::Get(parameters, "value", 1.0f);
+	}
+	else if (name == "brightness")
+	{
+		filter.type = FilterType::Basic;
+		filter.program = &Gfx::programs.brightness;
+		filter.has_value_uniform = true;
+		filter.value = Rml::Get(parameters, "value", 1.0f);
+	}
+	else if (name == "contrast")
+	{
+		filter.type = FilterType::Basic;
+		filter.program = &Gfx::programs.contrast;
+		filter.has_value_uniform = true;
+		filter.value = Rml::Get(parameters, "value", 1.0f);
+	}
+	else if (name == "invert")
+	{
+		filter.type = FilterType::Basic;
+		filter.program = &Gfx::programs.invert;
+		filter.has_value_uniform = true;
+		filter.value = Rml::Math::Clamp(Rml::Get(parameters, "value", 1.0f), 0.f, 1.f);
+	}
+	else if (name == "grayscale")
+	{
+		filter.type = FilterType::Basic;
+		filter.program = &Gfx::programs.gray;
+		filter.has_value_uniform = true;
+		filter.value = Rml::Get(parameters, "value", 1.0f);
+	}
+	else if (name == "sepia")
+	{
+		filter.type = FilterType::Basic;
+		filter.program = &Gfx::programs.sepia;
+		filter.has_value_uniform = true;
+		filter.value = Rml::Get(parameters, "value", 1.0f);
+	}
+	else if (name == "hue-rotate")
+	{
+		filter.type = FilterType::Basic;
+		filter.program = &Gfx::programs.hue_rotate;
+		filter.has_value_uniform = true;
+		filter.value = Rml::Get(parameters, "value", 1.0f);
+	}
+	else if (name == "saturate")
+	{
+		filter.type = FilterType::Basic;
+		filter.program = &Gfx::programs.saturate;
+		filter.has_value_uniform = true;
+		filter.value = Rml::Get(parameters, "value", 1.0f);
+	}
+
+	if (filter.type != FilterType::Invalid)
+		return reinterpret_cast<Rml::CompiledFilterHandle>(new CompiledFilter(std::move(filter)));
+
+	Rml::Log::Message(Rml::Log::LT_WARNING, "Unsupported filter type '%s'.", name.c_str());
+	return {};
+}
+
+void RenderInterface_GL3::AttachFilter(Rml::CompiledFilterHandle filter)
+{
+	attached_filters.push_back(reinterpret_cast<CompiledFilter*>(filter));
+}
+
+void RenderInterface_GL3::ReleaseCompiledFilter(Rml::CompiledFilterHandle filter)
+{
+	delete reinterpret_cast<CompiledFilter*>(filter);
+}
+
+void RenderInterface_GL3::RenderFilters()
+{
+	for (const CompiledFilter* filter_ptr : attached_filters)
+	{
+		const CompiledFilter& filter = *filter_ptr;
+		const FilterType type = filter.type;
+
+		switch (type)
+		{
+		case FilterType::Blur:
+		{
+			ScissorState original_scissor_state = scissor_state;
+			glDisable(GL_BLEND);
+
+			const Gfx::FramebufferData& source_destination = render_state.GetPostprocessPrimary();
+			const Gfx::FramebufferData& temp = render_state.GetPostprocessSecondary();
+
+			// Draw the blur
+			const Rml::Vector2i position = {scissor_state.x, source_destination.height - (scissor_state.y + scissor_state.height)};
+			const Rml::Vector2i size = {scissor_state.width, scissor_state.height};
+
+			RenderBlur(filter.sigma, source_destination, temp, position, size);
+
+			// Restore state
+			glEnable(GL_BLEND);
+			glViewport(0, 0, viewport_width, viewport_height);
+			EnableScissorRegion(original_scissor_state.enabled);
+			SetScissorRegion(original_scissor_state.x, original_scissor_state.y, original_scissor_state.width, original_scissor_state.height);
+		}
+		break;
+		case FilterType::DropShadow:
+		{
+			ScissorState original_scissor_state = scissor_state;
+			glUseProgram(Gfx::programs.dropshadow.id);
+			glDisable(GL_BLEND);
+
+			Rml::Colourf color;
+			color.red = (1.f / 255.f) * (float)filter.color.red;
+			color.green = (1.f / 255.f) * (float)filter.color.green;
+			color.blue = (1.f / 255.f) * (float)filter.color.blue;
+			color.alpha = (1.f / 255.f) * (float)filter.color.alpha;
+			glUniform4fv(Gfx::programs.dropshadow.uniform_locations[(int)Gfx::ProgramUniform::Color], 1, &color[0]);
+
+			const Gfx::FramebufferData& primary = render_state.GetPostprocessPrimary();
+			const Gfx::FramebufferData& secondary = render_state.GetPostprocessSecondary();
+			const Gfx::FramebufferData& tertiary = render_state.GetPostprocessTertiary();
+			Gfx::BindTexture(primary);
+			glBindFramebuffer(GL_FRAMEBUFFER, secondary.framebuffer);
+			glClear(GL_COLOR_BUFFER_BIT);
+
+			ScissorState new_scissor_state = scissor_state;
+			new_scissor_state.x += Rml::Math::Max((int)filter.offset.x, 0);
+			new_scissor_state.y += Rml::Math::Max((int)filter.offset.y, 0);
+			new_scissor_state.width = Rml::Math::Max(new_scissor_state.width - std::abs((int)filter.offset.x), 0);
+			new_scissor_state.height = Rml::Math::Max(new_scissor_state.height - std::abs((int)filter.offset.y), 0);
+			SetScissorRegion(new_scissor_state.x, new_scissor_state.y, new_scissor_state.width, new_scissor_state.height);
+
+			const Rml::Vector2f uv_offset = filter.offset / Rml::Vector2f(-(float)viewport_width, (float)viewport_height);
+			Gfx::DrawFullscreenQuad(uv_offset);
+
+			if (filter.sigma >= 0.5f)
+			{
+				const Rml::Vector2i position = {scissor_state.x, primary.height - (scissor_state.y + scissor_state.height)};
+				const Rml::Vector2i size = {scissor_state.width, scissor_state.height};
+				RenderBlur(filter.sigma, secondary, tertiary, position, size);
+			}
+
+			EnableScissorRegion(original_scissor_state.enabled);
+			SetScissorRegion(original_scissor_state.x, original_scissor_state.y, original_scissor_state.width, original_scissor_state.height);
+			glUseProgram(Gfx::programs.passthrough.id);
+			Gfx::BindTexture(primary);
+			glEnable(GL_BLEND);
+			Gfx::DrawFullscreenQuad();
+
+			render_state.SwapPostprocessPrimarySecondary();
+		}
+		break;
+		case FilterType::Basic:
+		{
+			if (!filter.program)
+				break;
+
+			glUseProgram(filter.program->id);
+
+			if (filter.has_value_uniform)
+				glUniform1fv(filter.program->uniform_locations[(int)Gfx::ProgramUniform::Value], 1, &filter.value);
+
+			if (filter.blend_factor >= 0.f)
+			{
+				glBlendFunc(GL_CONSTANT_ALPHA, GL_ZERO);
+				glBlendColor(0.0f, 0.0f, 0.0f, filter.blend_factor);
+			}
+			else
+			{
+				glDisable(GL_BLEND);
+			}
+
+			const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
+			const Gfx::FramebufferData& destination = render_state.GetPostprocessSecondary();
+			Gfx::BindTexture(source);
+			glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
+
+			Gfx::DrawFullscreenQuad();
+
+			render_state.SwapPostprocessPrimarySecondary();
+
+			// Restore state
+			if (filter.blend_factor >= 0.f)
+			{
+#if RMLUI_PREMULTIPLIED_ALPHA
+				glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+#else
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+#endif
+			}
+			else
+			{
+				glEnable(GL_BLEND);
+			}
+
+			Gfx::CheckGLError("RenderFilterBasic");
+		}
+		break;
+		case FilterType::Invalid:
+		{
+			Rml::Log::Message(Rml::Log::LT_WARNING, "Unhandled render filter %d.", (int)type);
+		}
+		break;
+		}
+	}
+
+	attached_filters.clear();
+}
+
+void RenderInterface_GL3::StackPush()
+{
+	render_state.StackPush();
+}
+
+void RenderInterface_GL3::StackPop()
+{
+	render_state.StackPop();
+	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetStackTop().framebuffer);
+}
+
+void RenderInterface_GL3::StackApply(const Rml::BlitDestination blit_destination, const Rml::Vector2i offset, const Rml::Vector2i dimensions)
+{
+	using Rml::BlitDestination;
+
+	// Nothing to do if we're just rendering to ourselves.
+	if (blit_destination == BlitDestination::Stack && !has_mask && attached_filters.empty())
+		return;
+
+	{
+		// -- Blit stack to filter rendering buffer --
+		// Do this regardless of whether we actually have any filters to be applied, because we need to resolve the multi-sampled framebuffer in
+		// any case.
+
+		pre_filter_scissor_state = scissor_state;
+		const Rml::Vector2i filter_size = (dimensions == Rml::Vector2i(0) ? Rml::Vector2i(viewport_width, viewport_height) : dimensions);
+
+		// Set the scissor region during filtering to the intersection of the destination scissor (equivalent to the current scissor state) and
+		// the filtering region provided by the function arguments.
+		const Rectangle2i rect_filter = {offset, filter_size};
+		const Rectangle2i rect_scissor_state = {scissor_state.x, scissor_state.y, scissor_state.width, scissor_state.height};
+		const Rectangle2i rect_new_scissor = scissor_state.enabled ? RectangleIntersection(rect_filter, rect_scissor_state) : rect_filter;
+
+		EnableScissorRegion(true);
+		SetScissorRegion(rect_new_scissor.pos.x, rect_new_scissor.pos.y, rect_new_scissor.size.x, rect_new_scissor.size.y);
+
+		const Gfx::FramebufferData& source = render_state.GetStackTop();
+		const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
+
+#if 0
+		// Debug clear
+		EnableScissorRegion(false);
+		glClearColor(0, 1, 0, 1);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glClearColor(0, 0, 0, 0);
+		EnableScissorRegion(true);
+#endif
+
+		glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, destination.width, destination.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	}
+
+	RenderFilters();
+
+	// Blit filter to stack. Apply any mask if active.
+	const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
+	const Gfx::FramebufferData& destination =
+		(blit_destination == BlitDestination::Stack ? render_state.GetStackTop() : render_state.GetStackBelow());
+
+	glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
+	Gfx::BindTexture(source);
+
+	if (has_mask)
+	{
+		const Gfx::FramebufferData& mask = render_state.GetMask();
+		glUseProgram(Gfx::programs.blend_mask.id);
+		glUniform1i(Gfx::programs.blend_mask.uniform_locations[(int)Gfx::ProgramUniform::TexMask], 1);
+
+		glActiveTexture(GL_TEXTURE1);
+		Gfx::BindTexture(mask);
+		glActiveTexture(GL_TEXTURE0);
+	}
+	else
+	{
+		glUseProgram(Gfx::programs.passthrough.id);
+	}
+
+	Gfx::DrawFullscreenQuad();
+
+	EnableScissorRegion(pre_filter_scissor_state.enabled);
+	SetScissorRegion(pre_filter_scissor_state.x, pre_filter_scissor_state.y, pre_filter_scissor_state.width, pre_filter_scissor_state.height);
+	pre_filter_scissor_state = {};
+	has_mask = false;
+}
+
+void RenderInterface_GL3::AttachMask(Rml::Vector2i offset, Rml::Vector2i dimensions)
+{
+	ScissorState scissor_state_initial = scissor_state;
+	const Rml::Vector2i scissor_size = (dimensions == Rml::Vector2i(0) ? Rml::Vector2i(viewport_width, viewport_height) : dimensions);
+	EnableScissorRegion(true);
+	SetScissorRegion(offset.x, offset.y, scissor_size.x, scissor_size.y);
+
+	const Gfx::FramebufferData& source = render_state.GetStackTop();
+	const Gfx::FramebufferData& destination = render_state.GetMask();
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
+
+	glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, destination.width, destination.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+	EnableScissorRegion(scissor_state_initial.enabled);
+	SetScissorRegion(scissor_state_initial.x, scissor_state_initial.y, scissor_state_initial.width, scissor_state_initial.height);
+	has_mask = true;
+}
+
+Rml::TextureHandle RenderInterface_GL3::RenderToTexture(Rml::Vector2i offset, Rml::Vector2i dimensions)
+{
+	Rml::TextureHandle texture_handle_result = {};
+
+	const bool scissor_initially_enabled = scissor_state.enabled;
+	EnableScissorRegion(false);
+
+	const Gfx::FramebufferData& source = render_state.GetStackTop();
+	const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
+
+	// Blit the desired stack region to the postprocess framebuffer to resolve MSAA. Also flip the image vertically since that convention is used
+	// for textures.
+	glBlitFramebuffer(offset.x, source.height - offset.y, offset.x + dimensions.x, source.height - (offset.y + dimensions.y), 0, 0, dimensions.x,
+		dimensions.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+	if (GenerateTexture(texture_handle_result, nullptr, dimensions))
+	{
+		glBindTexture(GL_TEXTURE_2D, (GLuint)texture_handle_result);
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, destination.framebuffer);
+		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, dimensions.x, dimensions.y);
+	}
+
+	Gfx::CheckGLError("StackToTexture");
+
+	EnableScissorRegion(scissor_initially_enabled);
+
+	return texture_handle_result;
 }
 
 void RenderInterface_GL3::SubmitTransformUniform(ProgramId program_id, int uniform_location)
@@ -1953,6 +2011,7 @@ void RmlGL3::BeginFrame()
 	render_state.BeginFrame(viewport_width, viewport_height);
 
 	glClearStencil(0);
+	glStencilMask(GLuint(-1));
 	glClearColor(0, 0, 0, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
@@ -1966,7 +2025,7 @@ void RmlGL3::BeginFrame()
 
 void RmlGL3::EndFrame()
 {
-	const Gfx::FramebufferData& fb_active = render_state.GetActiveFramebuffer();
+	const Gfx::FramebufferData& fb_active = render_state.GetStackTop();
 	const Gfx::FramebufferData& fb_postprocess = render_state.GetPostprocessPrimary();
 
 	// Resolve MSAA to postprocess framebuffer.

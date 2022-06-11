@@ -152,10 +152,10 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			return;
 		}
 
-		Geometry geometry_border(element);
 		Geometry geometry_padding(element);
+		Geometry geometry_padding_border(element); // TODO
 		Vector2f element_offset_in_texture;
-		Vector2f texture_dimensions;
+		Vector2i texture_dimensions;
 
 		{
 			Vector2f extend_top_left;
@@ -182,7 +182,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 				Vector2f offset;
 				const Box& box = element->GetBox(i, offset);
 				GeometryUtilities::GenerateBackgroundBorder(&geometry_padding, box, offset, radii, opaque_colors[0], nullptr);
-				GeometryUtilities::GenerateBackgroundBorder(&geometry_border, box, offset, radii, transparent_color, opaque_colors);
+				GeometryUtilities::GenerateBackgroundBorder(&geometry_padding_border, box, offset, radii, opaque_colors[0], opaque_colors);
 				offset_min = Math::Min(offset_min, offset);
 				offset_max = Math::Max(offset_max, offset);
 			}
@@ -190,26 +190,19 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			auto RoundUp = [](Vector2f v) { return Vector2f(Math::RoundUpFloat(v.x), Math::RoundUpFloat(v.y)); };
 
 			element_offset_in_texture = RoundUp(extend_top_left - offset_min);
-			texture_dimensions = RoundUp(element_offset_in_texture + element->GetBox().GetSize(Box::BORDER) + extend_bottom_right + offset_max);
+			texture_dimensions =
+				Vector2i(RoundUp(element_offset_in_texture + element->GetBox().GetSize(Box::BORDER) + extend_bottom_right + offset_max));
 		}
 
 		RenderState& render_state = context->GetRenderState();
 		const Matrix4f* active_element_transform = render_state.transform_pointer;
 		ElementUtilities::ApplyTransform(render_interface, render_state, nullptr);
+		render_interface->EnableClipMask(false);
 		render_interface->EnableScissorRegion(true);
 		render_interface->SetScissorRegion(0, 0, (int)texture_dimensions.x, (int)texture_dimensions.y);
-		render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
+		render_interface->StackPush();
 
-		constexpr int mask_padding = 0b001;
-		constexpr int mask_border = 0b010;
-		constexpr int mask_inset = 0b100;
-
-		render_interface->ExecuteStencilCommand(StencilCommand::Clear, 0);
-		render_interface->ExecuteStencilCommand(StencilCommand::WriteValue, mask_padding);
-		geometry_padding.Render(element_offset_in_texture);
-		render_interface->ExecuteStencilCommand(StencilCommand::WriteValue, mask_border);
-		geometry_border.Render(element_offset_in_texture);
-		render_interface->ExecuteStencilCommand(StencilCommand::WriteDisable);
+		// TODO Make a RAII wrapper to easily push and pop renderer states. Clear all states on push.
 
 		geometry.Render(element_offset_in_texture);
 
@@ -254,79 +247,56 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 					inset ? nullptr : shadow_colors);
 			}
 
-			CompiledEffectHandle blur = {};
+			CompiledFilterHandle blur = {};
 			if (shadow.blur_radius > 0.5f)
 			{
-				blur = render_interface->CompileEffect("blur", Dictionary{{"radius", Variant(shadow.blur_radius)}});
+				blur = render_interface->CompileFilter("blur", Dictionary{{"radius", Variant(shadow.blur_radius)}});
 				if (blur)
-					render_interface->ExecuteRenderCommand(RenderCommand::StackPush);
+				{
+					render_interface->StackPush();
+					render_interface->AttachFilter(blur);
+				}
 			}
 
 			render_interface->EnableScissorRegion(false);
 
 			if (inset)
 			{
-				render_interface->ExecuteStencilCommand(StencilCommand::WriteValue, mask_inset, mask_inset);
-				shadow_geometry.Render(shadow.offset + element_offset_in_texture);
-				render_interface->ExecuteStencilCommand(StencilCommand::WriteDisable);
+				render_interface->SetClipMask(ClipMask::ClipOut, shadow_geometry.GetCompiledHandle(), shadow.offset + element_offset_in_texture);
 
-				if (blur)
-					render_interface->ExecuteStencilCommand(StencilCommand::TestEqual, 0, mask_inset);
-				else
-					render_interface->ExecuteStencilCommand(StencilCommand::TestEqual, mask_padding);
-
+				// TODO: Maybe it would be a lot better to add a color render effect and just use white here.
 				for (Rml::Vertex& vertex : geometry_padding.GetVertices())
 					vertex.colour = shadow.color;
 
 				geometry_padding.Release();
 				geometry_padding.Render(element_offset_in_texture);
 
-				render_interface->ExecuteStencilCommand(StencilCommand::Clear, 0, mask_inset);
-
-				if (blur)
-				{
-					render_interface->ExecuteStencilCommand(StencilCommand::TestEqual, mask_padding, mask_padding);
-					render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter, {}, Rml::Vector2i(texture_dimensions));
-					render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
-					render_interface->RenderEffect(blur);
-					render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
-				}
+				render_interface->SetClipMask(ClipMask::Clip, geometry_padding.GetCompiledHandle(), element_offset_in_texture);
 			}
 			else
 			{
-				if (blur)
-					render_interface->ExecuteStencilCommand(StencilCommand::TestDisable);
-				else
-					render_interface->ExecuteStencilCommand(StencilCommand::TestEqual, 0);
-
+				render_interface->SetClipMask(ClipMask::ClipOut, geometry_padding_border.GetCompiledHandle(), element_offset_in_texture);
 				shadow_geometry.Render(shadow.offset + element_offset_in_texture);
-
-				if (blur)
-				{
-					render_interface->ExecuteStencilCommand(StencilCommand::TestEqual, 0);
-					render_interface->ExecuteRenderCommand(RenderCommand::StackToFilter, {}, Rml::Vector2i(texture_dimensions));
-					render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
-					render_interface->RenderEffect(blur);
-					render_interface->ExecuteRenderCommand(RenderCommand::FilterToStack);
-				}
 			}
 
-			render_interface->ExecuteStencilCommand(StencilCommand::TestDisable, 0);
-
 			if (blur)
-				render_interface->ReleaseCompiledEffect(blur);
+			{
+				render_interface->StackApply(BlitDestination::StackBelow, {}, texture_dimensions);
+				render_interface->StackPop();
+				render_interface->ReleaseCompiledFilter(blur);
+			}
 		}
 
+		render_interface->EnableClipMask(false);
 		render_interface->EnableScissorRegion(false);
 
-		shadow_texture = render_interface->ExecuteRenderCommand(RenderCommand::StackToTexture, Vector2i(), Vector2i(texture_dimensions));
-
-		render_interface->ExecuteRenderCommand(RenderCommand::StackPop);
+		shadow_texture = render_interface->RenderToTexture({}, texture_dimensions);
+		render_interface->StackPop();
 
 		Colourb color_white = Colourb(255, 255, 255, 255);
 		Vertex vertices[4];
 		int indices[6];
-		GeometryUtilities::GenerateQuad(vertices, indices, -element_offset_in_texture, texture_dimensions, color_white);
+		GeometryUtilities::GenerateQuad(vertices, indices, -element_offset_in_texture, Vector2f(texture_dimensions), color_white);
 		shadow_geometry = render_interface->CompileGeometry(vertices, 4, indices, 6, shadow_texture);
 
 		ElementUtilities::ApplyTransform(render_interface, render_state, active_element_transform);

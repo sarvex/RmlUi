@@ -58,13 +58,14 @@ void RenderInterface::RenderCompiledGeometry(CompiledGeometryHandle /*geometry*/
 }
 
 // Called by RmlUi when it wants to release application-compiled geometry.
-void RenderInterface::ReleaseCompiledGeometry(CompiledGeometryHandle /*geometry*/)
-{}
+void RenderInterface::ReleaseCompiledGeometry(CompiledGeometryHandle /*geometry*/) {}
 
-bool RenderInterface::ExecuteStencilCommand(StencilCommand /*command*/, int /*value*/, int /*mask*/)
+bool RenderInterface::EnableClipMask(bool /*enable*/)
 {
 	return false;
 }
+
+void RenderInterface::SetClipMask(ClipMask /*mask*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/) {}
 
 // Called by RmlUi when a texture is required by the library.
 bool RenderInterface::LoadTexture(TextureHandle& /*texture_handle*/, Vector2i& /*texture_dimensions*/, const String& /*source*/)
@@ -88,22 +89,36 @@ void RenderInterface::SetTransform(const Matrix4f* /*transform*/)
 {
 }
 
-TextureHandle RenderInterface::ExecuteRenderCommand(RenderCommand /*command*/, Vector2i /*offset*/, Vector2i /*dimensions*/)
-{
-	return TextureHandle();
-}
-
 CompiledEffectHandle RenderInterface::CompileEffect(const String& /*name*/, const Dictionary& /*parameters*/)
 {
-	return CompiledEffectHandle(0);
+	return CompiledEffectHandle{};
 }
 
-TextureHandle RenderInterface::RenderEffect(CompiledEffectHandle /*effect*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/)
-{
-	return TextureHandle{};
-}
+void RenderInterface::RenderEffect(CompiledEffectHandle /*effect*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/) {}
 
 void RenderInterface::ReleaseCompiledEffect(CompiledEffectHandle /*effect*/) {}
+
+CompiledFilterHandle RenderInterface::CompileFilter(const String& /*name*/, const Dictionary& /*parameters*/)
+{
+	return {};
+}
+
+void RenderInterface::AttachFilter(CompiledFilterHandle /*filter*/) {}
+
+void RenderInterface::ReleaseCompiledFilter(CompiledFilterHandle /*filter*/) {}
+
+void RenderInterface::StackPush() {}
+
+void RenderInterface::StackPop() {}
+
+void RenderInterface::StackApply(BlitDestination /*destination*/, Vector2i /*offset*/, Vector2i /*dimensions*/) {}
+
+void RenderInterface::AttachMask(Vector2i /*offset*/, Vector2i /*dimensions*/) {}
+
+TextureHandle RenderInterface::RenderToTexture(Vector2i /*offset*/, Vector2i /*dimensions*/)
+{
+	return {};
+}
 
 // Get the context currently being rendered.
 Context* RenderInterface::GetContext() const
