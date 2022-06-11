@@ -192,6 +192,11 @@ handle.size:hover, handle.size:active {
 <handle move_target="#document"><h1>Effect Sample</h1></handle>
 <handle class="size" size_target="#document"/>
 
+<div class="box boxshadow_blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box boxshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box inset"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+
+
 <div class="box"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box big shader"><div class="label">"Creation" (Danilo Guanabara)</div></div>
 <div class="box big gradient"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
@@ -206,13 +211,10 @@ handle.size:hover, handle.size:active {
 <div class="box brightness"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box contrast"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box dropshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
-<div class="box boxshadow_blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 
-<div class="box inset"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box window sepia" id="sepia" style="bottom: 150dp"><handle move_target="sepia"/><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box window back_blur" id="back_blur"><handle move_target="back_blur"/><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 
-<div class="box boxshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box grayscale"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box opacity_low"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 

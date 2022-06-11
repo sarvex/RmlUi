@@ -331,14 +331,12 @@ void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, 
 
 	const ElementClipList& stencil_elements = render_state.clip_stencil_elements;
 	const bool stencil_test_enabled = !stencil_elements.empty();
+
 	if (stencil_test_enabled)
 	{
 		const Matrix4f* active_transform = render_state.transform_pointer;
 
-		render_interface->ExecuteStencilCommand(StencilCommand::TestDisable);
-		render_interface->ExecuteStencilCommand(StencilCommand::Clear, 0);
-		render_interface->ExecuteStencilCommand(StencilCommand::WriteIncrement);
-
+		bool first_clip_mask = true;
 		for (const ElementClip& element_clip : stencil_elements)
 		{
 			const Box::Area clip_area = element_clip.clip_area;
@@ -355,20 +353,17 @@ void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, 
 			static const Colourb opaque_colors[4];
 			GeometryUtilities::GenerateBackgroundBorder(&geometry, box, {}, radii, Colourb(),
 				(clip_area == Box::Area::BORDER ? opaque_colors : nullptr));
-			geometry.Render(stencil_element->GetAbsoluteOffset(Box::BORDER));
-		}
 
-		const int stencil_value = (int)stencil_elements.size();
-		render_interface->ExecuteStencilCommand(StencilCommand::WriteDisable);
-		render_interface->ExecuteStencilCommand(StencilCommand::TestEqual, stencil_value);
+			const ClipMask clip_mask = (first_clip_mask ? ClipMask::Clip : ClipMask::ClipIntersect);
+			render_interface->SetClipMask(clip_mask, geometry.GetCompiledHandle(), stencil_element->GetAbsoluteOffset(Box::BORDER));
+			first_clip_mask = false;
+		}
 
 		// Apply the initially set transform in case it was changed.
 		ApplyTransform(render_interface, render_state, active_transform);
 	}
-	else
-	{
-		render_interface->ExecuteStencilCommand(StencilCommand::TestDisable);
-	}
+
+	render_interface->EnableClipMask(stencil_test_enabled);
 }
 
 bool ElementUtilities::GetElementRegionInWindowSpace(Vector2f& out_offset, Vector2f& out_size, Element* element, Box::Area area,

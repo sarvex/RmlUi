@@ -52,25 +52,25 @@ DecoratorDataHandle DecoratorBlur::GenerateElementData(Element* element) const
 	if (!render_interface)
 		return INVALID_DECORATORDATAHANDLE;
 
-	CompiledEffectHandle handle = render_interface->CompileEffect("blur", Dictionary{{"radius", Variant(radius)}});
+	CompiledFilterHandle handle = render_interface->CompileFilter("blur", Dictionary{{"radius", Variant(radius)}});
 
-	BasicEffectElementData* element_data = GetBasicEffectElementDataPool().AllocateAndConstruct(render_interface, handle);
+	BasicFilterElementData* element_data = GetBasicFilterElementDataPool().AllocateAndConstruct(render_interface, handle);
 	return reinterpret_cast<DecoratorDataHandle>(element_data);
 }
 
 void DecoratorBlur::ReleaseElementData(DecoratorDataHandle handle) const
 {
-	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
+	BasicFilterElementData* element_data = reinterpret_cast<BasicFilterElementData*>(handle);
 	RMLUI_ASSERT(element_data && element_data->render_interface);
 
-	element_data->render_interface->ReleaseCompiledEffect(element_data->effect);
-	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
+	element_data->render_interface->ReleaseCompiledFilter(element_data->filter);
+	GetBasicFilterElementDataPool().DestroyAndDeallocate(element_data);
 }
 
 void DecoratorBlur::RenderElement(Element* /*element*/, DecoratorDataHandle handle) const
 {
-	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
-	element_data->render_interface->RenderEffect(element_data->effect);
+	BasicFilterElementData* element_data = reinterpret_cast<BasicFilterElementData*>(handle);
+	element_data->render_interface->AttachFilter(element_data->filter);
 }
 
 void DecoratorBlur::GetClipExtension(Vector2f& top_left, Vector2f& bottom_right) const

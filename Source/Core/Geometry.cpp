@@ -137,8 +137,30 @@ void Geometry::Render(Vector2f translation)
 
 		// Either we've attempted to compile before (and failed), or the compile we just attempted failed; either way,
 		// render the uncompiled version.
-		render_interface->RenderGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), texture ? texture->GetHandle(GetRenderInterface()) : 0, translation);
+		render_interface->RenderGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
+			texture ? texture->GetHandle(render_interface) : 0, translation);
 	}
+}
+
+CompiledGeometryHandle Geometry::GetCompiledHandle()
+{
+	if (compile_attempted)
+		return compiled_geometry;
+
+	if (vertices.empty() || indices.empty())
+		return CompiledGeometryHandle{};
+
+	RenderInterface* render_interface = GetRenderInterface();
+	if (!render_interface)
+		return CompiledGeometryHandle{};
+
+	RMLUI_ZoneScoped;
+
+	compile_attempted = true;
+	compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
+		texture ? texture->GetHandle(render_interface) : 0);
+
+	return compiled_geometry;
 }
 
 // Returns the geometry's vertices. If these are written to, Release() should be called to force a recompile.

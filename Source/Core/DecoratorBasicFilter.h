@@ -70,6 +70,14 @@ private:
 	BasicFilterPropertyIds ids;
 };
 
+struct BasicFilterElementData {
+	BasicFilterElementData(RenderInterface* render_interface, CompiledFilterHandle filter) : render_interface(render_interface), filter(filter) {}
+	RenderInterface* render_interface;
+	CompiledFilterHandle filter;
+};
+
+Pool<BasicFilterElementData>& GetBasicFilterElementDataPool();
+
 struct BasicEffectElementData {
 	BasicEffectElementData(RenderInterface* render_interface, CompiledEffectHandle effect, CompiledGeometryHandle geometry = {}) :
 		render_interface(render_interface), effect(effect), geometry(geometry)

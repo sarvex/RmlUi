@@ -42,6 +42,8 @@ class Context;
 enum class StencilCommand { None, Clear, WriteValue, WriteIncrement, WriteDisable, TestEqual, TestDisable };
 enum class RenderCommand { None, StackPush, StackPop, StackToTexture, StackToFilter, FilterToStack, StackToMask };
 
+enum class ClipMask { Clip, ClipIntersect, ClipOut };
+enum class BlitDestination { Stack, StackBelow };
 
 /**
 	The abstract base class for application-specific rendering implementation. Your application must provide a concrete
@@ -64,6 +66,7 @@ public:
 	/// @param[in] num_indices The number of indices passed to the function. This will always be a multiple of three.
 	/// @param[in] texture The texture to be applied to the geometry. This may be nullptr, in which case the geometry is untextured.
 	/// @param[in] translation The translation to apply to the geometry.
+	/// @note Affected by transform: Yes. Affected by scissor: Yes. Affected by clip mask: Yes.
 	virtual void RenderGeometry(Vertex* vertices, int num_vertices, int* indices, int num_indices, TextureHandle texture, const Vector2f& translation) = 0;
 
 	/// Called by RmlUi when it wants to compile geometry it believes will be static for the forseeable future.
@@ -79,6 +82,7 @@ public:
 	/// Called by RmlUi when it wants to render application-compiled geometry.
 	/// @param[in] geometry The application-specific compiled geometry to render.
 	/// @param[in] translation The translation to apply to the geometry.
+	/// @note Affected by transform: Yes. Affected by scissor: Yes. Affected by clip mask: Yes.
 	virtual void RenderCompiledGeometry(CompiledGeometryHandle geometry, const Vector2f& translation);
 	/// Called by RmlUi when it wants to release application-compiled geometry.
 	/// @param[in] geometry The application-specific compiled geometry to release.
@@ -92,9 +96,12 @@ public:
 	/// @param[in] y The top-most pixel to be rendered. All pixels to the top of this should be clipped.
 	/// @param[in] width The width of the scissored region. All pixels to the right of (x + width) should be clipped.
 	/// @param[in] height The height of the scissored region. All pixels to below (y + height) should be clipped.
+	/// @note Affected by transform: No. Affected by scissor: No. Affected by clip mask: No.
 	virtual void SetScissorRegion(int x, int y, int width, int height) = 0;
-	/// Called by RmlUi when it wants to setup the stencil buffer.
-	virtual bool ExecuteStencilCommand(StencilCommand command, int value = 0, int mask = 0xff);
+
+	virtual bool EnableClipMask(bool enable);
+	/// @note Affected by transform: Yes. Affected by scissor: Yes. Affected by clip mask: No.
+	virtual void SetClipMask(ClipMask mask, CompiledGeometryHandle geometry, Vector2f translation);
 
 	/// Called by RmlUi when a texture is required by the library.
 	/// @param[out] texture_handle The handle to write the texture handle for the loaded texture to.
@@ -119,13 +126,33 @@ public:
 	virtual void SetTransform(const Matrix4f* transform);
 
 	/// Called by RmlUi when...
-	virtual TextureHandle ExecuteRenderCommand(RenderCommand command, Vector2i offset = {}, Vector2i dimensions = {});
-	/// Called by RmlUi when...
 	virtual CompiledEffectHandle CompileEffect(const String& name, const Dictionary& parameters);
 	/// Called by RmlUi when...
-	virtual TextureHandle RenderEffect(CompiledEffectHandle effect, CompiledGeometryHandle geometry = {}, Vector2f translation = {});
+	/// @note Affected by transform: Yes. Affected by scissor: Yes. Affected by clip mask: Yes.
+	virtual void RenderEffect(CompiledEffectHandle effect, CompiledGeometryHandle geometry, Vector2f translation);
 	/// Called by RmlUi when...
 	virtual void ReleaseCompiledEffect(CompiledEffectHandle effect);
+
+	/// Called by RmlUi when...
+	virtual CompiledFilterHandle CompileFilter(const String& name, const Dictionary& parameters);
+	// Apply filter to the next blit command.
+	virtual void AttachFilter(CompiledFilterHandle filter);
+	/// Called by RmlUi when...
+	virtual void ReleaseCompiledFilter(CompiledFilterHandle filter);
+
+	/// Called by RmlUi when...
+	virtual void StackPush();
+	/// Called by RmlUi when...
+	virtual void StackPop();
+	// Apply filters, clipping, and mask to the current stack top, and render back to the stack top or below. 
+	/// @note Affected by transform: No. Affected by scissor: Yes. Affected by clip mask: Yes.
+	virtual void StackApply(BlitDestination destination, Vector2i offset, Vector2i dimensions);
+
+	// Attach mask from the current stack top.
+	virtual void AttachMask(Vector2i offset, Vector2i dimensions);
+
+	// Render to texture from the current stack top.
+	virtual TextureHandle RenderToTexture(Vector2i offset, Vector2i dimensions);
 
 	/// Get the context currently being rendered. This is only valid during RenderGeometry,
 	/// CompileGeometry, RenderCompiledGeometry, EnableScissorRegion and SetScissorRegion.

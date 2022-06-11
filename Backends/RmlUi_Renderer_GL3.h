@@ -31,6 +31,8 @@
 
 #include <RmlUi/Core/RenderInterface.h>
 
+struct CompiledFilter;
+
 class RenderInterface_GL3 : public Rml::RenderInterface {
 public:
 	RenderInterface_GL3();
@@ -46,7 +48,9 @@ public:
 
 	void EnableScissorRegion(bool enable) override;
 	void SetScissorRegion(int x, int y, int width, int height) override;
-	bool ExecuteStencilCommand(Rml::StencilCommand command, int value, int mask) override;
+
+	bool EnableClipMask(bool enable) override;
+	void SetClipMask(Rml::ClipMask mask, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation) override;
 
 	bool LoadTexture(Rml::TextureHandle& texture_handle, Rml::Vector2i& texture_dimensions, const Rml::String& source) override;
 	bool GenerateTexture(Rml::TextureHandle& texture_handle, const Rml::byte* source, const Rml::Vector2i& source_dimensions) override;
@@ -54,11 +58,21 @@ public:
 
 	void SetTransform(const Rml::Matrix4f* transform) override;
 
-	Rml::TextureHandle ExecuteRenderCommand(Rml::RenderCommand command, Rml::Vector2i offset, Rml::Vector2i dimensions) override;
-
 	Rml::CompiledEffectHandle CompileEffect(const Rml::String& name, const Rml::Dictionary& parameters) override;
-	Rml::TextureHandle RenderEffect(Rml::CompiledEffectHandle effect, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation) override;
+	void RenderEffect(Rml::CompiledEffectHandle effect, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation) override;
 	void ReleaseCompiledEffect(Rml::CompiledEffectHandle effect) override;
+
+	Rml::CompiledFilterHandle CompileFilter(const Rml::String& name, const Rml::Dictionary& parameters) override;
+	void AttachFilter(Rml::CompiledFilterHandle filter) override;
+	void ReleaseCompiledFilter(Rml::CompiledFilterHandle filter) override;
+
+	void StackPush() override;
+	void StackPop() override;
+	void StackApply(Rml::BlitDestination destination, Rml::Vector2i offset, Rml::Vector2i dimensions) override;
+
+	void AttachMask(Rml::Vector2i offset, Rml::Vector2i dimensions) override;
+
+	Rml::TextureHandle RenderToTexture(Rml::Vector2i offset, Rml::Vector2i dimensions) override;
 
 	static const Rml::TextureHandle TextureIgnoreBinding = Rml::TextureHandle(-1);
 	static const Rml::TextureHandle TexturePostprocess = Rml::TextureHandle(-2);
@@ -66,6 +80,8 @@ public:
 private:
 	enum class ProgramId { None, Texture = 1, Color = 2, LinearGradient = 4, Creation = 8, All = (Texture | Color | LinearGradient | Creation) };
 	void SubmitTransformUniform(ProgramId program_id, int uniform_location);
+
+	void RenderFilters();
 
 	Rml::Matrix4f transform;
 	ProgramId transform_dirty_state = ProgramId::All;
@@ -76,6 +92,9 @@ private:
 	};
 	ScissorState scissor_state = {};
 	ScissorState pre_filter_scissor_state = {};
+
+	Rml::Vector<CompiledFilter*> attached_filters;
+
 	bool has_mask = false;
 };
 
