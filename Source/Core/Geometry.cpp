@@ -142,25 +142,54 @@ void Geometry::Render(Vector2f translation)
 	}
 }
 
-CompiledGeometryHandle Geometry::GetCompiledHandle()
+void Geometry::Render(CompiledEffectHandle effect_handle, Vector2f translation)
 {
-	if (compile_attempted)
-		return compiled_geometry;
-
-	if (vertices.empty() || indices.empty())
-		return CompiledGeometryHandle{};
-
 	RenderInterface* render_interface = GetRenderInterface();
 	if (!render_interface)
-		return CompiledGeometryHandle{};
+		return;
 
-	RMLUI_ZoneScoped;
+	if (!compile_attempted)
+	{
+		if (vertices.empty() || indices.empty())
+			return;
 
-	compile_attempted = true;
-	compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
-		texture ? texture->GetHandle(render_interface) : 0);
+		RMLUI_ZoneScoped;
 
-	return compiled_geometry;
+		compile_attempted = true;
+		compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
+			texture ? texture->GetHandle(render_interface) : 0);
+	}
+
+	if (compiled_geometry)
+	{
+		translation = translation.Round();
+		render_interface->RenderEffect(effect_handle, compiled_geometry, translation);
+	}
+}
+
+void Geometry::SetClipMask(ClipMask clip_mask, Vector2f translation)
+{
+	RenderInterface* render_interface = GetRenderInterface();
+	if (!render_interface)
+		return;
+
+	if (!compile_attempted)
+	{
+		if (vertices.empty() || indices.empty())
+			return;
+
+		RMLUI_ZoneScoped;
+
+		compile_attempted = true;
+		compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
+			texture ? texture->GetHandle(render_interface) : 0);
+	}
+
+	if (compiled_geometry)
+	{
+		translation = translation.Round();
+		render_interface->SetClipMask(clip_mask, compiled_geometry, translation);
+	}
 }
 
 // Returns the geometry's vertices. If these are written to, Release() should be called to force a recompile.

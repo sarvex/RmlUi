@@ -355,7 +355,7 @@ void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, 
 				(clip_area == Box::Area::BORDER ? opaque_colors : nullptr));
 
 			const ClipMask clip_mask = (first_clip_mask ? ClipMask::Clip : ClipMask::ClipIntersect);
-			render_interface->SetClipMask(clip_mask, geometry.GetCompiledHandle(), stencil_element->GetAbsoluteOffset(Box::BORDER));
+			geometry.SetClipMask(clip_mask, stencil_element->GetAbsoluteOffset(Box::BORDER));
 			first_clip_mask = false;
 		}
 

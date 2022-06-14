@@ -262,7 +262,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 
 			if (inset)
 			{
-				render_interface->SetClipMask(ClipMask::ClipOut, shadow_geometry.GetCompiledHandle(), shadow.offset + element_offset_in_texture);
+				shadow_geometry.SetClipMask(ClipMask::ClipOut, shadow.offset + element_offset_in_texture);
 
 				// TODO: Maybe it would be a lot better to add a color render effect and just use white here.
 				for (Rml::Vertex& vertex : geometry_padding.GetVertices())
@@ -271,11 +271,11 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 				geometry_padding.Release();
 				geometry_padding.Render(element_offset_in_texture);
 
-				render_interface->SetClipMask(ClipMask::Clip, geometry_padding.GetCompiledHandle(), element_offset_in_texture);
+				geometry_padding.SetClipMask(ClipMask::Clip, element_offset_in_texture);
 			}
 			else
 			{
-				render_interface->SetClipMask(ClipMask::ClipOut, geometry_padding_border.GetCompiledHandle(), element_offset_in_texture);
+				geometry_padding_border.SetClipMask(ClipMask::ClipOut, element_offset_in_texture);
 				shadow_geometry.Render(shadow.offset + element_offset_in_texture);
 			}
 
