@@ -281,7 +281,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 
 			if (blur)
 			{
-				render_interface->StackApply(BlitDestination::StackBelow, {}, texture_dimensions);
+				render_interface->StackApply(BlitDestination::BlendStackBelow, {}, texture_dimensions);
 				render_interface->StackPop();
 				render_interface->ReleaseCompiledFilter(blur);
 			}
