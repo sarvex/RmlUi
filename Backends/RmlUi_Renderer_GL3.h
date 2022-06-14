@@ -91,7 +91,6 @@ private:
 		int x, y, width, height;
 	};
 	ScissorState scissor_state = {};
-	ScissorState pre_filter_scissor_state = {};
 
 	Rml::Vector<CompiledFilter*> attached_filters;
 

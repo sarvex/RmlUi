@@ -189,6 +189,8 @@ void main() {
 )";
 static const char* shader_frag_effect_pre = RMLUI_SHADER_HEADER R"(
 uniform sampler2D _tex;
+uniform vec2 _texCoordMin;
+uniform vec2 _texCoordMax;
 uniform float _value;
 uniform vec4 _color;
 
@@ -215,7 +217,7 @@ static const char* shader_frag_gray = R"(
 	texColor.rgb = mix(texColor.rgb, vec3(gray), _value);
 )";
 static const char* shader_frag_dropshadow = R"(
-	texColor = texColor.a * _color;
+	texColor = texture(_tex, clamp(fragTexCoord, _texCoordMin, _texCoordMax)).a * _color;
 )";
 static const char* shader_frag_brightness = R"(
 	texColor.rgb *= _value;
@@ -277,6 +279,8 @@ void main() {
 static const char* frag_blur = RMLUI_SHADER_BLUR_HEADER R"(
 uniform sampler2D _tex;
 uniform float _weights[NUM_WEIGHTS];
+uniform vec2 _texCoordMin;
+uniform vec2 _texCoordMax;
 uniform float _value;
 
 in vec2 fragTexCoord[BLUR_SIZE];
@@ -285,7 +289,7 @@ out vec4 finalColor;
 void main() {    
 	vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
 	for(int i = 0; i < BLUR_SIZE; i++)
-		color += texture(_tex, fragTexCoord[i]) * _weights[abs(i - NUM_WEIGHTS + 1)];
+		color += texture(_tex, clamp(fragTexCoord[i], _texCoordMin, _texCoordMax)) * _weights[abs(i - NUM_WEIGHTS + 1)];
 	finalColor = color * _value;
 }
 )";
@@ -299,6 +303,8 @@ enum class ProgramUniform {
 	Value,
 	Color,
 	TexelOffset,
+	TexCoordMin,
+	TexCoordMax,
 	Weights,
 	TexMask,
 	P0,
@@ -310,7 +316,8 @@ enum class ProgramUniform {
 	Count
 };
 static const char* const program_uniform_names[(size_t)ProgramUniform::Count] = {"_translate", "_transform", "_tex", "_value", "_color",
-	"_texelOffset", "_weights[0]", "_texMask", "_p0", "_p1", "_stop_colors[0]", "_stop_positions[0]", "_num_stops", "_dimensions"};
+	"_texelOffset", "_texCoordMin", "_texCoordMax", "_weights[0]", "_texMask", "_p0", "_p1", "_stop_colors[0]", "_stop_positions[0]", "_num_stops",
+	"_dimensions"};
 
 enum class VertexAttribute { Position, Color0, TexCoord0, Count };
 static const char* const vertex_attribute_names[(size_t)VertexAttribute::Count] = {"inPosition", "inColor0", "inTexCoord0"};
@@ -1306,6 +1313,23 @@ Rml::CompiledEffectHandle RenderInterface_GL3::CompileEffect(const Rml::String& 
 	return {};
 }
 
+static void SetTexCoordLimits(const Gfx::ProgramData& program, Rml::Vector2i position, Rml::Vector2i size, Rml::Vector2i framebuffer_size)
+{
+#ifdef RMLUI_DEBUG
+	GLint program_id = {};
+	glGetIntegerv(GL_CURRENT_PROGRAM, &program_id);
+	RMLUI_ASSERTMSG((GLuint)program_id == program.id, "Passed-in program must be currently active.");
+#endif
+
+	// Offset by half-texel values so that texture lookups are clamped to fragment centers, thereby avoiding color bleeding from neighboring texels
+	// due to bilinear interpolation.
+	const Rml::Vector2f min = (Rml::Vector2f(position) + Rml::Vector2f(0.5f)) / Rml::Vector2f(framebuffer_size);
+	const Rml::Vector2f max = (Rml::Vector2f(position + size) - Rml::Vector2f(0.5f)) / Rml::Vector2f(framebuffer_size);
+
+	glUniform2f(program.uniform_locations[(int)Gfx::ProgramUniform::TexCoordMin], min.x, min.y);
+	glUniform2f(program.uniform_locations[(int)Gfx::ProgramUniform::TexCoordMax], max.x, max.y);
+}
+
 static void SigmaToParameters(const float desired_sigma, int& out_pass_level, float& out_sigma)
 {
 	constexpr int max_num_passes = 10;
@@ -1345,11 +1369,6 @@ static void RenderBlurPass(const Gfx::FramebufferData& source_destination, const
 	Gfx::BindTexture(source_destination);
 	glBindFramebuffer(GL_FRAMEBUFFER, temp.framebuffer);
 
-	Gfx::render_interface->EnableScissorRegion(false);
-	glClearColor(0, 0, 0, 0);
-	glClear(GL_COLOR_BUFFER_BIT);
-	Gfx::render_interface->EnableScissorRegion(true);
-
 	SetTexelOffset({0.f, 1.f}, source_destination.height);
 	Gfx::DrawFullscreenQuad();
 
@@ -1357,6 +1376,8 @@ static void RenderBlurPass(const Gfx::FramebufferData& source_destination, const
 	Gfx::BindTexture(temp);
 	glBindFramebuffer(GL_FRAMEBUFFER, source_destination.framebuffer);
 
+	// Clear the destination to make a 1px black border around the draw area.
+	// @performance We could simply enlargen the scissor rectangle by one pixel in each direction instead.
 	Gfx::render_interface->EnableScissorRegion(false);
 	glClearColor(0, 0, 0, 0);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -1393,10 +1414,11 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 
 	// Begin by downscale so that the blur pass can be done at a reduced resolution for large sigma.
 	Rml::Vector2i scissor_min = position;
+	Rml::Vector2i scissor_max = position + size;
 	Rml::Vector2i scissor_size = size;
 
 	glUseProgram(Gfx::programs.passthrough.id);
-	Gfx::render_interface->EnableScissorRegion(true);
+	glEnable(GL_SCISSOR_TEST);
 	glScissor(scissor_min.x, scissor_min.y, scissor_size.x, scissor_size.y);
 
 	// Downscale by iterative half-scaling with bilinear filtering, to reduce aliasing.
@@ -1407,29 +1429,18 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	const Rml::Vector2f uv_scaling = {(source_destination.width % 2 == 1) ? (1.f - 1.f / float(source_destination.width)) : 1.f,
 		(source_destination.height % 2 == 1) ? (1.f - 1.f / float(source_destination.height)) : 1.f};
 
-	auto ClearWithMargin = [&]() {
-		constexpr int radius = (blur_size + 1) / 2;
-		const Rml::Vector2i min = scissor_min - Rml::Vector2i(radius);
-		const Rml::Vector2i size = Rml::Math::Max(scissor_size + Rml::Vector2i(2 * radius), Rml::Vector2i(0));
-		glScissor(min.x, min.y, size.x, size.y);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glScissor(scissor_min.x, scissor_min.y, scissor_size.x, scissor_size.y);
-	};
-
 	// Move the texture data to the temp buffer if the last downscaling end up at the source_destination buffer.
 	const bool transfer_to_temp_buffer = (pass_level % 2 == 0);
 
 	for (int i = 0; i < pass_level; i++)
 	{
 		scissor_min = (scissor_min + Rml::Vector2i(1)) / 2;
-		scissor_size = scissor_size / 2;
+		scissor_max = Rml::Math::Max(scissor_max / 2, scissor_min);
+		scissor_size = scissor_max - scissor_min;
 		const bool from_source = (i % 2 == 0);
 		Gfx::BindTexture(from_source ? source_destination : temp);
 		glBindFramebuffer(GL_FRAMEBUFFER, (from_source ? temp : source_destination).framebuffer);
 		glScissor(scissor_min.x, scissor_min.y, scissor_size.x, scissor_size.y);
-
-		if (i == pass_level - 1 && !transfer_to_temp_buffer)
-			ClearWithMargin();
 
 		Gfx::DrawFullscreenQuad({}, uv_scaling);
 	}
@@ -1440,7 +1451,6 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	{
 		Gfx::BindTexture(source_destination);
 		glBindFramebuffer(GL_FRAMEBUFFER, temp.framebuffer);
-		ClearWithMargin();
 		Gfx::DrawFullscreenQuad();
 	}
 
@@ -1454,13 +1464,10 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	glClearColor(0, 0, 0, 0);
 #endif
 
-	// Zero out the region around the blur.
-	glBindFramebuffer(GL_FRAMEBUFFER, source_destination.framebuffer);
-	ClearWithMargin();
-
 	// Set up uniforms.
 	glUseProgram(Gfx::programs.blur.id);
 	SetBlurWeights(sigma);
+	SetTexCoordLimits(Gfx::programs.blur, scissor_min, scissor_size, {source_destination.width, source_destination.height});
 	const float blending_magnitude = 1.f;
 	glUniform1f(Gfx::programs.blur.uniform_locations[(int)Gfx::ProgramUniform::Value], blending_magnitude);
 
@@ -1469,7 +1476,7 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 
 	// Blit with a one pixel black border so that edges fade to zero.
 	const Rml::Vector2i blit_min = scissor_min - Rml::Vector2i(1);
-	const Rml::Vector2i blit_max = scissor_min + scissor_size + Rml::Vector2i(1);
+	const Rml::Vector2i blit_max = scissor_max + Rml::Vector2i(1);
 	const Rml::Vector2i blit_target_min = blit_min * (1 << pass_level);
 	const Rml::Vector2i blit_target_max = blit_max * (1 << pass_level);
 
@@ -1480,7 +1487,7 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	glBlitFramebuffer(blit_min.x, blit_min.y, blit_max.x, blit_max.y, blit_target_min.x, blit_target_min.y, blit_target_max.x, blit_target_max.y,
 		GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
-	Gfx::render_interface->EnableScissorRegion(false);
+	Gfx::CheckGLError("Blur");
 }
 
 void RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle effect_handle, Rml::CompiledGeometryHandle geometry_handle,
@@ -1689,7 +1696,6 @@ void RenderInterface_GL3::RenderFilters()
 
 			// Restore state
 			glEnable(GL_BLEND);
-			glViewport(0, 0, viewport_width, viewport_height);
 			EnableScissorRegion(original_scissor_state.enabled);
 			SetScissorRegion(original_scissor_state.x, original_scissor_state.y, original_scissor_state.width, original_scissor_state.height);
 		}
@@ -1709,23 +1715,19 @@ void RenderInterface_GL3::RenderFilters()
 
 			const Gfx::FramebufferData& primary = render_state.GetPostprocessPrimary();
 			const Gfx::FramebufferData& secondary = render_state.GetPostprocessSecondary();
-			const Gfx::FramebufferData& tertiary = render_state.GetPostprocessTertiary();
 			Gfx::BindTexture(primary);
 			glBindFramebuffer(GL_FRAMEBUFFER, secondary.framebuffer);
-			glClear(GL_COLOR_BUFFER_BIT);
 
-			ScissorState new_scissor_state = scissor_state;
-			new_scissor_state.x += Rml::Math::Max((int)filter.offset.x, 0);
-			new_scissor_state.y += Rml::Math::Max((int)filter.offset.y, 0);
-			new_scissor_state.width = Rml::Math::Max(new_scissor_state.width - std::abs((int)filter.offset.x), 0);
-			new_scissor_state.height = Rml::Math::Max(new_scissor_state.height - std::abs((int)filter.offset.y), 0);
-			SetScissorRegion(new_scissor_state.x, new_scissor_state.y, new_scissor_state.width, new_scissor_state.height);
+			SetTexCoordLimits(Gfx::programs.dropshadow, {scissor_state.x, primary.height - (scissor_state.y + scissor_state.height)},
+				{scissor_state.width, scissor_state.height}, {primary.width, primary.height});
 
 			const Rml::Vector2f uv_offset = filter.offset / Rml::Vector2f(-(float)viewport_width, (float)viewport_height);
 			Gfx::DrawFullscreenQuad(uv_offset);
 
 			if (filter.sigma >= 0.5f)
 			{
+				const Gfx::FramebufferData& tertiary = render_state.GetPostprocessTertiary();
+
 				const Rml::Vector2i position = {scissor_state.x, primary.height - (scissor_state.y + scissor_state.height)};
 				const Rml::Vector2i size = {scissor_state.width, scissor_state.height};
 				RenderBlur(filter.sigma, secondary, tertiary, position, size);
@@ -1743,13 +1745,10 @@ void RenderInterface_GL3::RenderFilters()
 		break;
 		case FilterType::Basic:
 		{
-			if (!filter.program)
-				break;
-
 			glUseProgram(filter.program->id);
 
 			if (filter.has_value_uniform)
-				glUniform1fv(filter.program->uniform_locations[(int)Gfx::ProgramUniform::Value], 1, &filter.value);
+				glUniform1f(filter.program->uniform_locations[(int)Gfx::ProgramUniform::Value], filter.value);
 
 			if (filter.blend_factor >= 0.f)
 			{
@@ -1817,19 +1816,22 @@ void RenderInterface_GL3::StackApply(const Rml::BlitDestination blit_destination
 	if (blit_destination == BlitDestination::Stack && !has_mask && attached_filters.empty())
 		return;
 
+	const ScissorState pre_filter_scissor_state = scissor_state;
+
 	{
 		// -- Blit stack to filter rendering buffer --
 		// Do this regardless of whether we actually have any filters to be applied, because we need to resolve the multi-sampled framebuffer in
 		// any case.
 
-		pre_filter_scissor_state = scissor_state;
 		const Rml::Vector2i filter_size = (dimensions == Rml::Vector2i(0) ? Rml::Vector2i(viewport_width, viewport_height) : dimensions);
 
 		// Set the scissor region during filtering to the intersection of the destination scissor (equivalent to the current scissor state) and
 		// the filtering region provided by the function arguments.
+		const Rectangle2i rect_viewport = {0, 0, viewport_width, viewport_height};
 		const Rectangle2i rect_filter = {offset, filter_size};
-		const Rectangle2i rect_scissor_state = {scissor_state.x, scissor_state.y, scissor_state.width, scissor_state.height};
-		const Rectangle2i rect_new_scissor = scissor_state.enabled ? RectangleIntersection(rect_filter, rect_scissor_state) : rect_filter;
+		const Rectangle2i rect_scissor = {scissor_state.x, scissor_state.y, scissor_state.width, scissor_state.height};
+		const Rectangle2i rect_filter_scissor = scissor_state.enabled ? RectangleIntersection(rect_filter, rect_scissor) : rect_filter;
+		const Rectangle2i rect_new_scissor = RectangleIntersection(rect_viewport, rect_filter_scissor);
 
 		EnableScissorRegion(true);
 		SetScissorRegion(rect_new_scissor.pos.x, rect_new_scissor.pos.y, rect_new_scissor.size.x, rect_new_scissor.size.y);
@@ -1863,6 +1865,8 @@ void RenderInterface_GL3::StackApply(const Rml::BlitDestination blit_destination
 
 	if (has_mask)
 	{
+		has_mask = false;
+
 		const Gfx::FramebufferData& mask = render_state.GetMask();
 		glUseProgram(Gfx::programs.blend_mask.id);
 		glUniform1i(Gfx::programs.blend_mask.uniform_locations[(int)Gfx::ProgramUniform::TexMask], 1);
@@ -1880,8 +1884,6 @@ void RenderInterface_GL3::StackApply(const Rml::BlitDestination blit_destination
 
 	EnableScissorRegion(pre_filter_scissor_state.enabled);
 	SetScissorRegion(pre_filter_scissor_state.x, pre_filter_scissor_state.y, pre_filter_scissor_state.width, pre_filter_scissor_state.height);
-	pre_filter_scissor_state = {};
-	has_mask = false;
 }
 
 void RenderInterface_GL3::AttachMask(Rml::Vector2i offset, Rml::Vector2i dimensions)
@@ -1900,6 +1902,7 @@ void RenderInterface_GL3::AttachMask(Rml::Vector2i offset, Rml::Vector2i dimensi
 
 	EnableScissorRegion(scissor_state_initial.enabled);
 	SetScissorRegion(scissor_state_initial.x, scissor_state_initial.y, scissor_state_initial.width, scissor_state_initial.height);
+
 	has_mask = true;
 }
 
