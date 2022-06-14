@@ -183,19 +183,20 @@ handle.size:hover, handle.size:active {
 	filter: drop-shadow(#ffc8 10px 10px 8px);
 	filter: grayscale(1), drop-shadow(#f11b 10px 10px 8px);
 	backdrop-filter: sepia(1);
+	box-shadow: #ffc8 10px 10px 4px;
 	*/
 }
 </style>
 </head>
 
-<body class="filter">
+<body>
 <handle move_target="#document"><h1>Effect Sample</h1></handle>
 <handle class="size" size_target="#document"/>
+<div class="filter">
 
 <div class="box boxshadow_blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box boxshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box inset"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
-
 
 <div class="box"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box big shader"><div class="label">"Creation" (Danilo Guanabara)</div></div>
@@ -208,6 +209,7 @@ handle.size:hover, handle.size:active {
 <div class="box saturate"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box invert"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+
 <div class="box brightness"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box contrast"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box dropshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
@@ -218,5 +220,6 @@ handle.size:hover, handle.size:active {
 <div class="box grayscale"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box opacity_low"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 
+</div>
 </body>
 </rml>

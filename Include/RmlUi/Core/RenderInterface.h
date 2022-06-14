@@ -43,7 +43,7 @@ enum class StencilCommand { None, Clear, WriteValue, WriteIncrement, WriteDisabl
 enum class RenderCommand { None, StackPush, StackPop, StackToTexture, StackToFilter, FilterToStack, StackToMask };
 
 enum class ClipMask { Clip, ClipIntersect, ClipOut };
-enum class BlitDestination { Stack, StackBelow };
+enum class BlitDestination { Stack, BlendStackBelow };
 
 /**
 	The abstract base class for application-specific rendering implementation. Your application must provide a concrete

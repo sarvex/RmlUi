@@ -274,7 +274,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				render_interface->StackPop();
 			}
 
-			render_interface->StackApply(BlitDestination::StackBelow, Vector2i(filter_origin), Vector2i(filter_size));
+			render_interface->StackApply(BlitDestination::BlendStackBelow, Vector2i(filter_origin), Vector2i(filter_size));
 			render_interface->StackPop();
 		}
 	}

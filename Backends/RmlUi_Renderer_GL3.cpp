@@ -1376,13 +1376,6 @@ static void RenderBlurPass(const Gfx::FramebufferData& source_destination, const
 	Gfx::BindTexture(temp);
 	glBindFramebuffer(GL_FRAMEBUFFER, source_destination.framebuffer);
 
-	// Clear the destination to make a 1px black border around the draw area.
-	// @performance We could simply enlargen the scissor rectangle by one pixel in each direction instead.
-	Gfx::render_interface->EnableScissorRegion(false);
-	glClearColor(0, 0, 0, 0);
-	glClear(GL_COLOR_BUFFER_BIT);
-	Gfx::render_interface->EnableScissorRegion(true);
-
 	SetTexelOffset({1.f, 0.f}, temp.width);
 	Gfx::DrawFullscreenQuad();
 }
@@ -1474,18 +1467,29 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	// Now do the actual render pass.
 	RenderBlurPass(temp, source_destination);
 
-	// Blit with a one pixel black border so that edges fade to zero.
-	const Rml::Vector2i blit_min = scissor_min - Rml::Vector2i(1);
-	const Rml::Vector2i blit_max = scissor_max + Rml::Vector2i(1);
-	const Rml::Vector2i blit_target_min = blit_min * (1 << pass_level);
-	const Rml::Vector2i blit_target_max = blit_max * (1 << pass_level);
-
+	// Blit the blurred image to the scissor region with upscaling.
 	glScissor(position.x, position.y, size.x, size.y);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, temp.framebuffer);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, source_destination.framebuffer);
-	glClear(GL_COLOR_BUFFER_BIT);
-	glBlitFramebuffer(blit_min.x, blit_min.y, blit_max.x, blit_max.y, blit_target_min.x, blit_target_min.y, blit_target_max.x, blit_target_max.y,
-		GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+	const Rml::Vector2i src_min = scissor_min;
+	const Rml::Vector2i src_max = scissor_max;
+	const Rml::Vector2i dst_min = position;
+	const Rml::Vector2i dst_max = position + size;
+	glBlitFramebuffer(src_min.x, src_min.y, src_max.x, src_max.y, dst_min.x, dst_min.y, dst_max.x, dst_max.y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+
+	// The above upscale blit might be jittery at low resolutions (large pass levels). This is especially noticable when moving an element with
+	// backdrop blur around or when trying to click/hover an element within a blurred region since it may be rendered at an offset. For more stable
+	// and accurate rendering we next upscale the blur image by an exact power-of-two. However, this may not fill the edges completely so we need to
+	// do the above first. Note that this strategy may sometimes result in visible seams. Alternatively, we could try to enlargen the window to the
+	// next power-of-two size and then downsample and blur that.
+	const Rml::Vector2i target_min = src_min * (1 << pass_level);
+	const Rml::Vector2i target_max = src_max * (1 << pass_level);
+	if (target_min != dst_min || target_max != dst_max)
+	{
+		glBlitFramebuffer(src_min.x, src_min.y, src_max.x, src_max.y, target_min.x, target_min.y, target_max.x, target_max.y, GL_COLOR_BUFFER_BIT,
+			GL_LINEAR);
+	}
 
 	Gfx::CheckGLError("Blur");
 }
@@ -1880,7 +1884,13 @@ void RenderInterface_GL3::StackApply(const Rml::BlitDestination blit_destination
 		glUseProgram(Gfx::programs.passthrough.id);
 	}
 
+	if (blit_destination == BlitDestination::Stack)
+		glDisable(GL_BLEND);
+
 	Gfx::DrawFullscreenQuad();
+
+	if (blit_destination == BlitDestination::Stack)
+		glEnable(GL_BLEND);
 
 	EnableScissorRegion(pre_filter_scissor_state.enabled);
 	SetScissorRegion(pre_filter_scissor_state.x, pre_filter_scissor_state.y, pre_filter_scissor_state.width, pre_filter_scissor_state.height);
