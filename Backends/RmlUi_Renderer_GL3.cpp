@@ -1923,21 +1923,61 @@ Rml::TextureHandle RenderInterface_GL3::RenderToTexture(Rml::Vector2i offset, Rm
 	const bool scissor_initially_enabled = scissor_state.enabled;
 	EnableScissorRegion(false);
 
-	const Gfx::FramebufferData& source = render_state.GetStackTop();
-	const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
-	glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
-	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
+#if not defined RMLUI_PLATFORM_EMSCRIPTEN
+	{
+		const Gfx::FramebufferData& source = render_state.GetStackTop();
+		const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
 
-	// Blit the desired stack region to the postprocess framebuffer to resolve MSAA. Also flip the image vertically since that convention is used
-	// for textures.
-	glBlitFramebuffer(offset.x, source.height - offset.y, offset.x + dimensions.x, source.height - (offset.y + dimensions.y), 0, 0, dimensions.x,
-		dimensions.y, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		// Blit the desired stack region to the postprocess framebuffer to resolve MSAA. Also flip the image vertically since that convention is used
+		// for textures.
+		glBlitFramebuffer(                                                      //
+			offset.x, source.height - offset.y,                                 // src0
+			offset.x + dimensions.x, source.height - (offset.y + dimensions.y), // src1
+			0, 0,                                                               // dst0
+			dimensions.x, dimensions.y,                                         // dst1
+			GL_COLOR_BUFFER_BIT, GL_NEAREST                                     //
+		);
+	}
+#else
+	// In OpenGL ES 3.0 the source and destination blit regions must be equal for multisampled buffers, thus we use a two-step approach here.
+	{
+		const Gfx::FramebufferData& source = render_state.GetStackTop();
+		const Gfx::FramebufferData& primary = render_state.GetPostprocessPrimary();
+		const Gfx::FramebufferData& secondary = render_state.GetPostprocessSecondary();
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, secondary.framebuffer);
+
+		// Blit the desired stack region to the postprocess framebuffer to resolve MSAA.
+		glBlitFramebuffer(                                       //
+			offset.x, source.height - (offset.y + dimensions.y), // src0
+			offset.x + dimensions.x, source.height - offset.y,   // src1
+			offset.x, source.height - (offset.y + dimensions.y), // dst0
+			offset.x + dimensions.x, source.height - offset.y,   // dst1
+			GL_COLOR_BUFFER_BIT, GL_NEAREST                      //
+		);
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, secondary.framebuffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, primary.framebuffer);
+
+		// Flip the image vertically, as that convention is used for textures, and move to origin.
+		glBlitFramebuffer(                                       //
+			offset.x, source.height - (offset.y + dimensions.y), // src0
+			offset.x + dimensions.x, source.height - offset.y,   // src1
+			0, dimensions.y,                                     // dst0
+			dimensions.x, 0,                                     // dst1
+			GL_COLOR_BUFFER_BIT, GL_NEAREST                      //
+		);
+	}
+#endif
 
 	if (GenerateTexture(texture_handle_result, nullptr, dimensions))
 	{
 		glBindTexture(GL_TEXTURE_2D, (GLuint)texture_handle_result);
 
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, destination.framebuffer);
+		const Gfx::FramebufferData& texture_source = render_state.GetPostprocessPrimary();
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, texture_source.framebuffer);
 		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, dimensions.x, dimensions.y);
 	}
 
