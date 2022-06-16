@@ -29,14 +29,14 @@
 #ifndef RMLUI_CORE_GEOMETRYUTILITIES_H
 #define RMLUI_CORE_GEOMETRYUTILITIES_H
 
+#include "Box.h"
 #include "Header.h"
+#include "StyleTypes.h"
 #include "Types.h"
 #include "Vertex.h"
-#include "StyleTypes.h"
 
 namespace Rml {
 
-class Box;
 class Geometry;
 
 /**
@@ -85,6 +85,16 @@ public:
 	/// @param[in] background_colour The colour applied to the background, set alpha to zero to not generate the background.
 	/// @param[in] border_colours Pointer to a four-element array of border colors in top-right-bottom-left order, or nullptr to not generate borders.
 	static void GenerateBackgroundBorder(Geometry* geometry, const Box& box, Vector2f offset, Vector4f border_radius, Colourb background_colour, const Colourb* border_colours = nullptr);
+
+	/// Generates the background geometry for an element's area, with support for border-radius.
+	/// Vertex positions are relative to the border-box, vertex texture coordinates are default initialized.
+	/// @param[out] geometry The geometry to append the newly created vertices and indices into.
+	/// @param[in] box The box which determines the background geometry.
+	/// @param[in] offset Offset the position of the generated vertices.
+	/// @param[in] border_radius The border radius in pixel units in the following order: top-left, top-right, bottom-right, bottom-left.
+	/// @param[in] colour The colour applied to the background.
+	/// @param[in] area Either the border, padding or content area to be filled.
+	static void GenerateBackground(Geometry* geometry, const Box& box, Vector2f offset, Vector4f border_radius, Colourb colour, Box::Area area = Box::PADDING);
 
 private:
 	GeometryUtilities();
