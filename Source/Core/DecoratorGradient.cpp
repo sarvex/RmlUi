@@ -77,9 +77,7 @@ DecoratorDataHandle DecoratorGradient::GenerateElementData(Element* element, Dec
 		computed.border_bottom_right_radius(),
 		computed.border_bottom_left_radius(),
 	};
-	const Colourb border_colors[4];
-	GeometryUtilities::GenerateBackgroundBorder(geometry, element->GetBox(), Vector2f(0), border_radius, Colourb(),
-		(painting_area == DecoratorPaintingArea::PaddingBox ? nullptr : border_colors));
+	GeometryUtilities::GenerateBackground(geometry, element->GetBox(), Vector2f(0), border_radius, Colourb(255), box_area);
 
 	// Apply opacity
 	Colourb colour_start = start;
@@ -289,10 +287,9 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 		const Vector4f radii(computed.border_top_left_radius(), computed.border_top_right_radius(), computed.border_bottom_right_radius(),
 			computed.border_bottom_left_radius());
 
-		const Colourb background_color(255);
 		Geometry geometry;
 		const Box& box = element->GetBox();
-		GeometryUtilities::GenerateBackgroundBorder(&geometry, box, Vector2f(), radii, background_color, nullptr);
+		GeometryUtilities::GenerateBackground(&geometry, box, Vector2f(), radii, Colourb(255), Box::PADDING);
 
 		const Vector2f padding_pos = box.GetPosition(Box::PADDING);
 		for (Vertex& vertex : geometry.GetVertices())
