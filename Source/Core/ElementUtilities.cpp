@@ -350,9 +350,7 @@ void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, 
 
 			// @performance: Store clipping geometry on element.
 			Geometry geometry;
-			static const Colourb opaque_colors[4];
-			GeometryUtilities::GenerateBackgroundBorder(&geometry, box, {}, radii, Colourb(),
-				(clip_area == Box::Area::BORDER ? opaque_colors : nullptr));
+			GeometryUtilities::GenerateBackground(&geometry, box, {}, radii, Colourb(255), clip_area);
 
 			const ClipMask clip_mask = (first_clip_mask ? ClipMask::Clip : ClipMask::ClipIntersect);
 			geometry.SetClipMask(clip_mask, stencil_element->GetAbsoluteOffset(Box::BORDER));

@@ -67,12 +67,9 @@ DecoratorDataHandle DecoratorShader::GenerateElementData(Element* element) const
 		const Vector4f radii(computed.border_top_left_radius(), computed.border_top_right_radius(), computed.border_bottom_right_radius(),
 			computed.border_bottom_left_radius());
 
-		const Colourb background_color(255);
-		const Colourb border_color[4] = {Colourb(255), Colourb(255), Colourb(255), Colourb(255)};
 		Geometry geometry;
 		const Box& box = element->GetBox();
-		GeometryUtilities::GenerateBackgroundBorder(&geometry, box, Vector2f(), radii, background_color,
-			render_area == Box::BORDER ? border_color : nullptr);
+		GeometryUtilities::GenerateBackground(&geometry, box, Vector2f(), radii, Colourb(255), render_area);
 
 		const Vector2f padding_pos = box.GetPosition(render_area);
 		const Vector2f border_size = box.GetSize(Box::BORDER);

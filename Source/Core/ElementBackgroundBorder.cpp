@@ -152,46 +152,54 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			return;
 		}
 
-		Geometry geometry_padding(element);
-		Geometry geometry_padding_border(element); // TODO
+		Geometry geometry_padding(element);        // Render geometry for inner box-shadow.
+		Geometry geometry_padding_border(element); // Clipping mask for outer box-shadow.
 		Vector2f element_offset_in_texture;
 		Vector2i texture_dimensions;
 
 		{
-			Vector2f extend_top_left;
-			Vector2f extend_bottom_right;
+			Vector2f extend_min;
+			Vector2f extend_max;
+			bool has_inner_box_shadow = false;
+			bool has_outer_box_shadow = false;
 
+			// Extend the render-texture to encompass box-shadow blur and spread.
 			for (const Shadow& shadow : shadow_list)
 			{
-				if (!shadow.inset)
+				if (shadow.inset)
 				{
+					has_inner_box_shadow = true;
+				}
+				else
+				{
+					has_outer_box_shadow = true;
 					const float extend = shadow.blur_radius + shadow.spread_distance;
-					extend_top_left = Math::Max(extend_top_left, Vector2f(extend) - shadow.offset);
-					extend_bottom_right = Math::Max(extend_bottom_right, Vector2f(extend) + shadow.offset);
+					extend_min = Math::Min(extend_min, shadow.offset - Vector2f(extend));
+					extend_max = Math::Max(extend_max, shadow.offset + Vector2f(extend));
 				}
 			}
 
-			Vector2f offset_min;
-			Vector2f offset_max;
+			Vector2f boxes_min;
+			Vector2f boxes_max;
 
-			// Generate border and padding geometry, and extend the texture to encompass any additional boxes.
+			// Generate the geometry for all the element's boxes and extend the render-texture further to cover all of them.
 			for (int i = 0; i < element->GetNumBoxes(); i++)
 			{
-				static const Colourb opaque_colors[4];
-				static const Colourb transparent_color(0, 0, 0, 0);
 				Vector2f offset;
 				const Box& box = element->GetBox(i, offset);
-				GeometryUtilities::GenerateBackgroundBorder(&geometry_padding, box, offset, radii, opaque_colors[0], nullptr);
-				GeometryUtilities::GenerateBackgroundBorder(&geometry_padding_border, box, offset, radii, opaque_colors[0], opaque_colors);
-				offset_min = Math::Min(offset_min, offset);
-				offset_max = Math::Max(offset_max, offset);
+				boxes_min = Math::Min(boxes_min, offset);
+				boxes_max = Math::Max(boxes_max, offset + box.GetSize(Box::BORDER));
+
+				if (has_inner_box_shadow)
+					GeometryUtilities::GenerateBackground(&geometry_padding, box, offset, radii, Colourb(255), Box::PADDING);
+				if (has_outer_box_shadow)
+					GeometryUtilities::GenerateBackground(&geometry_padding_border, box, offset, radii, Colourb(255), Box::BORDER);
 			}
 
 			auto RoundUp = [](Vector2f v) { return Vector2f(Math::RoundUpFloat(v.x), Math::RoundUpFloat(v.y)); };
 
-			element_offset_in_texture = RoundUp(extend_top_left - offset_min);
-			texture_dimensions =
-				Vector2i(RoundUp(element_offset_in_texture + element->GetBox().GetSize(Box::BORDER) + extend_bottom_right + offset_max));
+			element_offset_in_texture = -RoundUp(extend_min + boxes_min);
+			texture_dimensions = Vector2i(RoundUp(element_offset_in_texture + extend_max + boxes_max));
 		}
 
 		RenderState& render_state = context->GetRenderState();
@@ -209,9 +217,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		for (int shadow_index = (int)shadow_list.size() - 1; shadow_index >= 0; shadow_index--)
 		{
 			const Shadow& shadow = shadow_list[shadow_index];
-
 			const bool inset = shadow.inset;
-			const Colourb shadow_colors[4] = {shadow.color, shadow.color, shadow.color, shadow.color};
 
 			Vector4f spread_radii = radii;
 			for (int i = 0; i < 4; i++)
@@ -228,7 +234,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 
 			Geometry shadow_geometry;
 
-			// Generate the shadow box
+			// Generate the shadow geometry. For outer box-shadows it is rendered normally, while for inner box-shadows it is used as a clipping mask.
 			for (int i = 0; i < element->GetNumBoxes(); i++)
 			{
 				Vector2f offset;
@@ -243,8 +249,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 					box.SetEdge(Box::PADDING, edge, new_size);
 				}
 
-				GeometryUtilities::GenerateBackgroundBorder(&shadow_geometry, box, offset, spread_radii, shadow.color,
-					inset ? nullptr : shadow_colors);
+				GeometryUtilities::GenerateBackground(&shadow_geometry, box, offset, spread_radii, shadow.color, inset ? Box::PADDING : Box::BORDER);
 			}
 
 			CompiledFilterHandle blur = {};
@@ -264,7 +269,6 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			{
 				shadow_geometry.SetClipMask(ClipMask::ClipOut, shadow.offset + element_offset_in_texture);
 
-				// TODO: Maybe it would be a lot better to add a color render effect and just use white here.
 				for (Rml::Vertex& vertex : geometry_padding.GetVertices())
 					vertex.colour = shadow.color;
 
@@ -293,10 +297,9 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		shadow_texture = render_interface->RenderToTexture({}, texture_dimensions);
 		render_interface->StackPop();
 
-		Colourb color_white = Colourb(255, 255, 255, 255);
 		Vertex vertices[4];
 		int indices[6];
-		GeometryUtilities::GenerateQuad(vertices, indices, -element_offset_in_texture, Vector2f(texture_dimensions), color_white);
+		GeometryUtilities::GenerateQuad(vertices, indices, -element_offset_in_texture, Vector2f(texture_dimensions), Colourb(255));
 		shadow_geometry = render_interface->CompileGeometry(vertices, 4, indices, 6, shadow_texture);
 
 		ElementUtilities::ApplyTransform(render_interface, render_state, active_element_transform);
