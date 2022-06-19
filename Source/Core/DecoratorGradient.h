@@ -44,7 +44,7 @@ public:
 
 	bool Initialise(Direction dir_, Colourb start_, Colourb stop_);
 
-	DecoratorDataHandle GenerateElementData(Element* element, DecoratorPaintingArea painting_area) const override;
+	DecoratorDataHandle GenerateElementData(Element* element, PaintArea paint_area) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
 
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
@@ -76,7 +76,7 @@ public:
 
 	bool Initialise(float angle, const ColorStopList& color_stops);
 
-	DecoratorDataHandle GenerateElementData(Element* element) const override;
+	DecoratorDataHandle GenerateElementData(Element* element, PaintArea paint_area) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
 
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;

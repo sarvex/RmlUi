@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -29,26 +29,38 @@
 #include "PropertyParserDecorator.h"
 #include "../../Include/RmlUi/Core/DecoratorInstancer.h"
 #include "../../Include/RmlUi/Core/Factory.h"
-#include "../../Include/RmlUi/Core/PropertySpecification.h"
 #include "../../Include/RmlUi/Core/Profiling.h"
+#include "../../Include/RmlUi/Core/PropertySpecification.h"
 #include "../../Include/RmlUi/Core/StyleSheetTypes.h"
 
 namespace Rml {
 
-PropertyParserDecorator::PropertyParserDecorator()
+PropertyParserDecorator::PropertyParserDecorator() :
+	decorator_class_map{
+		{"background", DecoratorClasses::Background},
+		{"filter", DecoratorClasses::Filter},
+		{"backdrop-filter", DecoratorClasses::BackdropFilter},
+		{"mask-image", DecoratorClasses::MaskImage},
+	},
+	area_keywords{
+		{"border-box", PaintArea::Border},
+		{"padding-box", PaintArea::Padding},
+		{"content-box", PaintArea::Content},
+	}
 {}
 
-PropertyParserDecorator::~PropertyParserDecorator()
-{}
+PropertyParserDecorator::~PropertyParserDecorator() {}
 
 bool PropertyParserDecorator::ParseValue(Property& property, const String& decorator_string_value, const ParameterMap& parameters) const
 {
 	// Decorators are declared as
 	//   decorator: <decorator-value>[, <decorator-value> ...];
 	// Where <decorator-value> is either a @decorator name:
-	//   decorator: invader-theme-background, ...;
+	//   decorator: invader-theme-background <paint-area>?, ...;
 	// or is an anonymous decorator with inline properties
-	//   decorator: tiled-box( <shorthand properties> ), ...;
+	//   decorator: tiled-box( <shorthand properties> ) <paint-area>?, ...;
+	// where <paint-area> is one of
+	//   border-box, padding-box, content-box
 
 	if (decorator_string_value.empty() || decorator_string_value == "none")
 	{
@@ -59,19 +71,13 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 
 	RMLUI_ZoneScoped;
 
-	static const SmallUnorderedMap<String, DecoratorClasses> decorator_class_map = {
-		{"background", DecoratorClasses::Background},
-		{"filter", DecoratorClasses::Filter},
-		{"backdrop-filter", DecoratorClasses::BackdropFilter},
-		{"mask-image", DecoratorClasses::MaskImage},
-	};
-	auto it = decorator_class_map.find(parameters.empty() ? String("background") : parameters.begin()->first);
-	if (it == decorator_class_map.end())
+	auto it_decorator_class = decorator_class_map.find(parameters.empty() ? String("background") : parameters.begin()->first);
+	if (it_decorator_class == decorator_class_map.end())
 	{
 		RMLUI_ERRORMSG("Invalid decorator parser parameter.");
 		return false;
 	}
-	const DecoratorClasses decorator_class = it->second;
+	const DecoratorClasses decorator_class = it_decorator_class->second;
 
 	DecoratorDeclarationList decorators;
 
@@ -89,10 +95,52 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 		const size_t shorthand_close = decorator_string.rfind(')');
 		const bool invalid_parenthesis = (shorthand_open == String::npos || shorthand_close == String::npos || shorthand_open >= shorthand_close);
 
+		// Find the paint area for the decorator.
+		PaintArea paint_area = PaintArea::Auto;
+		bool paint_area_configurable = false;
+
+		switch (decorator_class)
+		{
+		case DecoratorClasses::Background:
+			paint_area = PaintArea::Padding;
+			paint_area_configurable = true;
+			break;
+		case DecoratorClasses::MaskImage:
+			paint_area = PaintArea::Border;
+			paint_area_configurable = true;
+			break;
+		case DecoratorClasses::BackdropFilter:
+		case DecoratorClasses::Filter:
+		case DecoratorClasses::Invalid:
+			break;
+		}
+
+		// Look-up keywords for customized paint area.
+		{
+			const size_t keywords_begin = (invalid_parenthesis ? decorator_string.find(' ') : shorthand_close + 1);
+			StringList keywords;
+			if (keywords_begin < decorator_string.size())
+				StringUtilities::ExpandString(keywords, decorator_string.substr(keywords_begin), ' ');
+
+			for (const String& keyword : keywords)
+			{
+				if (keyword.empty())
+					continue;
+				if (!paint_area_configurable)
+					return false; // Trying to use a paint area/keyword on a property type that does not support it.
+
+				auto it = area_keywords.find(StringUtilities::ToLower(keyword));
+				if (it == area_keywords.end())
+					return false; // Bail out if we have an invalid keyword.
+
+				paint_area = it->second;
+			}
+		}
+
 		if (invalid_parenthesis)
 		{
 			// We found no parenthesis, that means the value must be a name of a @decorator rule.
-			decorators.list.emplace_back(DecoratorDeclaration{ decorator_string, nullptr, {} });
+			decorators.list.emplace_back(DecoratorDeclaration{decorator_string, nullptr, {}, paint_area});
 		}
 		else
 		{
@@ -126,7 +174,7 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 			// Set unspecified values to their defaults
 			specification.SetPropertyDefaults(properties);
 
-			decorators.list.emplace_back(DecoratorDeclaration{ type, instancer, std::move(properties) });
+			decorators.list.emplace_back(DecoratorDeclaration{type, instancer, std::move(properties), paint_area});
 		}
 	}
 

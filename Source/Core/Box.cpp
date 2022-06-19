@@ -134,4 +134,14 @@ bool Box::operator!=(const Box& rhs) const
 	return !(*this == rhs);
 }
 
+Box::Area ToBoxArea(PaintArea paint_area, Box::Area clamp_outer, Box::Area clamp_inner)
+{
+	RMLUI_ASSERT(clamp_outer <= clamp_inner);
+	static_assert((int)PaintArea::Border == (int)Box::BORDER && (int)PaintArea::Padding == (int)Box::PADDING &&
+			(int)PaintArea::Content == (int)Box::CONTENT,
+		"Ensure PaintArea values correspond to Box::Area");
+
+	return (Box::Area)Math::Clamp((int)paint_area, (int)clamp_outer, (int)clamp_inner);
+}
+
 } // namespace Rml

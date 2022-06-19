@@ -76,6 +76,7 @@ private:
 		SharedPtr<const Decorator> decorator;
 		DecoratorDataHandle decorator_data;
 		DecoratorClasses decorator_class;
+		PaintArea paint_area;
 	};
 
 	using DecoratorHandleList = Vector< DecoratorHandle >;

@@ -62,6 +62,7 @@ struct DecoratorDeclaration {
 	String type;
 	DecoratorInstancer* instancer;
 	PropertyDictionary properties;
+	PaintArea paint_area;
 };
 struct DecoratorDeclarationList {
 	Vector<DecoratorDeclaration> list;

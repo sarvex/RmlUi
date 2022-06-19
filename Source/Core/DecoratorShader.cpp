@@ -42,45 +42,35 @@ DecoratorShader::DecoratorShader() {}
 
 DecoratorShader::~DecoratorShader() {}
 
-bool DecoratorShader::Initialise(String&& in_value, Box::Area in_render_area)
+bool DecoratorShader::Initialise(String&& in_value)
 {
 	value = std::move(in_value);
-	render_area = in_render_area;
 	return true;
 }
 
-DecoratorDataHandle DecoratorShader::GenerateElementData(Element* element) const
+DecoratorDataHandle DecoratorShader::GenerateElementData(Element* element, PaintArea paint_area) const
 {
 	RenderInterface* render_interface = element->GetRenderInterface();
 	if (!render_interface)
 		return INVALID_DECORATORDATAHANDLE;
 
-	const Vector2f dimensions = element->GetBox().GetSize(render_area);
+	const Box::Area render_area = ToBoxArea(paint_area);
+
+	const Box& box = element->GetBox();
+	const Vector2f dimensions = box.GetSize(render_area);
 	CompiledEffectHandle effect_handle =
 		render_interface->CompileEffect("shader", Dictionary{{"value", Variant(value)}, {"dimensions", Variant(dimensions)}});
 
-	CompiledGeometryHandle geometry_handle = 0;
+	Geometry geometry(render_interface);
 
-	{
-		// TODO: Geometry caching in element background?
-		const ComputedValues& computed = element->GetComputedValues();
-		const Vector4f radii(computed.border_top_left_radius(), computed.border_top_right_radius(), computed.border_bottom_right_radius(),
-			computed.border_bottom_left_radius());
+	const ComputedValues& computed = element->GetComputedValues();
+	GeometryUtilities::GenerateBackground(&geometry, box, Vector2f(), computed.border_radius(), Colourb(255), render_area);
 
-		Geometry geometry;
-		const Box& box = element->GetBox();
-		GeometryUtilities::GenerateBackground(&geometry, box, Vector2f(), radii, Colourb(255), render_area);
+	const Vector2f offset = box.GetPosition(render_area);
+	for (Vertex& vertex : geometry.GetVertices())
+		vertex.tex_coord = (vertex.position - offset) / dimensions;
 
-		const Vector2f padding_pos = box.GetPosition(render_area);
-		const Vector2f border_size = box.GetSize(Box::BORDER);
-		for (Vertex& vertex : geometry.GetVertices())
-			vertex.tex_coord = (vertex.position - padding_pos) / border_size;
-
-		geometry_handle = render_interface->CompileGeometry(geometry.GetVertices().data(), (int)geometry.GetVertices().size(),
-			geometry.GetIndices().data(), (int)geometry.GetIndices().size(), TextureHandle{});
-	}
-
-	BasicEffectElementData* element_data = GetBasicEffectElementDataPool().AllocateAndConstruct(render_interface, effect_handle, geometry_handle);
+	BasicEffectElementData* element_data = GetBasicEffectElementDataPool().AllocateAndConstruct(std::move(geometry), effect_handle);
 
 	return reinterpret_cast<DecoratorDataHandle>(element_data);
 }
@@ -88,10 +78,9 @@ DecoratorDataHandle DecoratorShader::GenerateElementData(Element* element) const
 void DecoratorShader::ReleaseElementData(DecoratorDataHandle handle) const
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
-	RMLUI_ASSERT(element_data && element_data->render_interface);
+	RenderInterface* render_interface = element_data->geometry.GetRenderInterface();
 
-	element_data->render_interface->ReleaseCompiledEffect(element_data->effect);
-	element_data->render_interface->ReleaseCompiledGeometry(element_data->geometry);
+	render_interface->ReleaseCompiledEffect(element_data->effect);
 
 	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
 }
@@ -99,14 +88,13 @@ void DecoratorShader::ReleaseElementData(DecoratorDataHandle handle) const
 void DecoratorShader::RenderElement(Element* element, DecoratorDataHandle handle) const
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
-	element_data->render_interface->RenderEffect(element_data->effect, element_data->geometry, element->GetAbsoluteOffset(Box::BORDER).Round());
+	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(Box::BORDER));
 }
 
 DecoratorShaderInstancer::DecoratorShaderInstancer() : DecoratorInstancer(DecoratorClasses::Background), ids{}
 {
 	ids.value = RegisterProperty("value", String()).AddParser("string").GetId();
-	ids.render_area = RegisterProperty("render-area", String("padding-box")).AddParser("keyword", "border-box=1, padding-box, content-box").GetId();
-	RegisterShorthand("decorator", "render-area,value", ShorthandType::FallThrough);
+	RegisterShorthand("decorator", "value", ShorthandType::FallThrough);
 }
 
 DecoratorShaderInstancer::~DecoratorShaderInstancer() {}
@@ -115,15 +103,13 @@ SharedPtr<Decorator> DecoratorShaderInstancer::InstanceDecorator(const String& /
 	const DecoratorInstancerInterface& /*interface_*/)
 {
 	const Property* p_value = properties_.GetProperty(ids.value);
-	const Property* p_render_area = properties_.GetProperty(ids.render_area);
-	if (!p_value || !p_render_area)
+	if (!p_value)
 		return nullptr;
 
 	String value = p_value->Get<String>();
-	Box::Area render_area = (Box::Area)Math::Clamp(p_render_area->Get<int>(), (int)Box::BORDER, (int)Box::CONTENT);
 
 	auto decorator = MakeShared<DecoratorShader>();
-	if (decorator->Initialise(std::move(value), render_area))
+	if (decorator->Initialise(std::move(value)))
 		return decorator;
 
 	return nullptr;

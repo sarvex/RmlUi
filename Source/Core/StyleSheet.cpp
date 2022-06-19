@@ -113,7 +113,7 @@ const Keyframes * StyleSheet::GetKeyframes(const String & name) const
 	return nullptr;
 }
 
-const Vector<SharedPtr<const Decorator>>& StyleSheet::InstanceDecorators(const DecoratorDeclarationList& declaration_list, const PropertySource* source) const
+const DecoratorPtrList& StyleSheet::InstanceDecorators(const DecoratorDeclarationList& declaration_list, const PropertySource* source) const
 {
 	// Generate the cache key. Relative paths of textures may be affected by the source path, and ultimately
 	// which texture should be displayed. Thus, we need to include this path in the cache key.
@@ -128,32 +128,42 @@ const Vector<SharedPtr<const Decorator>>& StyleSheet::InstanceDecorators(const D
 	if (it_cache != decorator_cache.end())
 		return it_cache->second;
 
-	Vector<SharedPtr<const Decorator>>& decorators = decorator_cache[key];
+	DecoratorPtrList& decorators = decorator_cache[key];
+	decorators.reserve(declaration_list.list.size());
 
 	for (const DecoratorDeclaration& declaration : declaration_list.list)
 	{
+		SharedPtr<Decorator> decorator;
+
 		if (declaration.instancer)
 		{
 			RMLUI_ZoneScopedN("InstanceDecorator");
-			
-			if (SharedPtr<Decorator> decorator = declaration.instancer->InstanceDecorator(declaration.type, declaration.properties, DecoratorInstancerInterface(*this, source)))
-				decorators.push_back(std::move(decorator));
-			else
-				Log::Message(Log::LT_WARNING, "Decorator '%s' in '%s' could not be instanced, declared at %s:%d", declaration.type.c_str(), declaration_list.value.c_str(), source ? source->path.c_str() : "", source ? source->line_number : -1);
+			decorator =
+				declaration.instancer->InstanceDecorator(declaration.type, declaration.properties, DecoratorInstancerInterface(*this, source));
+
+			if (!decorator)
+				Log::Message(Log::LT_WARNING, "Decorator '%s' in '%s' could not be instanced, declared at %s:%d", declaration.type.c_str(),
+					declaration_list.value.c_str(), source ? source->path.c_str() : "", source ? source->line_number : -1);
 		}
 		else
 		{
 			// If we have no instancer, this means the type is the name of an @decorator rule.
-			SharedPtr<Decorator> decorator;
 			auto it_map = decorator_map.find(declaration.type);
 			if (it_map != decorator_map.end())
 				decorator = it_map->second.decorator;
 
-			if (decorator)
-				decorators.push_back(std::move(decorator));
-			else
-				Log::Message(Log::LT_WARNING, "Decorator name '%s' could not be found in any @decorator rule, declared at %s:%d", declaration.type.c_str(), source ? source->path.c_str() : "", source ? source->line_number : -1);
+			if (!decorator)
+				Log::Message(Log::LT_WARNING, "Decorator name '%s' could not be found in any @decorator rule, declared at %s:%d",
+					declaration.type.c_str(), source ? source->path.c_str() : "", source ? source->line_number : -1);
 		}
+
+		if (!decorator)
+		{
+			decorators.clear();
+			break;
+		}
+
+		decorators.push_back(std::move(decorator));
 	}
 
 	return decorators;

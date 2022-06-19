@@ -129,7 +129,7 @@ handle.size:hover, handle.size:active {
 	padding-left: 200dp;
 }
 
-.gradient { decorator: linear-gradient(110deg, #fff3, #fff 10%, #c33 50%, #3c3, #33c, #000 90%, #0003); }
+.gradient { decorator: linear-gradient(110deg, #fff3, #fff 10%, #c33 50%, #3c3, #33c, #000 90%, #0003) border-box; }
 
 .dropshadow { filter: drop-shadow(#f33f 30px 20px 5px); } 
 
@@ -146,7 +146,7 @@ handle.size:hover, handle.size:active {
 .hue_rotate { filter: hue-rotate(260deg); }
 .invert { filter: invert(100%); }
 
-.shader { decorator: shader(padding-box "creation"); }
+.shader { decorator: shader("creation"); }
 
 .opacity_one { filter: opacity(1); }
 .opacity_low { filter: opacity(0.2); }
