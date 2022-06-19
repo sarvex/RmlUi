@@ -43,7 +43,7 @@ Geometry::Geometry(Element* host_element) : host_element(host_element)
 	database_handle = GeometryDatabase::Insert(this);
 }
 
-Geometry::Geometry(Context* host_context) : host_context(host_context)
+Geometry::Geometry(RenderInterface* render_interface) : render_interface(render_interface)
 {
 	database_handle = GeometryDatabase::Insert(this);
 }
@@ -63,7 +63,7 @@ Geometry& Geometry::operator=(Geometry&& other)
 
 void Geometry::MoveFrom(Geometry& other)
 {
-	host_context = std::exchange(other.host_context, nullptr);
+	render_interface = std::exchange(other.render_interface, nullptr);
 	host_element = std::exchange(other.host_element, nullptr);
 
 	vertices = std::move(other.vertices);
@@ -88,10 +88,10 @@ void Geometry::SetHostElement(Element* _host_element)
 	if (host_element == _host_element)
 		return;
 
-	if (host_element != nullptr)
+	if (host_element)
 	{
 		Release();
-		host_context = nullptr;
+		render_interface = nullptr;
 	}
 
 	host_element = _host_element;
@@ -239,19 +239,21 @@ Geometry::operator bool() const
 	return !indices.empty();
 }
 
-// Returns the host context's render interface.
 RenderInterface* Geometry::GetRenderInterface()
 {
-	if (!host_context)
+	if (!render_interface)
 	{
 		if (host_element)
-			host_context = host_element->GetContext();
+		{
+			if (Context* host_context = host_element->GetContext())
+				render_interface = host_context->GetRenderInterface();
+		}
+
+		if (!render_interface)
+			render_interface = ::Rml::GetRenderInterface();
 	}
 
-	if (host_context)
-		return host_context->GetRenderInterface();
-	else
-		return ::Rml::GetRenderInterface();
+	return render_interface;
 }
 
 } // namespace Rml
