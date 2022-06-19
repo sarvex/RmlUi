@@ -54,7 +54,7 @@ class RMLUICORE_API Geometry
 {
 public:
 	Geometry(Element* host_element = nullptr);
-	Geometry(Context* host_context);
+	Geometry(RenderInterface* render_interface);
 
 	Geometry(const Geometry&) = delete;
 	Geometry& operator=(const Geometry&) = delete;
@@ -109,7 +109,7 @@ private:
 	// Move members from another geometry.
 	void MoveFrom(Geometry& other);
 
-	Context* host_context = nullptr;
+	RenderInterface* render_interface = nullptr;
 	Element* host_element = nullptr;
 
 	Vector< Vertex > vertices;
