@@ -31,6 +31,7 @@
 
 #include "../../Include/RmlUi/Core/Decorator.h"
 #include "../../Include/RmlUi/Core/DecoratorInstancer.h"
+#include "../../Include/RmlUi/Core/Geometry.h"
 #include "../../Include/RmlUi/Core/Property.h"
 #include "Pool.h"
 
@@ -79,12 +80,9 @@ struct BasicFilterElementData {
 Pool<BasicFilterElementData>& GetBasicFilterElementDataPool();
 
 struct BasicEffectElementData {
-	BasicEffectElementData(RenderInterface* render_interface, CompiledEffectHandle effect, CompiledGeometryHandle geometry = {}) :
-		render_interface(render_interface), effect(effect), geometry(geometry)
-	{}
-	RenderInterface* render_interface;
+	BasicEffectElementData(Geometry&& geometry, CompiledEffectHandle effect) : geometry(std::move(geometry)), effect(effect) {}
+	Geometry geometry;
 	CompiledEffectHandle effect;
-	CompiledGeometryHandle geometry;
 };
 
 Pool<BasicEffectElementData>& GetBasicEffectElementDataPool();

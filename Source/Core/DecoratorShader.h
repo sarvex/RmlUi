@@ -41,16 +41,15 @@ public:
 	DecoratorShader();
 	virtual ~DecoratorShader();
 
-	bool Initialise(String&& value, Box::Area render_area);
+	bool Initialise(String&& value);
 
-	DecoratorDataHandle GenerateElementData(Element* element) const override;
+	DecoratorDataHandle GenerateElementData(Element* element, PaintArea paint_area) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
 
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
 
 private:
 	String value;
-	Box::Area render_area;
 };
 
 class DecoratorShaderInstancer : public DecoratorInstancer {
@@ -64,7 +63,6 @@ public:
 private:
 	struct PropertyIds {
 		PropertyId value;
-		PropertyId render_area;
 	};
 	PropertyIds ids;
 };

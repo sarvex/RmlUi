@@ -34,12 +34,20 @@
 
 namespace Rml {
 
-Decorator::Decorator()
+Decorator::Decorator() {}
+
+Decorator::~Decorator() {}
+
+DecoratorDataHandle Decorator::GenerateElementData(Element* element, PaintArea /*paint_area*/) const
 {
+	// For backward compatibility.
+	return GenerateElementData(element);
 }
 
-Decorator::~Decorator()
+DecoratorDataHandle Decorator::GenerateElementData(Element* /*element*/) const
 {
+	RMLUI_ERRORMSG("Missing decorator implementation of GenerateElementData()");
+	return INVALID_DECORATORDATAHANDLE;
 }
 
 void Decorator::GetClipExtension(Vector2f& /*top_left*/, Vector2f& /*bottom_right*/) const {}

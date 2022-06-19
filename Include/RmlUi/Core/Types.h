@@ -162,6 +162,9 @@ inline bool operator!=(const Shadow& a, const Shadow& b)
 {
 	return !(a == b);
 }
+// The values should correspond to a subset of Box::Area using the same underlying numeric values.
+enum class PaintArea { Auto, Border, Padding, Content };
+
 enum class DecoratorClasses : byte {
 	Invalid = 0,
 	Background = 1 << 0,

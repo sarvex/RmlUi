@@ -46,6 +46,8 @@ class StyleSheetParser;
 struct PropertySource;
 struct Sprite;
 
+using DecoratorPtrList = Vector<SharedPtr<const Decorator>>;
+
 /**
 	StyleSheet maintains a single stylesheet definition. A stylesheet can be combined with another stylesheet to create
 	a new, merged stylesheet.
@@ -78,7 +80,7 @@ public:
 	SharedPtr<const ElementDefinition> GetElementDefinition(const Element* element) const;
 
 	/// Returns a list of instanced decorators from the declarations. The instances are cached for faster future retrieval.
-	const Vector<SharedPtr<const Decorator>>& InstanceDecorators(const DecoratorDeclarationList& declaration_list, const PropertySource* decorator_source) const;
+	const DecoratorPtrList& InstanceDecorators(const DecoratorDeclarationList& declaration_list, const PropertySource* decorator_source) const;
 
 private:
 	StyleSheet();
@@ -110,7 +112,7 @@ private:
 	mutable ElementDefinitionCache node_cache;
 
 	// Cached decorator instances.
-	using DecoratorCache = UnorderedMap<String, Vector<SharedPtr<const Decorator>>>;
+	using DecoratorCache = UnorderedMap<String, DecoratorPtrList>;
 	mutable DecoratorCache decorator_cache;
 
 	friend Rml::StyleSheetParser;

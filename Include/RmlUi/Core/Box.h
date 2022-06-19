@@ -125,5 +125,7 @@ private:
 	float area_edges[NUM_AREAS][NUM_EDGES];
 };
 
+RMLUICORE_API Box::Area ToBoxArea(PaintArea paint_area, Box::Area clamp_outer = Box::BORDER, Box::Area clamp_inner = Box::CONTENT);
+
 } // namespace Rml
 #endif

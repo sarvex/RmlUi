@@ -98,8 +98,9 @@ void ElementDecoration::ReloadDecorators()
 				source = &document_source;
 			}
 		}
-
-		const auto& decorator_list = style_sheet->InstanceDecorators(*decorators_ptr, source);
+		
+		const DecoratorPtrList& decorator_list = style_sheet->InstanceDecorators(*decorators_ptr, source);
+		RMLUI_ASSERT(decorator_list.empty() || decorator_list.size() == decorators_ptr->list.size());
 
 		const int list_size = (int)decorator_list.size();
 
@@ -127,14 +128,19 @@ void ElementDecoration::ReloadDecorators()
 			break;
 		}
 
-		for (const SharedPtr<const Decorator>& decorator : decorator_list)
+
+		for (size_t i = 0; i < decorator_list.size() && i < decorators_ptr->list.size(); i++)
 		{
+			const SharedPtr<const Decorator>& decorator = decorator_list[i];
+			const DecoratorDeclaration& declaration = decorators_ptr->list[i];
+
 			if (decorator)
 			{
 				DecoratorHandle decorator_handle;
 				decorator_handle.decorator_data = 0;
 				decorator_handle.decorator_class = decorator_class;
 				decorator_handle.decorator = decorator;
+				decorator_handle.paint_area = declaration.paint_area;
 
 				decorators.push_back(std::move(decorator_handle));
 			}
@@ -154,10 +160,7 @@ void ElementDecoration::ReloadDecoratorsData()
 			if (decorator.decorator_data)
 				decorator.decorator->ReleaseElementData(decorator.decorator_data);
 
-			const DecoratorPaintingArea painting_area =
-				(decorator.decorator_class == DecoratorClasses::Background ? DecoratorPaintingArea::PaddingBox : DecoratorPaintingArea::BorderBox);
-
-			decorator.decorator_data = decorator.decorator->GenerateElementData(element, painting_area);
+			decorator.decorator_data = decorator.decorator->GenerateElementData(element, decorator.paint_area);
 		}
 	}
 }
