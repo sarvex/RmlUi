@@ -187,63 +187,39 @@ void main() {
     gl_Position = vec4(inPosition, 0.0, 1.0);
 }
 )";
-static const char* shader_frag_effect_pre = RMLUI_SHADER_HEADER R"(
+static const char* shader_frag_passthrough = RMLUI_SHADER_HEADER R"(
 uniform sampler2D _tex;
-uniform vec2 _texCoordMin;
-uniform vec2 _texCoordMax;
-uniform float _value;
-uniform vec4 _color;
+in vec2 fragTexCoord;
+out vec4 finalColor;
+
+void main() {
+	finalColor = texture(_tex, fragTexCoord);
+}
+)";
+static const char* shader_frag_color_matrix = RMLUI_SHADER_HEADER R"(
+uniform sampler2D _tex;
+uniform mat4 _color_matrix;
 
 in vec2 fragTexCoord;
 out vec4 finalColor;
 
 void main() {
 	vec4 texColor = texture(_tex, fragTexCoord);
-)";
-static const char* shader_frag_effect_post = R"(
-	finalColor = texColor;
+	finalColor = _color_matrix * texColor;
 }
 )";
-static const char* shader_frag_passthrough = "";
-static const char* shader_frag_sepia = R"(
-	vec3 r_mix = vec3(0.393, 0.769, 0.189);
-	vec3 g_mix = vec3(0.349, 0.686, 0.168);
-	vec3 b_mix = vec3(0.272, 0.534, 0.131);
-	vec3 sepia = vec3(dot(texColor.rgb, r_mix), dot(texColor.rgb, g_mix), dot(texColor.rgb, b_mix));
-	texColor.rgb = mix(texColor.rgb, sepia, _value);
-)";
-static const char* shader_frag_gray = R"(
-	float gray = 0.2126 * texColor.r + 0.7152 * texColor.g + 0.0722 * texColor.b;
-	texColor.rgb = mix(texColor.rgb, vec3(gray), _value);
-)";
-static const char* shader_frag_dropshadow = R"(
-	texColor = texture(_tex, clamp(fragTexCoord, _texCoordMin, _texCoordMax)).a * _color;
-)";
-static const char* shader_frag_brightness = R"(
-	texColor.rgb *= _value;
-)";
-static const char* shader_frag_contrast = R"(
-	vec3 gray = vec3(0.5 * texColor.a);
-	texColor.rgb = mix(gray, texColor.rgb, _value);
-)";
-static const char* shader_frag_invert = R"(
-	vec3 inverted = vec3(texColor.a) - texColor.rgb;
-	texColor.rgb = mix(texColor.rgb, inverted, _value);
-)";
-// TODO: Generate final matrix on CPU side, combine color matrix shaders.
-// Hue-rotation and saturation values based on: https://www.w3.org/TR/filter-effects-1/#attr-valuedef-type-huerotate
-static const char* shader_frag_hue_rotate = R"(
-	mat3 G = mat3(vec3(0.213), vec3(0.715), vec3(0.072));
-	mat3 C = mat3(vec3(0.787, -0.213, -0.213), vec3(-0.715, 0.285, -0.715), vec3(-0.072, -0.072, 0.928));
-	mat3 S = mat3(vec3(-0.213, 0.143, -0.787), vec3(-0.715, 0.140, 0.715), vec3(0.928, -0.283, 0.072));
-	mat3 A = G + C * cos(_value) + S * sin(_value);
-	texColor.rgb = A * texColor.rgb;
-)";
-static const char* shader_frag_saturate = R"(
-	mat3 G = mat3(vec3(0.213), vec3(0.715), vec3(0.072));
-	mat3 C = mat3(vec3(0.787, -0.213, -0.213), vec3(-0.715, 0.285, -0.715), vec3(-0.072, -0.072, 0.928));
-	mat3 A = G + C * _value;
-	texColor.rgb = A * texColor.rgb;
+static const char* shader_frag_dropshadow = RMLUI_SHADER_HEADER R"(
+uniform sampler2D _tex;
+uniform vec2 _texCoordMin;
+uniform vec2 _texCoordMax;
+uniform vec4 _color;
+
+in vec2 fragTexCoord;
+out vec4 finalColor;
+
+void main() {
+	finalColor = texture(_tex, clamp(fragTexCoord, _texCoordMin, _texCoordMax)).a * _color;
+}
 )";
 static const char* shader_frag_blend_mask = RMLUI_SHADER_HEADER R"(
 uniform sampler2D _tex;
@@ -302,6 +278,7 @@ enum class ProgramUniform {
 	Tex,
 	Value,
 	Color,
+	ColorMatrix,
 	TexelOffset,
 	TexCoordMin,
 	TexCoordMax,
@@ -316,8 +293,8 @@ enum class ProgramUniform {
 	Count
 };
 static const char* const program_uniform_names[(size_t)ProgramUniform::Count] = {"_translate", "_transform", "_tex", "_value", "_color",
-	"_texelOffset", "_texCoordMin", "_texCoordMax", "_weights[0]", "_texMask", "_p0", "_p1", "_stop_colors[0]", "_stop_positions[0]", "_num_stops",
-	"_dimensions"};
+	"_color_matrix", "_texelOffset", "_texCoordMin", "_texCoordMax", "_weights[0]", "_texMask", "_p0", "_p1", "_stop_colors[0]", "_stop_positions[0]",
+	"_num_stops", "_dimensions"};
 
 enum class VertexAttribute { Position, Color0, TexCoord0, Count };
 static const char* const vertex_attribute_names[(size_t)VertexAttribute::Count] = {"inPosition", "inColor0", "inTexCoord0"};
@@ -339,14 +316,8 @@ struct Shaders {
 
 	GLuint vert_passthrough;
 	GLuint frag_passthrough;
-	GLuint frag_brightness;
-	GLuint frag_contrast;
-	GLuint frag_invert;
-	GLuint frag_sepia;
-	GLuint frag_gray;
+	GLuint frag_color_matrix;
 	GLuint frag_dropshadow;
-	GLuint frag_hue_rotate;
-	GLuint frag_saturate;
 
 	GLuint frag_blend_mask;
 
@@ -365,14 +336,8 @@ struct Programs {
 	ProgramData main_creation;
 
 	ProgramData passthrough;
-	ProgramData brightness;
-	ProgramData contrast;
-	ProgramData invert;
-	ProgramData sepia;
-	ProgramData gray;
+	ProgramData color_matrix;
 	ProgramData dropshadow;
-	ProgramData hue_rotate;
-	ProgramData saturate;
 
 	ProgramData blend_mask;
 
@@ -419,17 +384,9 @@ static void CheckGLError(const char* operation_name)
 	(void)operation_name;
 }
 
-static bool CreateShader(GLuint& out_shader_id, GLenum shader_type, const char* code_string, const char* code_pre = nullptr,
-	const char* code_post = nullptr)
+static bool CreateShader(GLuint& out_shader_id, GLenum shader_type, const char* code_string)
 {
 	RMLUI_ASSERT(shader_type == GL_VERTEX_SHADER || shader_type == GL_FRAGMENT_SHADER);
-
-	Rml::String combined_code;
-	if (code_pre && code_post)
-	{
-		combined_code = Rml::String(code_pre) + Rml::String(code_string) + Rml::String(code_post);
-		code_string = combined_code.c_str();
-	}
 
 	GLuint id = glCreateShader(shader_type);
 	glShaderSource(id, 1, (const GLchar**)&code_string, NULL);
@@ -681,43 +638,19 @@ static bool CreateShaders(Shaders& out_shaders, Programs& out_programs)
 	// Effects
 	if (!CreateShader(out_shaders.vert_passthrough, GL_VERTEX_SHADER, shader_vert_passthrough))
 		return ReportError("shader", "vert_passthrough");
-	if (!CreateShader(out_shaders.frag_passthrough, GL_FRAGMENT_SHADER, shader_frag_passthrough, shader_frag_effect_pre, shader_frag_effect_post))
+	if (!CreateShader(out_shaders.frag_passthrough, GL_FRAGMENT_SHADER, shader_frag_passthrough))
 		return ReportError("shader", "frag_passthrough");
-	if (!CreateShader(out_shaders.frag_brightness, GL_FRAGMENT_SHADER, shader_frag_brightness, shader_frag_effect_pre, shader_frag_effect_post))
-		return ReportError("shader", "frag_brightness");
-	if (!CreateShader(out_shaders.frag_contrast, GL_FRAGMENT_SHADER, shader_frag_contrast, shader_frag_effect_pre, shader_frag_effect_post))
-		return ReportError("shader", "frag_contrast");
-	if (!CreateShader(out_shaders.frag_invert, GL_FRAGMENT_SHADER, shader_frag_invert, shader_frag_effect_pre, shader_frag_effect_post))
-		return ReportError("shader", "frag_invert");
-	if (!CreateShader(out_shaders.frag_sepia, GL_FRAGMENT_SHADER, shader_frag_sepia, shader_frag_effect_pre, shader_frag_effect_post))
-		return ReportError("shader", "frag_sepia");
-	if (!CreateShader(out_shaders.frag_gray, GL_FRAGMENT_SHADER, shader_frag_gray, shader_frag_effect_pre, shader_frag_effect_post))
-		return ReportError("shader", "frag_gray");
-	if (!CreateShader(out_shaders.frag_dropshadow, GL_FRAGMENT_SHADER, shader_frag_dropshadow, shader_frag_effect_pre, shader_frag_effect_post))
+	if (!CreateShader(out_shaders.frag_color_matrix, GL_FRAGMENT_SHADER, shader_frag_color_matrix))
+		return ReportError("shader", "frag_color_matrix");
+	if (!CreateShader(out_shaders.frag_dropshadow, GL_FRAGMENT_SHADER, shader_frag_dropshadow))
 		return ReportError("shader", "frag_dropshadow");
-	if (!CreateShader(out_shaders.frag_hue_rotate, GL_FRAGMENT_SHADER, shader_frag_hue_rotate, shader_frag_effect_pre, shader_frag_effect_post))
-		return ReportError("shader", "frag_hue_rotate");
-	if (!CreateShader(out_shaders.frag_saturate, GL_FRAGMENT_SHADER, shader_frag_saturate, shader_frag_effect_pre, shader_frag_effect_post))
-		return ReportError("shader", "frag_saturate");
 
 	if (!CreateProgram(out_programs.passthrough, out_shaders.vert_passthrough, out_shaders.frag_passthrough))
 		return ReportError("program", "passthrough");
-	if (!CreateProgram(out_programs.brightness, out_shaders.vert_passthrough, out_shaders.frag_brightness))
-		return ReportError("program", "brightness");
-	if (!CreateProgram(out_programs.contrast, out_shaders.vert_passthrough, out_shaders.frag_contrast))
-		return ReportError("program", "contrast");
-	if (!CreateProgram(out_programs.invert, out_shaders.vert_passthrough, out_shaders.frag_invert))
-		return ReportError("program", "invert");
-	if (!CreateProgram(out_programs.sepia, out_shaders.vert_passthrough, out_shaders.frag_sepia))
-		return ReportError("program", "sepia");
-	if (!CreateProgram(out_programs.gray, out_shaders.vert_passthrough, out_shaders.frag_gray))
-		return ReportError("program", "gray");
+	if (!CreateProgram(out_programs.color_matrix, out_shaders.vert_passthrough, out_shaders.frag_color_matrix))
+		return ReportError("program", "color_matrix");
 	if (!CreateProgram(out_programs.dropshadow, out_shaders.vert_passthrough, out_shaders.frag_dropshadow))
 		return ReportError("program", "dropshadow");
-	if (!CreateProgram(out_programs.hue_rotate, out_shaders.vert_passthrough, out_shaders.frag_hue_rotate))
-		return ReportError("program", "hue_rotate");
-	if (!CreateProgram(out_programs.saturate, out_shaders.vert_passthrough, out_shaders.frag_saturate))
-		return ReportError("program", "saturate");
 
 	// Blend mask
 	if (!CreateShader(out_shaders.frag_blend_mask, GL_FRAGMENT_SHADER, shader_frag_blend_mask))
@@ -742,28 +675,27 @@ static void DestroyShaders()
 	glDeleteProgram(programs.main_color.id);
 	glDeleteProgram(programs.main_texture.id);
 	glDeleteProgram(programs.main_linear_gradient.id);
+	glDeleteProgram(programs.main_creation.id);
 	glDeleteShader(shaders.vert_main);
 	glDeleteShader(shaders.frag_main_color);
 	glDeleteShader(shaders.frag_main_texture);
 	glDeleteShader(shaders.frag_main_linear_gradient);
+	glDeleteShader(shaders.frag_main_creation);
 
 	glDeleteProgram(programs.passthrough.id);
-	glDeleteProgram(programs.brightness.id);
-	glDeleteProgram(programs.contrast.id);
-	glDeleteProgram(programs.invert.id);
-	glDeleteProgram(programs.sepia.id);
-	glDeleteProgram(programs.gray.id);
+	glDeleteProgram(programs.color_matrix.id);
+	glDeleteProgram(programs.dropshadow.id);
 	glDeleteShader(shaders.vert_passthrough);
 	glDeleteShader(shaders.frag_passthrough);
-	glDeleteShader(shaders.frag_brightness);
-	glDeleteShader(shaders.frag_contrast);
-	glDeleteShader(shaders.frag_invert);
-	glDeleteShader(shaders.frag_sepia);
-	glDeleteShader(shaders.frag_gray);
+	glDeleteShader(shaders.frag_color_matrix);
+	glDeleteShader(shaders.frag_dropshadow);
 
+	glDeleteProgram(programs.blend_mask.id);
+	glDeleteShader(shaders.frag_blend_mask);
+
+	glDeleteProgram(programs.blur.id);
 	glDeleteShader(shaders.vert_blur);
 	glDeleteShader(shaders.frag_blur);
-	glDeleteProgram(programs.blur.id);
 
 	shaders = {};
 	programs = {};
@@ -1568,15 +1500,15 @@ void RenderInterface_GL3::ReleaseCompiledEffect(Rml::CompiledEffectHandle effect
 	delete reinterpret_cast<CompiledEffect*>(effect_handle);
 }
 
-enum class FilterType { Invalid = 0, Basic, Blur, DropShadow };
+enum class FilterType { Invalid = 0, Passthrough, ColorMatrix, Blur, DropShadow };
 struct CompiledFilter {
 	FilterType type;
 
-	// Basic
-	Gfx::ProgramData* program;
-	bool has_value_uniform;
-	float value;
-	float blend_factor = -1.f;
+	// Passthrough
+	float blend_factor;
+
+	// ColorMatrix
+	Rml::Matrix4f color_matrix;
 
 	// Blur
 	float sigma;
@@ -1604,58 +1536,91 @@ Rml::CompiledFilterHandle RenderInterface_GL3::CompileFilter(const Rml::String& 
 	}
 	else if (name == "opacity")
 	{
-		filter.type = FilterType::Basic;
-		filter.program = &Gfx::programs.passthrough;
+		filter.type = FilterType::Passthrough;
 		filter.blend_factor = Rml::Get(parameters, "value", 1.0f);
 	}
 	else if (name == "brightness")
 	{
-		filter.type = FilterType::Basic;
-		filter.program = &Gfx::programs.brightness;
-		filter.has_value_uniform = true;
-		filter.value = Rml::Get(parameters, "value", 1.0f);
+		filter.type = FilterType::ColorMatrix;
+		const float value = Rml::Get(parameters, "value", 1.0f);
+		filter.color_matrix = Rml::Matrix4f::Diag(value, value, value, 1.f);
 	}
 	else if (name == "contrast")
 	{
-		filter.type = FilterType::Basic;
-		filter.program = &Gfx::programs.contrast;
-		filter.has_value_uniform = true;
-		filter.value = Rml::Get(parameters, "value", 1.0f);
+		filter.type = FilterType::ColorMatrix;
+		const float value = Rml::Get(parameters, "value", 1.0f);
+		const float grayness = 0.5f - 0.5f * value;
+		filter.color_matrix = Rml::Matrix4f::Diag(value, value, value, 1.f);
+		filter.color_matrix.SetColumn(3, Rml::Vector4f(grayness, grayness, grayness, 1.f));
 	}
 	else if (name == "invert")
 	{
-		filter.type = FilterType::Basic;
-		filter.program = &Gfx::programs.invert;
-		filter.has_value_uniform = true;
-		filter.value = Rml::Math::Clamp(Rml::Get(parameters, "value", 1.0f), 0.f, 1.f);
+		filter.type = FilterType::ColorMatrix;
+		const float value = Rml::Math::Clamp(Rml::Get(parameters, "value", 1.0f), 0.f, 1.f);
+		const float inverted = 1.f - 2.f * value;
+		filter.color_matrix = Rml::Matrix4f::Diag(inverted, inverted, inverted, 1.f);
+		filter.color_matrix.SetColumn(3, Rml::Vector4f(value, value, value, 1.f));
 	}
 	else if (name == "grayscale")
 	{
-		filter.type = FilterType::Basic;
-		filter.program = &Gfx::programs.gray;
-		filter.has_value_uniform = true;
-		filter.value = Rml::Get(parameters, "value", 1.0f);
+		filter.type = FilterType::ColorMatrix;
+		const float value = Rml::Get(parameters, "value", 1.0f);
+		const float rev_value = 1.f - value;
+		const Rml::Vector3f gray = value * Rml::Vector3f(0.2126f, 0.7152f, 0.0722f);
+		// clang-format off
+		filter.color_matrix = Rml::Matrix4f::FromRows(
+			{gray.x + rev_value, gray.y,             gray.z,             0.f},
+			{gray.x,             gray.y + rev_value, gray.z,             0.f},
+			{gray.x,             gray.y,             gray.z + rev_value, 0.f},
+			{0.f,                0.f,                0.f,                1.f}
+		);
+		// clang-format on
 	}
 	else if (name == "sepia")
 	{
-		filter.type = FilterType::Basic;
-		filter.program = &Gfx::programs.sepia;
-		filter.has_value_uniform = true;
-		filter.value = Rml::Get(parameters, "value", 1.0f);
+		filter.type = FilterType::ColorMatrix;
+		const float value = Rml::Get(parameters, "value", 1.0f);
+		const float rev_value = 1.f - value;
+		const Rml::Vector3f r_mix = value * Rml::Vector3f(0.393f, 0.769f, 0.189f);
+		const Rml::Vector3f g_mix = value * Rml::Vector3f(0.349f, 0.686f, 0.168f);
+		const Rml::Vector3f b_mix = value * Rml::Vector3f(0.272f, 0.534f, 0.131f);
+		// clang-format off
+		filter.color_matrix = Rml::Matrix4f::FromRows(
+			{r_mix.x + rev_value, r_mix.y,             r_mix.z,             0.f},
+			{g_mix.x,             g_mix.y + rev_value, g_mix.z,             0.f},
+			{b_mix.x,             b_mix.y,             b_mix.z + rev_value, 0.f},
+			{0.f,                 0.f,                 0.f,                 1.f}
+		);
+		// clang-format on
 	}
 	else if (name == "hue-rotate")
 	{
-		filter.type = FilterType::Basic;
-		filter.program = &Gfx::programs.hue_rotate;
-		filter.has_value_uniform = true;
-		filter.value = Rml::Get(parameters, "value", 1.0f);
+		// Hue-rotation and saturation values based on: https://www.w3.org/TR/filter-effects-1/#attr-valuedef-type-huerotate
+		filter.type = FilterType::ColorMatrix;
+		const float value = Rml::Get(parameters, "value", 1.0f);
+		const float s = Rml::Math::Sin(value);
+		const float c = Rml::Math::Cos(value);
+		// clang-format off
+		filter.color_matrix = Rml::Matrix4f::FromRows(
+			{0.213f + 0.787f * c - 0.213f * s,  0.715f - 0.715f * c - 0.715f * s,  0.072f - 0.072f * c + 0.928f * s,  0.f},
+			{0.213f - 0.213f * c + 0.143f * s,  0.715f + 0.285f * c + 0.140f * s,  0.072f - 0.072f * c - 0.283f * s,  0.f},
+			{0.213f - 0.213f * c - 0.787f * s,  0.715f - 0.715f * c + 0.715f * s,  0.072f + 0.928f * c + 0.072f * s,  0.f},
+			{0.f,                               0.f,                               0.f,                               1.f}
+		);
+		// clang-format on
 	}
 	else if (name == "saturate")
 	{
-		filter.type = FilterType::Basic;
-		filter.program = &Gfx::programs.saturate;
-		filter.has_value_uniform = true;
-		filter.value = Rml::Get(parameters, "value", 1.0f);
+		filter.type = FilterType::ColorMatrix;
+		const float value = Rml::Get(parameters, "value", 1.0f);
+		// clang-format off
+		filter.color_matrix = Rml::Matrix4f::FromRows(
+			{0.213f + 0.787f * value,  0.715f - 0.715f * value,  0.072f - 0.072f * value,  0.f},
+			{0.213f - 0.213f * value,  0.715f + 0.285f * value,  0.072f - 0.072f * value,  0.f},
+			{0.213f - 0.213f * value,  0.715f - 0.715f * value,  0.072f + 0.928f * value,  0.f},
+			{0.f,                      0.f,                      0.f,                      1.f}
+		);
+		// clang-format on
 	}
 
 	if (filter.type != FilterType::Invalid)
@@ -1747,22 +1712,11 @@ void RenderInterface_GL3::RenderFilters()
 			render_state.SwapPostprocessPrimarySecondary();
 		}
 		break;
-		case FilterType::Basic:
+		case FilterType::Passthrough:
 		{
-			glUseProgram(filter.program->id);
-
-			if (filter.has_value_uniform)
-				glUniform1f(filter.program->uniform_locations[(int)Gfx::ProgramUniform::Value], filter.value);
-
-			if (filter.blend_factor >= 0.f)
-			{
-				glBlendFunc(GL_CONSTANT_ALPHA, GL_ZERO);
-				glBlendColor(0.0f, 0.0f, 0.0f, filter.blend_factor);
-			}
-			else
-			{
-				glDisable(GL_BLEND);
-			}
+			glUseProgram(Gfx::programs.passthrough.id);
+			glBlendFunc(GL_CONSTANT_ALPHA, GL_ZERO);
+			glBlendColor(0.0f, 0.0f, 0.0f, filter.blend_factor);
 
 			const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
 			const Gfx::FramebufferData& destination = render_state.GetPostprocessSecondary();
@@ -1772,22 +1726,27 @@ void RenderInterface_GL3::RenderFilters()
 			Gfx::DrawFullscreenQuad();
 
 			render_state.SwapPostprocessPrimarySecondary();
+			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		}
+		break;
+		case FilterType::ColorMatrix:
+		{
+			glUseProgram(Gfx::programs.color_matrix.id);
+			glDisable(GL_BLEND);
 
-			// Restore state
-			if (filter.blend_factor >= 0.f)
-			{
-#if RMLUI_PREMULTIPLIED_ALPHA
-				glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-#else
-				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-#endif
-			}
-			else
-			{
-				glEnable(GL_BLEND);
-			}
+			const GLint uniform_location = Gfx::programs.color_matrix.uniform_locations[(int)Gfx::ProgramUniform::ColorMatrix];
+			constexpr bool transpose = std::is_same<decltype(filter.color_matrix), Rml::RowMajorMatrix4f>::value;
+			glUniformMatrix4fv(uniform_location, 1, transpose, filter.color_matrix.data());
 
-			Gfx::CheckGLError("RenderFilterBasic");
+			const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
+			const Gfx::FramebufferData& destination = render_state.GetPostprocessSecondary();
+			Gfx::BindTexture(source);
+			glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
+
+			Gfx::DrawFullscreenQuad();
+
+			render_state.SwapPostprocessPrimarySecondary();
+			glEnable(GL_BLEND);
 		}
 		break;
 		case FilterType::Invalid:
@@ -1798,6 +1757,7 @@ void RenderInterface_GL3::RenderFilters()
 		}
 	}
 
+	Gfx::CheckGLError("RenderFilter");
 	attached_filters.clear();
 }
 
