@@ -111,8 +111,9 @@ public:
 
 	/// Returns a rectangle covering the element's area in window coordinate space.
 	/// @return True on success, otherwise false.
-	static bool GetElementRegionInWindowSpace(Vector2f& out_offset, Vector2f& out_size, Element* element, Box::Area area,
-		Vector2f expand_top_left = Vector2f(0), Vector2f expand_bottom_right = Vector2f(0));
+	/// @note When area is Auto the element's box-shadow area is also included.
+	static bool GetBoundingBox(Vector2f& out_offset, Vector2f& out_size, Element* element, PaintArea area, Vector2f expand_top_left = Vector2f(0),
+		Vector2f expand_bottom_right = Vector2f(0));
 
 	/// Formats the contents of an element. This does not need to be called for ordinary elements, but can be useful
 	/// for non-DOM elements of custom elements.

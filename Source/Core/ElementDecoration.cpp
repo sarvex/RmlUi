@@ -214,7 +214,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			ElementUtilities::SetClippingRegion(element, true);
 
 			Vector2f filter_origin, filter_size;
-			ElementUtilities::GetElementRegionInWindowSpace(filter_origin, filter_size, element, Box::BORDER);
+			ElementUtilities::GetBoundingBox(filter_origin, filter_size, element, PaintArea::Border);
 			// @performance Shrink scissor region to element region
 
 			const int i0 = num_backgrounds;
@@ -254,7 +254,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			}
 
 			Vector2f filter_origin, filter_size;
-			ElementUtilities::GetElementRegionInWindowSpace(filter_origin, filter_size, element, Box::BORDER, max_top_left, max_bottom_right);
+			ElementUtilities::GetBoundingBox(filter_origin, filter_size, element, PaintArea::Auto, max_top_left, max_bottom_right);
 
 			for (int i = i0; i < i0 + num_filters; i++)
 			{
