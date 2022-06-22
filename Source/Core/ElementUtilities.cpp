@@ -364,12 +364,38 @@ void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, 
 	render_interface->EnableClipMask(stencil_test_enabled);
 }
 
-bool ElementUtilities::GetElementRegionInWindowSpace(Vector2f& out_offset, Vector2f& out_size, Element* element, Box::Area area,
-	Vector2f expand_top_left, Vector2f expand_bottom_right)
+bool ElementUtilities::GetBoundingBox(Vector2f& out_offset, Vector2f& out_size, Element* element, PaintArea area, Vector2f expand_top_left,
+	Vector2f expand_bottom_right)
 {
 	RMLUI_ASSERT(element);
-	const Vector2f element_origin = element->GetAbsoluteOffset(area);
-	const Vector2f element_size = element->GetBox().GetSize(area);
+
+	const Box::Area box_area = (area == PaintArea::Auto ? Box::BORDER : (Box::Area)area);
+	const Vector2f element_origin = element->GetAbsoluteOffset(box_area);
+	const Vector2f element_size = element->GetBox().GetSize(box_area);
+
+	if (area == PaintArea::Auto)
+	{
+		// Extend the bounding box to include the element's box-shadow.
+		if (const Property* p_box_shadow = element->GetLocalProperty(PropertyId::BoxShadow))
+		{
+			RMLUI_ASSERT(p_box_shadow->value.GetType() == Variant::SHADOWLIST);
+			const ShadowList& shadow_list = p_box_shadow->value.GetReference<ShadowList>();
+
+			Vector2f extend_min;
+			Vector2f extend_max;
+			for (const Shadow& shadow : shadow_list)
+			{
+				if (!shadow.inset)
+				{
+					const float extend = shadow.blur_radius + shadow.spread_distance;
+					extend_min = Math::Min(extend_min, shadow.offset - Vector2f(extend));
+					extend_max = Math::Max(extend_max, shadow.offset + Vector2f(extend));
+				}
+			}
+			expand_top_left -= extend_min;
+			expand_bottom_right += extend_max;
+		}
+	}
 
 	const TransformState* transform_state = element->GetTransformState();
 	const Matrix4f* transform = (transform_state ? transform_state->GetTransform() : nullptr);
@@ -385,10 +411,6 @@ bool ElementUtilities::GetElementRegionInWindowSpace(Vector2f& out_offset, Vecto
 
 	Context* context = element->GetContext();
 	if (!context)
-		return false;
-
-	RenderInterface* render_interface = context->GetRenderInterface();
-	if (!render_interface)
 		return false;
 
 	constexpr int num_corners = 4;
