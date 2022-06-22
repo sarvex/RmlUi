@@ -162,7 +162,7 @@ void ElementInfo::RenderSourceElement()
 		for (int i = 0; i < source_element->GetNumBoxes(); i++)
 		{
 			Vector2f box_offset;
-			const Box element_box = source_element->GetBox(i, box_offset);
+			const Box& element_box = source_element->GetBox(i, box_offset);
 			const Vector2f border_offset = box_offset + source_element->GetAbsoluteOffset(Box::BORDER);
 
 			// Content area:
@@ -176,6 +176,17 @@ void ElementInfo::RenderSourceElement()
 
 			// Border area:
 			Geometry::RenderBox(border_offset + element_box.GetPosition(Box::MARGIN), element_box.GetSize(Box::MARGIN), border_offset + element_box.GetPosition(Box::BORDER), element_box.GetSize(Box::BORDER), Colourb(240, 255, 131, 128));
+		}
+
+		if (Context* context = source_element->GetContext())
+		{
+			ElementUtilities::ApplyTransform(context->GetRenderInterface(), context->GetRenderState(), nullptr);
+
+			Vector2f region_offset, region_size;
+			ElementUtilities::GetBoundingBox(region_offset, region_size, source_element, PaintArea::Auto);
+
+			// Bounding box
+			Geometry::RenderOutline(region_offset - Vector2f(1.f), region_size + Vector2f(2.f), Colourb(255, 255, 255, 200), 1.f);
 		}
 	}
 }
