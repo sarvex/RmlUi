@@ -92,6 +92,7 @@ void ElementBackgroundBorder::DirtyBorder()
 void ElementBackgroundBorder::GenerateGeometry(Element* element)
 {
 	const ComputedValues& computed = element->GetComputedValues();
+	const Property* p_box_shadow = element->GetLocalProperty(PropertyId::BoxShadow);
 
 	Colourb background_color = computed.background_color();
 	Colourb border_colors[4] = {
@@ -101,27 +102,30 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		computed.border_left_color(),
 	};
 
-	// Apply opacity
-	const float opacity = computed.opacity();
-	background_color.alpha = (byte)(opacity * (float)background_color.alpha);
-
-	if (opacity < 1)
+	if (!p_box_shadow)
 	{
-		for (int i = 0; i < 4; ++i)
-			border_colors[i].alpha = (byte)(opacity * (float)border_colors[i].alpha);
+		// Apply opacity except if we have a box shadow. In the latter case the background is rendered opaquely into the box-shadow texture, while
+		// opacity is applied to the entire box-shadow texture when that is rendered.
+		const float opacity = computed.opacity();
+		if (opacity < 1.f)
+		{
+			background_color.alpha = (byte)(opacity * (float)background_color.alpha);
+
+			for (int i = 0; i < 4; ++i)
+				border_colors[i].alpha = (byte)(opacity * (float)border_colors[i].alpha);
+		}
 	}
 
 	geometry.GetVertices().clear();
 	geometry.GetIndices().clear();
 
-	const Vector4f radii(computed.border_top_left_radius(), computed.border_top_right_radius(), computed.border_bottom_right_radius(),
-		computed.border_bottom_left_radius());
+	const Vector4f border_radius = computed.border_radius();
 
 	for (int i = 0; i < element->GetNumBoxes(); i++)
 	{
 		Vector2f offset;
 		const Box& box = element->GetBox(i, offset);
-		GeometryUtilities::GenerateBackgroundBorder(&geometry, box, offset, radii, background_color, border_colors);
+		GeometryUtilities::GenerateBackgroundBorder(&geometry, box, offset, border_radius, background_color, border_colors);
 	}
 
 	geometry.Release();
@@ -138,7 +142,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		shadow_geometry = 0;
 	}
 
-	if (const Property* p_box_shadow = element->GetLocalProperty(PropertyId::BoxShadow))
+	if (p_box_shadow)
 	{
 		RMLUI_ASSERT(p_box_shadow->value.GetType() == Variant::SHADOWLIST);
 		const ShadowList& shadow_list = p_box_shadow->value.GetReference<ShadowList>();
@@ -151,6 +155,8 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			RMLUI_ERROR;
 			return;
 		}
+
+		const byte alpha = byte(computed.opacity() * 255.f);
 
 		Geometry geometry_padding(element);        // Render geometry for inner box-shadow.
 		Geometry geometry_padding_border(element); // Clipping mask for outer box-shadow.
@@ -191,9 +197,9 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 				boxes_max = Math::Max(boxes_max, offset + box.GetSize(Box::BORDER));
 
 				if (has_inner_box_shadow)
-					GeometryUtilities::GenerateBackground(&geometry_padding, box, offset, radii, Colourb(255), Box::PADDING);
+					GeometryUtilities::GenerateBackground(&geometry_padding, box, offset, border_radius, Colourb(255), Box::PADDING);
 				if (has_outer_box_shadow)
-					GeometryUtilities::GenerateBackground(&geometry_padding_border, box, offset, radii, Colourb(255), Box::BORDER);
+					GeometryUtilities::GenerateBackground(&geometry_padding_border, box, offset, border_radius, Colourb(255), Box::BORDER);
 			}
 
 			auto RoundUp = [](Vector2f v) { return Vector2f(Math::RoundUpFloat(v.x), Math::RoundUpFloat(v.y)); };
@@ -219,7 +225,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 			const Shadow& shadow = shadow_list[shadow_index];
 			const bool inset = shadow.inset;
 
-			Vector4f spread_radii = radii;
+			Vector4f spread_radii = border_radius;
 			for (int i = 0; i < 4; i++)
 			{
 				float& radius = spread_radii[i];
@@ -299,7 +305,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 
 		Vertex vertices[4];
 		int indices[6];
-		GeometryUtilities::GenerateQuad(vertices, indices, -element_offset_in_texture, Vector2f(texture_dimensions), Colourb(255));
+		GeometryUtilities::GenerateQuad(vertices, indices, -element_offset_in_texture, Vector2f(texture_dimensions), Colourb(255, alpha));
 		shadow_geometry = render_interface->CompileGeometry(vertices, 4, indices, 6, shadow_texture);
 
 		ElementUtilities::ApplyTransform(render_interface, render_state, active_element_transform);
