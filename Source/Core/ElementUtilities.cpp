@@ -369,7 +369,7 @@ bool ElementUtilities::GetBoundingBox(Vector2f& out_offset, Vector2f& out_size, 
 {
 	RMLUI_ASSERT(element);
 
-	const Box::Area box_area = (area == PaintArea::Auto ? Box::BORDER : (Box::Area)area);
+	const Box::Area box_area = ToBoxArea(area);
 	const Vector2f element_origin = element->GetAbsoluteOffset(box_area);
 	const Vector2f element_size = element->GetBox().GetSize(box_area);
 

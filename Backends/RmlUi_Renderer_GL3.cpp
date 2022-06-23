@@ -156,6 +156,7 @@ uniform float _value;
 uniform vec2 _dimensions;
 
 in vec2 fragTexCoord;
+in vec4 fragColor;
 out vec4 finalColor;
 
 void main() {    
@@ -172,7 +173,7 @@ void main() {
 		uv += p / l * (sin(z) + 1.) * abs(sin(l * 9. - z - z));
 		c[i] = .01 / length(mod(uv, 1.) - .5);
 	}
-	finalColor = vec4(c / l, t);
+	finalColor = vec4(c / l, fragColor.a);
 }
 )";
 

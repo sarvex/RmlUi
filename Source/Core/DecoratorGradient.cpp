@@ -282,7 +282,8 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 	Geometry geometry(render_interface);
 
 	const ComputedValues& computed = element->GetComputedValues();
-	GeometryUtilities::GenerateBackground(&geometry, box, Vector2f(), computed.border_radius(), Colourb(255), box_area);
+	const byte alpha = byte(computed.opacity() * 255.f);
+	GeometryUtilities::GenerateBackground(&geometry, box, Vector2f(), computed.border_radius(), Colourb(255, alpha), box_area);
 
 	const Vector2f render_offset = box.GetPosition(box_area);
 	for (Vertex& vertex : geometry.GetVertices())

@@ -184,6 +184,7 @@ handle.size:hover, handle.size:active {
 	filter: grayscale(1), drop-shadow(#f11b 10px 10px 8px);
 	backdrop-filter: sepia(1);
 	box-shadow: #ffc8 10px 10px 4px;
+	opacity: 0.3;
 	*/
 }
 </style>
@@ -196,6 +197,7 @@ handle.size:hover, handle.size:active {
 
 <div class="box boxshadow_blur"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box boxshadow"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
+<div class="box boxshadow sepia"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 <div class="box inset"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
 
 <div class="box"><img sprite="icon-invader"/>Hello, do you feel the funk?</div>
