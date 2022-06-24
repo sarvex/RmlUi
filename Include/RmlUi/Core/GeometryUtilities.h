@@ -83,8 +83,8 @@ public:
 	/// @param[in] offset Offset the position of the generated vertices.
 	/// @param[in] border_radius The border radius in pixel units in the following order: top-left, top-right, bottom-right, bottom-left.
 	/// @param[in] background_colour The colour applied to the background, set alpha to zero to not generate the background.
-	/// @param[in] border_colours Pointer to a four-element array of border colors in top-right-bottom-left order, or nullptr to not generate borders.
-	static void GenerateBackgroundBorder(Geometry* geometry, const Box& box, Vector2f offset, Vector4f border_radius, Colourb background_colour, const Colourb* border_colours = nullptr);
+	/// @param[in] border_colours A four-element array of border colors in top-right-bottom-left order.
+	static void GenerateBackgroundBorder(Geometry* geometry, const Box& box, Vector2f offset, Vector4f border_radius, Colourb background_colour, const Colourb border_colours[4]);
 
 	/// Generates the background geometry for an element's area, with support for border-radius.
 	/// Vertex positions are relative to the border-box, vertex texture coordinates are default initialized.

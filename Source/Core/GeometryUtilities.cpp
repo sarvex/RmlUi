@@ -110,8 +110,10 @@ void GeometryUtilities::GenerateLine(FontFaceHandle font_face_handle, Geometry* 
 }
 
 void GeometryUtilities::GenerateBackgroundBorder(Geometry* out_geometry, const Box& box, Vector2f offset, Vector4f border_radius,
-	Colourb background_color, const Colourb* border_colors)
+	Colourb background_color, const Colourb border_colors[4])
 {
+	RMLUI_ASSERT(border_colors);
+
 	Vector<Vertex>& vertices = out_geometry->GetVertices();
 	Vector<int>& indices = out_geometry->GetIndices();
 
@@ -126,12 +128,9 @@ void GeometryUtilities::GenerateBackgroundBorder(Geometry* out_geometry, const B
 
 	int num_borders = 0;
 
-	if (border_colors)
-	{
-		for (int i = 0; i < 4; i++)
-			if (border_colors[i].alpha > 0 && border_widths[i] > 0)
-				num_borders += 1;
-	}
+	for (int i = 0; i < 4; i++)
+		if (border_colors[i].alpha > 0 && border_widths[i] > 0)
+			num_borders += 1;
 
 	const Vector2f padding_size = box.GetSize(Box::PADDING).Round();
 
