@@ -47,13 +47,15 @@ public:
 private:
 	void GenerateGeometry(Element* element);
 
+	void GenerateBoxShadow(Element* element, const ShadowList& shadow_list, Vector4f border_radius, float opacity);
+
 	bool background_dirty = false;
 	bool border_dirty = false;
 
 	Geometry geometry;
 
-	TextureHandle shadow_texture = 0;
-	CompiledGeometryHandle shadow_geometry = 0;
+	Geometry shadow_geometry;
+	Texture shadow_texture;
 };
 
 } // namespace Rml
