@@ -209,15 +209,10 @@ void Element::Render()
 
 	UpdateTransformState();
 
-	meta->decoration.RenderDecorators(RenderStage::Enter);
-
-	// Render all elements in our local stacking context that have a z-index beneath our local index of 0.
-	size_t i = 0;
-	for (; i < stacking_context.size() && stacking_context[i]->z_index < 0; ++i)
-		stacking_context[i]->Render();
-
 	// Apply our transform
 	ElementUtilities::ApplyTransform(this);
+
+	meta->decoration.RenderDecorators(RenderStage::Enter);
 
 	// Set up the clipping region for this element.
 	if (ElementUtilities::SetClippingRegion(this))
@@ -227,14 +222,13 @@ void Element::Render()
 
 		{
 			RMLUI_ZoneScopedNC("OnRender", 0x228B22);
-
 			OnRender();
 		}
 	}
 
-	// Render the rest of the elements in the stacking context.
-	for (; i < stacking_context.size(); ++i)
-		stacking_context[i]->Render();
+	// Render all elements in our local stacking context.
+	for (Element* element : stacking_context)
+		element->Render();
 
 	meta->decoration.RenderDecorators(RenderStage::Exit);
 }
