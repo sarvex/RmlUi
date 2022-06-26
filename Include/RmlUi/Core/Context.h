@@ -60,7 +60,8 @@ public:
 	/// Constructs a new, uninitialised context. This should not be called directly, use CreateContext()
 	/// instead.
 	/// @param[in] name The name of the context.
-	Context(const String& name);
+	/// @param[in] render_interface The render interface to use with the context.
+	Context(const String& name, RenderInterface* render_interface);
 	/// Destroys a context.
 	virtual ~Context();
 
@@ -372,7 +373,6 @@ private:
 	static void SendEvents(const ElementSet& old_items, const ElementSet& new_items, EventId id, const Dictionary& parameters);
 
 	friend class Rml::Element;
-	friend RMLUICORE_API Context* CreateContext(const String&, Vector2i, RenderInterface*);
 };
 
 } // namespace Rml
