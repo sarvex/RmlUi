@@ -261,18 +261,14 @@ Context* CreateContext(const String& name, const Vector2i dimensions, RenderInte
 		return nullptr;
 	}
 
-	ContextPtr new_context = Factory::InstanceContext(name);
+	RenderInterface* used_render_interface = (custom_render_interface ? custom_render_interface : render_interface);
+
+	ContextPtr new_context = Factory::InstanceContext(name, used_render_interface);
 	if (!new_context)
 	{
 		Log::Message(Log::LT_WARNING, "Failed to instance context '%s', instancer returned nullptr.", name.c_str());
 		return nullptr;
 	}
-
-	// Set the render interface on the context, and add a reference onto it.
-	if (custom_render_interface)
-		new_context->render_interface = custom_render_interface;
-	else
-		new_context->render_interface = render_interface;
 
 	new_context->SetDimensions(dimensions);
 

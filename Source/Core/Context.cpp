@@ -52,12 +52,11 @@ namespace Rml {
 static constexpr float DOUBLE_CLICK_TIME = 0.5f;     // [s]
 static constexpr float DOUBLE_CLICK_MAX_DIST = 3.f;  // [dp]
 
-Context::Context(const String& name) : name(name), dimensions(0, 0), density_independent_pixel_ratio(1.0f), mouse_position(0, 0)
+Context::Context(const String& name, RenderInterface* render_interface) :
+	name(name), dimensions(0, 0), density_independent_pixel_ratio(1.0f), mouse_position(0, 0), render_interface(render_interface)
 {
+	RMLUI_ASSERTMSG(render_interface, "A valid render interface must be passed into the context.");
 	instancer = nullptr;
-
-	// Initialise this to nullptr; this will be set in Rml::CreateContext().
-	render_interface = nullptr;
 
 	root = Factory::InstanceElement(nullptr, "*", "#root", XMLAttributes());
 	root->SetId(name);

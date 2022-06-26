@@ -39,9 +39,9 @@ ContextInstancerDefault::~ContextInstancerDefault()
 {
 }
 
-ContextPtr ContextInstancerDefault::InstanceContext(const String& name)
+ContextPtr ContextInstancerDefault::InstanceContext(const String& name, RenderInterface* render_interface)
 {
-	return ContextPtr(new Context(name));
+	return ContextPtr(new Context(name, render_interface));
 }
 
 // Releases a context previously created by this context.

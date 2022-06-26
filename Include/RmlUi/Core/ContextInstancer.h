@@ -37,6 +37,7 @@ namespace Rml {
 
 class Context;
 class Event;
+class RenderInterface;
 
 /**
 	Abstract instancer interface for instancing contexts.
@@ -51,8 +52,9 @@ public:
 
 	/// Instances a context.
 	/// @param[in] name Name of this context.
+	/// @param[in] render_interface The render interface to use with this context.
 	/// @return The instanced context.
-	virtual ContextPtr InstanceContext(const String& name) = 0;
+	virtual ContextPtr InstanceContext(const String& name, RenderInterface* render_interface) = 0;
 
 	/// Releases a context previously created by this context.
 	/// @param[in] context The context to release.
