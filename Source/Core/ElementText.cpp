@@ -117,12 +117,10 @@ void ElementText::OnRender()
 	
 	bool render = true;
 	const RenderState& render_state = GetContext()->GetRenderState();
-
-	if (render_state.clip_dimensions != Vector2i(-1, -1))
+	
+	Vector2i clip_origin, clip_dimensions;
+	if (render_state.GetScissorState(clip_origin, clip_dimensions))
 	{
-		Vector2i clip_origin = render_state.clip_origin;
-		Vector2i clip_dimensions = render_state.clip_dimensions;
-
 		float clip_top = (float)clip_origin.y;
 		float clip_left = (float)clip_origin.x;
 		float clip_right = (float)(clip_origin.x + clip_dimensions.x);

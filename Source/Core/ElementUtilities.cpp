@@ -285,83 +285,19 @@ bool ElementUtilities::SetClippingRegion(Element* element, bool force_clip_self)
 	Vector2i clip_origin = {-1, -1};
 	Vector2i clip_dimensions = {-1, -1};
 	ElementClipList stencil_elements;
-	ElementClipList* stencil_elements_ptr = (render_state.supports_stencil ? &stencil_elements : nullptr);
+	ElementClipList* stencil_elements_ptr = (render_state.SupportsStencil() ? &stencil_elements : nullptr);
 
 	GetClippingRegion(clip_origin, clip_dimensions, element, stencil_elements_ptr, force_clip_self);
 
-	Vector2i& active_origin = render_state.clip_origin;
-	Vector2i& active_dimensions = render_state.clip_dimensions;
-	ElementClipList& active_stencil_elements = render_state.clip_stencil_elements;
+	const bool scissoring_enabled = (clip_dimensions != Vector2i(-1, -1));
+	if (scissoring_enabled)
+		render_state.EnableScissorRegion(clip_origin, clip_dimensions);
+	else
+		render_state.DisableScissorRegion();
 
-	if (clip_origin != active_origin || clip_dimensions != active_dimensions || stencil_elements != active_stencil_elements)
-	{
-		active_origin = clip_origin;
-		active_dimensions = clip_dimensions;
-		active_stencil_elements = std::move(stencil_elements);
-		ElementUtilities::ApplyActiveClipRegion(render_interface, render_state);
-	}
+	render_state.SetClipMask(std::move(stencil_elements));
 
 	return true;
-}
-
-void ElementUtilities::DisableClippingRegion(Context* context)
-{
-	RMLUI_ASSERT(context);
-	RenderInterface* render_interface = context->GetRenderInterface();
-
-	RenderState render_state;
-	ApplyActiveClipRegion(render_interface, render_state);
-}
-
-void ElementUtilities::ApplyActiveClipRegion(RenderInterface* render_interface, RenderState& render_state)
-{
-	RMLUI_ASSERT(render_interface);
-
-	const bool scissoring_enabled = (render_state.clip_dimensions != Vector2i(-1, -1));
-	if (scissoring_enabled)
-	{
-		render_interface->EnableScissorRegion(true);
-		render_interface->SetScissorRegion(render_state.clip_origin.x, render_state.clip_origin.y, render_state.clip_dimensions.x,
-			render_state.clip_dimensions.y);
-	}
-	else
-	{
-		render_interface->EnableScissorRegion(false);
-	}
-
-	const ElementClipList& stencil_elements = render_state.clip_stencil_elements;
-	const bool stencil_test_enabled = !stencil_elements.empty();
-
-	if (stencil_test_enabled)
-	{
-		const Matrix4f* active_transform = render_state.transform_pointer;
-
-		bool first_clip_mask = true;
-		for (const ElementClip& element_clip : stencil_elements)
-		{
-			const Box::Area clip_area = element_clip.clip_area;
-			Element* stencil_element = element_clip.element;
-			const Box& box = stencil_element->GetBox();
-			const ComputedValues& computed = stencil_element->GetComputedValues();
-			const Vector4f radii(computed.border_top_left_radius(), computed.border_top_right_radius(), computed.border_bottom_right_radius(),
-				computed.border_bottom_left_radius());
-
-			ApplyTransform(stencil_element);
-
-			// @performance: Store clipping geometry on element.
-			Geometry geometry;
-			GeometryUtilities::GenerateBackground(&geometry, box, {}, radii, Colourb(255), clip_area);
-
-			const ClipMask clip_mask = (first_clip_mask ? ClipMask::Clip : ClipMask::ClipIntersect);
-			geometry.SetClipMask(clip_mask, stencil_element->GetAbsoluteOffset(Box::BORDER));
-			first_clip_mask = false;
-		}
-
-		// Apply the initially set transform in case it was changed.
-		ApplyTransform(render_interface, render_state, active_transform);
-	}
-
-	render_interface->EnableClipMask(stencil_test_enabled);
 }
 
 bool ElementUtilities::GetBoundingBox(Vector2f& out_offset, Vector2f& out_size, Element* element, PaintArea area, Vector2f expand_top_left,
@@ -487,9 +423,7 @@ bool ElementUtilities::ApplyTransform(Element* element)
 {
 	RMLUI_ASSERT(element);
 	Context* context = element->GetContext();
-	RenderInterface* render_interface = context ? context->GetRenderInterface() : nullptr;
-
-	if (!render_interface || !context)
+	if (!context)
 		return false;
 
 	RenderState& render_state = context->GetRenderState();
@@ -501,32 +435,9 @@ bool ElementUtilities::ApplyTransform(Element* element)
 			new_transform = state->GetTransform();
 	}
 
-	ApplyTransform(render_interface, render_state, new_transform);
+	render_state.SetTransform(new_transform);
 
 	return true;
-}
-
-void ElementUtilities::ApplyTransform(RenderInterface* render_interface, RenderState& render_state, const Matrix4f* new_transform)
-{
-	RMLUI_ASSERT(render_interface);
-	const Matrix4f*& old_transform = render_state.transform_pointer;
-
-	// Only changed transforms are submitted.
-	if (old_transform != new_transform)
-	{
-		Matrix4f& old_transform_value = render_state.transform;
-
-		// Do a deep comparison as well to avoid submitting a new transform which is equal.
-		if (!old_transform || !new_transform || (old_transform_value != *new_transform))
-		{
-			render_interface->SetTransform(new_transform);
-
-			if (new_transform)
-				old_transform_value = *new_transform;
-		}
-
-		old_transform = new_transform;
-	}
 }
 
 static bool ApplyDataViewsControllersInternal(Element* element, const bool construct_structural_view, const String& structural_view_inner_rml)

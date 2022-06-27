@@ -53,7 +53,7 @@ static constexpr float DOUBLE_CLICK_TIME = 0.5f;     // [s]
 static constexpr float DOUBLE_CLICK_MAX_DIST = 3.f;  // [dp]
 
 Context::Context(const String& name, RenderInterface* render_interface) :
-	name(name), dimensions(0, 0), density_independent_pixel_ratio(1.0f), mouse_position(0, 0), render_interface(render_interface)
+	name(name), dimensions(0, 0), density_independent_pixel_ratio(1.0f), mouse_position(0, 0), render_state(render_interface)
 {
 	RMLUI_ASSERTMSG(render_interface, "A valid render interface must be passed into the context.");
 	instancer = nullptr;
@@ -64,7 +64,7 @@ Context::Context(const String& name, RenderInterface* render_interface) :
 	root->SetProperty(PropertyId::ZIndex, Property(0, Property::NUMBER));
 
 	cursor_proxy = Factory::InstanceElement(nullptr, documents_base_tag, documents_base_tag, XMLAttributes());
-	ElementDocument* cursor_proxy_document = rmlui_dynamic_cast< ElementDocument* >(cursor_proxy.get());
+	ElementDocument* cursor_proxy_document = rmlui_dynamic_cast<ElementDocument*>(cursor_proxy.get());
 	RMLUI_ASSERT(cursor_proxy_document);
 	cursor_proxy_document->context = this;
 
@@ -79,7 +79,7 @@ Context::Context(const String& name, RenderInterface* render_interface) :
 	cursor_proxy_document->SetProperty(PropertyId::Decorator, Property());
 	cursor_proxy_document->SetProperty(PropertyId::OverflowX, Property(Style::Overflow::Visible));
 	cursor_proxy_document->SetProperty(PropertyId::OverflowY, Property(Style::Overflow::Visible));
-		
+
 	enable_cursor = true;
 
 	document_focus_history.push_back(root.get());
@@ -111,8 +111,6 @@ Context::~Context()
 	cursor_proxy.reset();
 
 	instancer = nullptr;
-
-	render_interface = nullptr;
 }
 
 // Returns the name of the context.
@@ -204,13 +202,11 @@ bool Context::Render()
 	RMLUI_ZoneScoped;
 
 	RenderInterface* render_interface = GetRenderInterface();
-	if (render_interface == nullptr)
+	if (!render_interface)
 		return false;
 
 	render_interface->context = this;
-	render_state = RenderState{};
-	render_state.supports_stencil = render_interface->EnableClipMask(false);
-	ElementUtilities::ApplyActiveClipRegion(render_interface, render_state);
+	render_state.BeginRender();
 
 	root->Render();
 
@@ -224,10 +220,7 @@ bool Context::Render()
 		cursor_proxy->Render();
 	}
 
-	ElementUtilities::ApplyTransform(render_interface, render_state, nullptr);
-	render_state = RenderState{};
-	ElementUtilities::ApplyActiveClipRegion(render_interface, render_state);
-
+	render_state.Reset();
 	render_interface->context = nullptr;
 
 	return true;
@@ -829,10 +822,9 @@ bool Context::IsMouseInteracting() const
 	return (hover && hover != root.get()) || (active && active != root.get());
 }
 
-// Gets the context's render interface.
 RenderInterface* Context::GetRenderInterface() const
 {
-	return render_interface;
+	return render_state.GetRenderInterface();
 }
 	
 RenderState& Context::GetRenderState()
