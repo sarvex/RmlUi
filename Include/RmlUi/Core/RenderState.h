@@ -34,6 +34,9 @@
 
 namespace Rml {
 
+class RenderInterface;
+class RenderStateSession;
+
 struct ElementClip {
 	Element* element = nullptr;
 	Box::Area clip_area = Box::Area::PADDING;
@@ -48,13 +51,80 @@ inline bool operator!=(const ElementClip& a, const ElementClip& b)
 }
 using ElementClipList = Vector<ElementClip>;
 
-struct RenderState {
+/**
+    A wrapper over the render interface which tracks the following state:
+       - Scissor
+       - Clip mask
+       - Transform
+    All such operations on the render interface should go through this class. Pushing and popping the render state is supported through the
+    RenderStateSession() object.
+ */
+class RMLUICORE_API RenderState : NonCopyMoveable {
+public:
+	RenderState(RenderInterface* render_interface);
+
+	void BeginRender();
+
+	void Reset();
+
+	void DisableScissorRegion();
+	void EnableScissorRegion(Vector2i origin, Vector2i dimensions);
+
+	void SetClipMask(ElementClipList clip_elements);
+
+	void SetTransform(const Matrix4f* new_transform);
+
+	void ApplyTransform(Element* element);
+
+	// Returns true if the scissor region is active.
+	bool GetScissorState(Vector2i& out_scissor_origin, Vector2i& out_scissor_dimensions) const;
+	
+	bool SupportsStencil() const { return supports_stencil; }
+	RenderInterface* GetRenderInterface() const { return render_interface; }
+
+private:
+	struct State {
+		Vector2i scissor_origin = {-1, -1};
+		Vector2i scissor_dimensions = {-1, -1};
+		ElementClipList clip_stencil_elements;
+		const Matrix4f* transform_pointer = nullptr;
+		Matrix4f transform;
+	};
+
+	void Push();
+	void Pop();
+	void Set(const State& next);
+
+	void ApplyClipMask(const ElementClipList& clip_elements);
+
+	RenderInterface* render_interface = nullptr;
+	Vector<State> stack;
 	bool supports_stencil = false;
-	Vector2i clip_origin = {-1, -1};
-	Vector2i clip_dimensions = {-1, -1};
-	ElementClipList clip_stencil_elements;
-	const Matrix4f* transform_pointer = nullptr;
-	Matrix4f transform;
+
+	friend class Rml::RenderStateSession;
+};
+
+/**
+    A RAII wrapper which pushes a new render state on construction and pops it on destruction, thereby restoring the original render state.
+
+    Should only be constructed as a stack object.
+ */
+class RMLUICORE_API RenderStateSession : NonCopyMoveable {
+public:
+	explicit RenderStateSession(RenderState& render_state) : render_state(&render_state) { render_state.Push(); }
+	~RenderStateSession() { Reset(); }
+
+	void Reset()
+	{
+		if (render_state)
+		{
+			render_state->Pop();
+			render_state = nullptr;
+		}
+	}
+
+private:
+	RenderState* render_state;
 };
 
 } // namespace Rml

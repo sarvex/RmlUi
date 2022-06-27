@@ -102,12 +102,6 @@ public:
 	/// @param[in] force_clip_self If true, also clips to the border area of the provided element regardless.
 	/// @return The visibility of the given element within its clipping region.
 	static bool SetClippingRegion(Element* element, bool force_clip_self = false);
-	/// Disable clipping.
-	static void DisableClippingRegion(Context* context);
-	/// Applies the clip region from the render interface to the renderer.
-	/// @param[in] render_interface The render interface to update.
-	/// @param[in] render_state The render state to be applied.
-	static void ApplyActiveClipRegion(RenderInterface* render_interface, RenderState& render_state);
 
 	/// Returns a rectangle covering the element's area in window coordinate space.
 	/// @return True on success, otherwise false.
@@ -139,8 +133,6 @@ public:
 	/// @param[in] element The element whose transform to apply, or nullptr for identity transform.
 	/// @return True if a render interface is available to set the transform.
 	static bool ApplyTransform(Element* element);
-	/// Applies the new transform to the provided render interface and updates the render state. Low-level interface.
-	static void ApplyTransform(RenderInterface* render_interface, RenderState& render_state, const Matrix4f* new_transform);
 
 	/// Creates data views and data controllers if a data model applies to the element.
 	/// Attributes such as 'data-' are used to create the views and controllers.

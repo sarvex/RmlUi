@@ -329,8 +329,7 @@ private:
 	// Input state; stored from the most recent input events we receive from the application.
 	Vector2i mouse_position;
 
-	// The render interface this context renders through.
-	RenderInterface* render_interface;
+	// A wrapper around the render interface this context renders through.
 	RenderState render_state;
 
 	using DataModels = UnorderedMap<String, UniquePtr<DataModel>>;

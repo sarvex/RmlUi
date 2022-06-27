@@ -174,8 +174,8 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 		}
 		RMLUI_ASSERT(context->GetRenderInterface() == render_interface);
 
-		Geometry geometry_padding(element);        // Render geometry for inner box-shadow.
-		Geometry geometry_padding_border(element); // Clipping mask for outer box-shadow.
+		Geometry geometry_padding(render_interface);        // Render geometry for inner box-shadow.
+		Geometry geometry_padding_border(render_interface); // Clipping mask for outer box-shadow.
 
 		bool has_inner_shadow = false;
 		bool has_outer_shadow = false;
@@ -199,15 +199,13 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 				GeometryUtilities::GenerateBackground(&geometry_padding_border, box, offset, border_radius, Colourb(255), Box::BORDER);
 		}
 
+		// TODO
 		RenderState& render_state = context->GetRenderState();
-		const Matrix4f* active_element_transform = render_state.transform_pointer;
-		ElementUtilities::ApplyTransform(render_interface, render_state, nullptr);
-		render_interface->EnableClipMask(false);
-		render_interface->EnableScissorRegion(true);
-		render_interface->SetScissorRegion(0, 0, (int)texture_dimensions.x, (int)texture_dimensions.y);
-		render_interface->StackPush();
+		RenderStateSession render_state_session(render_state);
+		render_state.Reset();
+		render_state.EnableScissorRegion(Vector2i(0), texture_dimensions);
 
-		// TODO Make a RAII wrapper to easily push and pop renderer states. Clear all states on push.
+		render_interface->StackPush();
 
 		box_geometry.Render(element_offset_in_texture);
 
@@ -293,9 +291,6 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 
 		TextureHandle shadow_texture = render_interface->RenderToTexture({}, texture_dimensions);
 		render_interface->StackPop();
-
-		ElementUtilities::ApplyTransform(render_interface, render_state, active_element_transform);
-		ElementUtilities::ApplyActiveClipRegion(render_interface, render_state);
 
 		out_dimensions = texture_dimensions;
 		out_handle = shadow_texture;

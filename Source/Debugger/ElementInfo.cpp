@@ -180,7 +180,7 @@ void ElementInfo::RenderSourceElement()
 
 		if (Context* context = source_element->GetContext())
 		{
-			ElementUtilities::ApplyTransform(context->GetRenderInterface(), context->GetRenderState(), nullptr);
+			context->GetRenderState().SetTransform(nullptr);
 
 			Vector2f region_offset, region_size;
 			ElementUtilities::GetBoundingBox(region_offset, region_size, source_element, PaintArea::Auto);
