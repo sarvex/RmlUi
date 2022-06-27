@@ -45,7 +45,9 @@ static SDL_Cursor* cursor_unavailable = nullptr;
 
 double SystemInterface_SDL::GetElapsedTime()
 {
-	return double(SDL_GetTicks()) / 1000.0;
+	static const Uint64 start = SDL_GetPerformanceCounter();
+	static const double frequency = double(SDL_GetPerformanceFrequency());
+	return double(SDL_GetPerformanceCounter() - start) / frequency;
 }
 
 void SystemInterface_SDL::SetMouseCursor(const Rml::String& cursor_name)
@@ -85,7 +87,7 @@ void SystemInterface_SDL::GetClipboardText(Rml::String& text)
 
 bool RmlSDL::Initialize()
 {
-	int result = SDL_Init(SDL_INIT_VIDEO);
+	int result = SDL_Init(SDL_INIT_TIMER | SDL_INIT_VIDEO | SDL_INIT_EVENTS);
 	return result == 0;
 }
 
