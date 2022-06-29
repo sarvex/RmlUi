@@ -44,7 +44,7 @@ void RenderState::BeginRender()
 	RMLUI_ASSERTMSG(stack.size() == 1, "Unbalanced render state push/pop detected.");
 
 	render_interface->EnableScissorRegion(false);
-	supports_stencil = render_interface->EnableClipMask(false);
+	supports_clip_mask = render_interface->EnableClipMask(false);
 	render_interface->SetTransform(nullptr);
 
 	stack.back() = State{};
@@ -86,10 +86,10 @@ void RenderState::EnableScissorRegion(Vector2i origin, Vector2i dimensions)
 void RenderState::SetClipMask(ElementClipList in_clip_elements)
 {
 	State& state = stack.back();
-	if (state.clip_stencil_elements != in_clip_elements)
+	if (state.clip_mask_elements != in_clip_elements)
 	{
-		state.clip_stencil_elements = std::move(in_clip_elements);
-		ApplyClipMask(state.clip_stencil_elements);
+		state.clip_mask_elements = std::move(in_clip_elements);
+		ApplyClipMask(state.clip_mask_elements);
 	}
 }
 
@@ -116,18 +116,6 @@ void RenderState::SetTransform(const Matrix4f* p_new_transform)
 	}
 }
 
-void RenderState::ApplyTransform(Element* element)
-{
-	const Matrix4f* new_transform = nullptr;
-	if (element)
-	{
-		if (const TransformState* transform_state = element->GetTransformState())
-			new_transform = transform_state->GetTransform();
-	}
-
-	SetTransform(new_transform);
-}
-
 bool RenderState::GetScissorState(Vector2i& out_scissor_origin, Vector2i& out_scissor_dimensions) const
 {
 	const State& state = stack.back();
@@ -152,22 +140,10 @@ void RenderState::ApplyClipMask(const ElementClipList& clip_elements)
 		bool first_clip_mask = true;
 		for (const ElementClip& element_clip : clip_elements)
 		{
-			const Box::Area clip_area = element_clip.clip_area;
-			Element* clip_element = element_clip.element;
-			const Box& box = clip_element->GetBox();
-			const ComputedValues& computed = clip_element->GetComputedValues();
-			const Vector4f border_radius = computed.border_radius();
-
-			ApplyTransform(clip_element);
-
-			// TODO: Store everything needed in ElementClip: It should not be our responsibility to probe into the element class or computed values.
-			// Is it sufficient to store a pointer to the geometry and transform? Can then remove clip area.
-			// @performance: Store clipping geometry on element.
-			Geometry geometry(render_interface);
-			GeometryUtilities::GenerateBackground(&geometry, box, {}, border_radius, Colourb(255), clip_area);
+			SetTransform(element_clip.transform);
 
 			const ClipMask clip_mask = (first_clip_mask ? ClipMask::Clip : ClipMask::ClipIntersect);
-			geometry.SetClipMask(clip_mask, clip_element->GetAbsoluteOffset(Box::BORDER));
+			element_clip.clip_geometry->SetClipMask(clip_mask, element_clip.absolute_offset);
 			first_clip_mask = false;
 		}
 
@@ -204,7 +180,7 @@ void RenderState::Set(const State& next)
 	else
 		DisableScissorRegion();
 
-	SetClipMask(next.clip_stencil_elements);
+	SetClipMask(next.clip_mask_elements);
 
 	// TODO: Is it safe to submit an old pointer here (e.g. in case of Pop())?
 	SetTransform(next.transform_pointer);

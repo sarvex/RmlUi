@@ -1573,6 +1573,11 @@ String Element::GetEventDispatcherSummary() const
 	return meta->event_dispatcher.ToString();
 }
 
+ElementBackgroundBorder* Element::GetElementBackgroundBorder() const
+{
+	return &meta->background_border;
+}
+
 // Access the element decorators
 ElementDecoration* Element::GetElementDecoration() const
 {

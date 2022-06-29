@@ -92,10 +92,10 @@ public:
 	/// @param[out] clip_origin The origin, in context coordinates, of the origin of the element's clipping window.
 	/// @param[out] clip_dimensions The size, in context coordinates, of the element's clipping window.
 	/// @param[in] element The element to generate the clipping region for.
-	/// @param[out] stencil_elements Optional, returns a list of elements that require stencil clipping.
+	/// @param[out] clip_mask_list Optional, returns a list of elements that should have their clip mask applied.
 	/// @param[in] force_clip_self If true, also clips to the border area of the provided element regardless.
 	/// @return True if a scissor region exists for the element and clip_origin and clip_dimensions were set, otherwise false.
-	static bool GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementClipList* stencil_elements = nullptr,
+	static bool GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementClipList* clip_mask_list = nullptr,
 		bool force_clip_self = false);
 	/// Sets the clipping region from an element and its ancestors.
 	/// @param[in] element The element to generate the clipping region from.

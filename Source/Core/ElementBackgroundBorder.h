@@ -29,8 +29,9 @@
 #ifndef RMLUI_CORE_ELEMENTBACKGROUNDBORDER_H
 #define RMLUI_CORE_ELEMENTBACKGROUNDBORDER_H
 
-#include "../../Include/RmlUi/Core/Types.h"
+#include "../../Include/RmlUi/Core/Box.h"
 #include "../../Include/RmlUi/Core/Geometry.h"
+#include "../../Include/RmlUi/Core/Types.h"
 
 namespace Rml {
 
@@ -44,6 +45,8 @@ public:
 	void DirtyBackground();
 	void DirtyBorder();
 
+	Geometry* GetClipGeometry(Element* element, Box::Area client_area);
+
 private:
 	void GenerateGeometry(Element* element);
 
@@ -54,6 +57,8 @@ private:
 
 	Geometry geometry;
 
+	// TODO: Only allocate these as needed.
+	Geometry clip_geometry;
 	Geometry shadow_geometry;
 	Texture shadow_texture;
 };
