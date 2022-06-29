@@ -38,6 +38,7 @@
 #include "DataController.h"
 #include "DataModel.h"
 #include "DataView.h"
+#include "ElementBackgroundBorder.h"
 #include "ElementStyle.h"
 #include "LayoutDetails.h"
 #include "LayoutEngine.h"
@@ -165,7 +166,7 @@ int ElementUtilities::GetStringWidth(Element* element, const String& string, Cha
 }
 
 // Generates the clipping region for an element.
-bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementClipList* stencil_elements,
+bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementClipList* clip_mask_list,
 	bool force_clip_self)
 {
 	using Style::Clip;
@@ -189,38 +190,43 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 
 	while (clipping_element != nullptr)
 	{
-		const bool force_clipping_current_element = (force_clip_self && clipping_element == element);
+		const bool force_clip_current_element = (force_clip_self && clipping_element == element);
 		const ComputedValues& clip_computed = clipping_element->GetComputedValues();
 		const bool clip_enabled = (clip_computed.overflow_x() != Style::Overflow::Visible || clip_computed.overflow_y() != Style::Overflow::Visible);
 		const bool clip_always = (clip_computed.clip() == Clip::Type::Always);
 		const bool clip_none = (clip_computed.clip() == Clip::Type::None);
 		const int clip_number = clip_computed.clip().GetNumber();
 
-		// Merge the existing clip region with the current clip region if we aren't ignoring clip regions.
-		if (((clip_always || clip_enabled) && num_ignored_clips == 0) || force_clipping_current_element)
+		// Merge the existing clip region with the current clip region, unless we are ignoring clip regions.
+		if (((clip_always || clip_enabled) && num_ignored_clips == 0) || force_clip_current_element)
 		{
-			const Box::Area client_area = (force_clipping_current_element ? Box::BORDER : clipping_element->GetClientArea());
+			const Box::Area client_area = (force_clip_current_element ? Box::BORDER : clipping_element->GetClientArea());
 			const bool has_clipping_content =
-				(clip_always || force_clipping_current_element || clipping_element->GetClientWidth() < clipping_element->GetScrollWidth() - 0.5f ||
+				(clip_always || force_clip_current_element || clipping_element->GetClientWidth() < clipping_element->GetScrollWidth() - 0.5f ||
 					clipping_element->GetClientHeight() < clipping_element->GetScrollHeight() - 0.5f);
 			bool disable_scissor_clipping = false;
 
-			if (stencil_elements)
+			if (clip_mask_list)
 			{
 				const TransformState* transform_state = clipping_element->GetTransformState();
-				const bool has_transform = (transform_state && transform_state->GetTransform());
+				const Matrix4f* transform = (transform_state ? transform_state->GetTransform() : nullptr);
 				const bool has_border_radius = (clip_computed.border_top_left_radius() > 0.f || clip_computed.border_top_right_radius() > 0.f ||
 					clip_computed.border_bottom_right_radius() > 0.f || clip_computed.border_bottom_left_radius() > 0.f);
 
-				// If the element has border-radius we always use stencil clipping, since we can't easily predict if content is located on the
-				// curved region to be clipped. If the element has a transform we only clip when the content clips.
-				if (has_border_radius || (has_transform && has_clipping_content))
-					stencil_elements->push_back(ElementClip{clipping_element, client_area});
+				// If the element has border-radius we always use a clip mask, since we can't easily predict if content is located on the curved
+				// region to be clipped. If the element has a transform we only use a clip mask when the content clips.
+				if (has_border_radius || (transform && has_clipping_content))
+				{
+					Geometry* clip_geometry = clipping_element->GetElementBackgroundBorder()->GetClipGeometry(clipping_element, client_area);
+					const Vector2f absolute_offset = clipping_element->GetAbsoluteOffset(Box::BORDER);
+					clip_mask_list->push_back(ElementClip{clip_geometry, transform, absolute_offset});
+				}
 
-				// If we only have border-radius then we add this element to the scissor region as well as the stencil buffer. This may help with eg.
+				// If we only have border-radius then we add this element to the scissor region as well as the clip mask. This may help with e.g.
 				// culling text render calls. However, when we have a transform, the element cannot be added to the scissor region since its geometry
 				// may be projected entirely elsewhere.
-				disable_scissor_clipping = has_transform;
+				if (transform)
+					disable_scissor_clipping = true;
 			}
 
 			if (has_clipping_content && !disable_scissor_clipping)
@@ -243,7 +249,7 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 			}
 		}
 
-		if (!force_clipping_current_element)
+		if (!force_clip_current_element)
 		{
 			// If this region is meant to clip and we're skipping regions, update the counter.
 			if (num_ignored_clips > 0 && clip_enabled)
@@ -284,10 +290,10 @@ bool ElementUtilities::SetClippingRegion(Element* element, bool force_clip_self)
 
 	Vector2i clip_origin = {-1, -1};
 	Vector2i clip_dimensions = {-1, -1};
-	ElementClipList stencil_elements;
-	ElementClipList* stencil_elements_ptr = (render_state.SupportsStencil() ? &stencil_elements : nullptr);
+	ElementClipList clip_mask_list;
+	ElementClipList* clip_mask_list_ptr = (render_state.SupportsClipMask() ? &clip_mask_list : nullptr);
 
-	GetClippingRegion(clip_origin, clip_dimensions, element, stencil_elements_ptr, force_clip_self);
+	GetClippingRegion(clip_origin, clip_dimensions, element, clip_mask_list_ptr, force_clip_self);
 
 	const bool scissoring_enabled = (clip_dimensions != Vector2i(-1, -1));
 	if (scissoring_enabled)
@@ -295,7 +301,7 @@ bool ElementUtilities::SetClippingRegion(Element* element, bool force_clip_self)
 	else
 		render_state.DisableScissorRegion();
 
-	render_state.SetClipMask(std::move(stencil_elements));
+	render_state.SetClipMask(std::move(clip_mask_list));
 
 	return true;
 }

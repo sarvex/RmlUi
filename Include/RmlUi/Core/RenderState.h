@@ -34,16 +34,18 @@
 
 namespace Rml {
 
+class Geometry;
 class RenderInterface;
 class RenderStateSession;
 
 struct ElementClip {
-	Element* element = nullptr;
-	Box::Area clip_area = Box::Area::PADDING;
+	Geometry* clip_geometry;
+	const Matrix4f* transform;
+	Vector2f absolute_offset;
 };
 inline bool operator==(const ElementClip& a, const ElementClip& b)
 {
-	return a.element == b.element && a.clip_area == b.clip_area;
+	return a.clip_geometry == b.clip_geometry && a.transform == b.transform && a.absolute_offset == b.absolute_offset;
 }
 inline bool operator!=(const ElementClip& a, const ElementClip& b)
 {
@@ -74,19 +76,17 @@ public:
 
 	void SetTransform(const Matrix4f* new_transform);
 
-	void ApplyTransform(Element* element);
-
 	// Returns true if the scissor region is active.
 	bool GetScissorState(Vector2i& out_scissor_origin, Vector2i& out_scissor_dimensions) const;
-	
-	bool SupportsStencil() const { return supports_stencil; }
+
+	bool SupportsClipMask() const { return supports_clip_mask; }
 	RenderInterface* GetRenderInterface() const { return render_interface; }
 
 private:
 	struct State {
 		Vector2i scissor_origin = {-1, -1};
 		Vector2i scissor_dimensions = {-1, -1};
-		ElementClipList clip_stencil_elements;
+		ElementClipList clip_mask_elements;
 		const Matrix4f* transform_pointer = nullptr;
 		Matrix4f transform;
 	};
@@ -99,7 +99,7 @@ private:
 
 	RenderInterface* render_interface = nullptr;
 	Vector<State> stack;
-	bool supports_stencil = false;
+	bool supports_clip_mask = false;
 
 	friend class Rml::RenderStateSession;
 };

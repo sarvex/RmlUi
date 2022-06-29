@@ -37,7 +37,7 @@
 
 namespace Rml {
 
-ElementBackgroundBorder::ElementBackgroundBorder(Element* element) : geometry(element), shadow_geometry(element) {}
+ElementBackgroundBorder::ElementBackgroundBorder(Element* element) : geometry(element), clip_geometry(element), shadow_geometry(element) {}
 
 ElementBackgroundBorder::~ElementBackgroundBorder() {}
 
@@ -59,12 +59,29 @@ void ElementBackgroundBorder::Render(Element* element)
 
 void ElementBackgroundBorder::DirtyBackground()
 {
+	clip_geometry.Release(true);
+
 	background_dirty = true;
 }
 
 void ElementBackgroundBorder::DirtyBorder()
 {
+	clip_geometry.Release(true);
+
 	border_dirty = true;
+}
+
+Geometry* ElementBackgroundBorder::GetClipGeometry(Element* element, Box::Area clip_area)
+{
+	if (!clip_geometry)
+	{
+		// TODO: Store for different clip_area
+		const Box& box = element->GetBox();
+		const Vector4f border_radius = element->GetComputedValues().border_radius();
+		GeometryUtilities::GenerateBackground(&clip_geometry, box, {}, border_radius, Colourb(255), clip_area);
+	}
+
+	return &clip_geometry;
 }
 
 void ElementBackgroundBorder::GenerateGeometry(Element* element)
