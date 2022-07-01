@@ -73,7 +73,7 @@ static constexpr int ChildNotifyLevels = 2;
 // Meta objects for element collected in a single struct to reduce memory allocations
 struct ElementMeta
 {
-	ElementMeta(Element* el) : event_dispatcher(el), style(el), background_border(el), decoration(el), scroll(el), computed_values(el) {}
+	ElementMeta(Element* el) : event_dispatcher(el), style(el), decoration(el), scroll(el), computed_values(el) {}
 	SmallUnorderedMap<EventId, EventListener*> attribute_event_listeners;
 	EventDispatcher event_dispatcher;
 	ElementStyle style;

@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -37,7 +37,7 @@ namespace Rml {
 
 class ElementBackgroundBorder {
 public:
-	ElementBackgroundBorder(Element* element);
+	ElementBackgroundBorder();
 	~ElementBackgroundBorder();
 
 	void Render(Element* element);
@@ -45,22 +45,26 @@ public:
 	void DirtyBackground();
 	void DirtyBorder();
 
-	Geometry* GetClipGeometry(Element* element, Box::Area client_area);
+	Geometry* GetClipGeometry(Element* element, Box::Area clip_area);
 
 private:
-	void GenerateGeometry(Element* element);
+	enum class BackgroundType { Main, BoxShadow, ClipBorder, ClipPadding, ClipContent, Count };
+	struct Background {
+		Background(Element* element) : geometry(element) {}
+		Geometry geometry;
+		Texture texture;
+	};
 
+	void GenerateGeometry(Element* element);
 	void GenerateBoxShadow(Element* element, const ShadowList& shadow_list, Vector4f border_radius, float opacity);
+
+	Geometry* GetGeometry(BackgroundType type);
+	Background& GetOrCreateBackground(Element* element, BackgroundType type);
 
 	bool background_dirty = false;
 	bool border_dirty = false;
 
-	Geometry geometry;
-
-	// TODO: Only allocate these as needed.
-	Geometry clip_geometry;
-	Geometry shadow_geometry;
-	Texture shadow_texture;
+	Array<UniquePtr<Background>, (size_t)BackgroundType::Count> geometries;
 };
 
 } // namespace Rml

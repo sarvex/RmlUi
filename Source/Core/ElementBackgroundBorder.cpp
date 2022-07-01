@@ -37,7 +37,7 @@
 
 namespace Rml {
 
-ElementBackgroundBorder::ElementBackgroundBorder(Element* element) : geometry(element), clip_geometry(element), shadow_geometry(element) {}
+ElementBackgroundBorder::ElementBackgroundBorder() {}
 
 ElementBackgroundBorder::~ElementBackgroundBorder() {}
 
@@ -45,43 +45,63 @@ void ElementBackgroundBorder::Render(Element* element)
 {
 	if (background_dirty || border_dirty)
 	{
+		for (size_t i = 0; i < size_t(BackgroundType::Count); i++)
+		{
+			if (geometries[i])
+				geometries[i]->geometry.Release(true);
+		}
+
 		GenerateGeometry(element);
 
 		background_dirty = false;
 		border_dirty = false;
 	}
 
-	if (shadow_geometry)
-		shadow_geometry.Render(element->GetAbsoluteOffset(Box::BORDER));
-	else if (geometry)
-		geometry.Render(element->GetAbsoluteOffset(Box::BORDER));
+	Geometry* shadow_geometry = GetGeometry(BackgroundType::BoxShadow);
+	if (shadow_geometry && *shadow_geometry)
+		shadow_geometry->Render(element->GetAbsoluteOffset(Box::BORDER));
+	else if (Geometry* main_geometry = GetGeometry(BackgroundType::Main))
+		main_geometry->Render(element->GetAbsoluteOffset(Box::BORDER));
 }
 
 void ElementBackgroundBorder::DirtyBackground()
 {
-	clip_geometry.Release(true);
-
 	background_dirty = true;
 }
 
 void ElementBackgroundBorder::DirtyBorder()
 {
-	clip_geometry.Release(true);
-
 	border_dirty = true;
 }
 
 Geometry* ElementBackgroundBorder::GetClipGeometry(Element* element, Box::Area clip_area)
 {
-	if (!clip_geometry)
+	BackgroundType type = {};
+	switch (clip_area)
 	{
-		// TODO: Store for different clip_area
-		const Box& box = element->GetBox();
-		const Vector4f border_radius = element->GetComputedValues().border_radius();
-		GeometryUtilities::GenerateBackground(&clip_geometry, box, {}, border_radius, Colourb(255), clip_area);
+	case Rml::Box::BORDER:
+		type = BackgroundType::ClipBorder;
+		break;
+	case Rml::Box::PADDING:
+		type = BackgroundType::ClipPadding;
+		break;
+	case Rml::Box::CONTENT:
+		type = BackgroundType::ClipContent;
+		break;
+	default:
+		RMLUI_ERROR;
+		return nullptr;
 	}
 
-	return &clip_geometry;
+	Geometry& geometry = GetOrCreateBackground(element, type).geometry;
+	if (!geometry)
+	{
+		const Box& box = element->GetBox();
+		const Vector4f border_radius = element->GetComputedValues().border_radius();
+		GeometryUtilities::GenerateBackground(&geometry, box, {}, border_radius, Colourb(255), clip_area);
+	}
+
+	return &geometry;
 }
 
 void ElementBackgroundBorder::GenerateGeometry(Element* element)
@@ -89,6 +109,7 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 	const ComputedValues& computed = element->GetComputedValues();
 	const Property* p_box_shadow = element->GetLocalProperty(PropertyId::BoxShadow);
 
+	const Vector4f border_radius = computed.border_radius();
 	Colourb background_color = computed.background_color();
 	Colourb border_colors[4] = {
 		computed.border_top_color(),
@@ -111,19 +132,14 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		}
 	}
 
-	geometry.GetVertices().clear();
-	geometry.GetIndices().clear();
-
-	const Vector4f border_radius = computed.border_radius();
+	Geometry& main_geometry = GetOrCreateBackground(element, BackgroundType::Main).geometry;
 
 	for (int i = 0; i < element->GetNumBoxes(); i++)
 	{
 		Vector2f offset;
 		const Box& box = element->GetBox(i, offset);
-		GeometryUtilities::GenerateBackgroundBorder(&geometry, box, offset, border_radius, background_color, border_colors);
+		GeometryUtilities::GenerateBackgroundBorder(&main_geometry, box, offset, border_radius, background_color, border_colors);
 	}
-
-	geometry.Release();
 
 	if (p_box_shadow)
 	{
@@ -131,10 +147,6 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 		const ShadowList& shadow_list = p_box_shadow->value.GetReference<ShadowList>();
 
 		GenerateBoxShadow(element, shadow_list, border_radius, computed.opacity());
-	}
-	else
-	{
-		shadow_geometry.Release(true);
 	}
 }
 
@@ -177,11 +189,11 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 		texture_dimensions = Vector2i(RoundUp(element_offset_in_texture + extend_max + boxes_max));
 	}
 
-	Geometry& box_geometry = geometry;
+	Geometry& main_geometry = *GetGeometry(BackgroundType::Main);
 
 	// Callback for generating the box-shadow texture. Using a callback ensures that the texture can be regenerated at any time, for example if the
 	// device loses its GPU context and the client calls Rml::ReleaseTextures().
-	auto p_callback = [&box_geometry, element, border_radius, texture_dimensions, element_offset_in_texture, shadow_list](
+	auto p_callback = [&main_geometry, element, border_radius, texture_dimensions, element_offset_in_texture, shadow_list](
 						  RenderInterface* render_interface, const String& /*name*/, TextureHandle& out_handle, Vector2i& out_dimensions) -> bool {
 		Context* context = element->GetContext();
 		if (!context)
@@ -224,7 +236,7 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 
 		render_interface->StackPush();
 
-		box_geometry.Render(element_offset_in_texture);
+		main_geometry.Render(element_offset_in_texture);
 
 		for (int shadow_index = (int)shadow_list.size() - 1; shadow_index >= 0; shadow_index--)
 		{
@@ -316,7 +328,10 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 	};
 
 	// Generate the geometry for the box-shadow texture.
-	shadow_geometry.Release();
+	Background& shadow_background = GetOrCreateBackground(element, BackgroundType::BoxShadow);
+	Geometry& shadow_geometry = shadow_background.geometry;
+	Texture& shadow_texture = shadow_background.texture;
+
 	Vector<Vertex>& vertices = shadow_geometry.GetVertices();
 	Vector<int>& indices = shadow_geometry.GetIndices();
 	vertices.resize(4);
@@ -326,6 +341,21 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 
 	shadow_texture.Set("box-shadow", p_callback);
 	shadow_geometry.SetTexture(&shadow_texture);
+}
+
+Geometry* ElementBackgroundBorder::GetGeometry(BackgroundType type)
+{
+	if (Background* geometry = geometries[size_t(type)].get())
+		return &geometry->geometry;
+	return nullptr;
+}
+
+ElementBackgroundBorder::Background& ElementBackgroundBorder::GetOrCreateBackground(Element* element, BackgroundType type)
+{
+	UniquePtr<Background>& geometry = geometries[size_t(type)];
+	if (!geometry)
+		geometry = MakeUnique<Background>(element);
+	return *geometry;
 }
 
 } // namespace Rml
