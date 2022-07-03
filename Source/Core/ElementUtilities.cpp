@@ -219,7 +219,8 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 				{
 					Geometry* clip_geometry = clipping_element->GetElementBackgroundBorder()->GetClipGeometry(clipping_element, client_area);
 					const Vector2f absolute_offset = clipping_element->GetAbsoluteOffset(Box::BORDER);
-					clip_mask_list->push_back(ElementClip{clip_geometry, transform, absolute_offset});
+					const ClipMask clip_mask = (clip_mask_list->empty() ? ClipMask::Clip : ClipMask::ClipIntersect);
+					clip_mask_list->push_back(ElementClip{clip_mask, clip_geometry, absolute_offset, transform});
 				}
 
 				// If we only have border-radius then we add this element to the scissor region as well as the clip mask. This may help with e.g.

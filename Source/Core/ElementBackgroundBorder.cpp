@@ -228,7 +228,6 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 				GeometryUtilities::GenerateBackground(&geometry_padding_border, box, offset, border_radius, Colourb(255), Box::BORDER);
 		}
 
-		// TODO
 		RenderState& render_state = context->GetRenderState();
 		RenderStateSession render_state_session(render_state);
 		render_state.Reset();
@@ -287,11 +286,9 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 				}
 			}
 
-			render_interface->EnableScissorRegion(false);
-
 			if (inset)
 			{
-				shadow_geometry.SetClipMask(ClipMask::ClipOut, shadow.offset + element_offset_in_texture);
+				render_state.SetClipMask(ClipMask::ClipOut, &shadow_geometry, shadow.offset + element_offset_in_texture);
 
 				for (Rml::Vertex& vertex : geometry_padding.GetVertices())
 					vertex.colour = shadow.color;
@@ -299,11 +296,11 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 				geometry_padding.Release();
 				geometry_padding.Render(element_offset_in_texture);
 
-				geometry_padding.SetClipMask(ClipMask::Clip, element_offset_in_texture);
+				render_state.SetClipMask(ClipMask::Clip, &geometry_padding, element_offset_in_texture);
 			}
 			else
 			{
-				geometry_padding_border.SetClipMask(ClipMask::ClipOut, element_offset_in_texture);
+				render_state.SetClipMask(ClipMask::ClipOut, &geometry_padding_border, element_offset_in_texture);
 				shadow_geometry.Render(shadow.offset + element_offset_in_texture);
 			}
 
@@ -315,8 +312,8 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 			}
 		}
 
-		render_interface->EnableClipMask(false);
-		render_interface->EnableScissorRegion(false);
+		render_state.DisableScissorRegion();
+		render_state.DisableClipMask();
 
 		TextureHandle shadow_texture = render_interface->RenderToTexture({}, texture_dimensions);
 		render_interface->StackPop();

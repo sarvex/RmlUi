@@ -83,6 +83,24 @@ void RenderState::EnableScissorRegion(Vector2i origin, Vector2i dimensions)
 	}
 }
 
+void RenderState::DisableClipMask()
+{
+	State& state = stack.back();
+	if (!state.clip_mask_elements.empty())
+	{
+		state.clip_mask_elements.clear();
+		ApplyClipMask(state.clip_mask_elements);
+	}
+}
+
+void RenderState::SetClipMask(ClipMask clip_mask, Geometry* geometry, Vector2f translation)
+{
+	RMLUI_ASSERT(geometry);
+	State& state = stack.back();
+	state.clip_mask_elements = {ElementClip{clip_mask, geometry, translation, nullptr}};
+	ApplyClipMask(state.clip_mask_elements);
+}
+
 void RenderState::SetClipMask(ElementClipList in_clip_elements)
 {
 	State& state = stack.back();
@@ -137,14 +155,10 @@ void RenderState::ApplyClipMask(const ElementClipList& clip_elements)
 	{
 		const Matrix4f* initial_transform = stack.back().transform_pointer;
 
-		bool first_clip_mask = true;
 		for (const ElementClip& element_clip : clip_elements)
 		{
 			SetTransform(element_clip.transform);
-
-			const ClipMask clip_mask = (first_clip_mask ? ClipMask::Clip : ClipMask::ClipIntersect);
-			element_clip.clip_geometry->SetClipMask(clip_mask, element_clip.absolute_offset);
-			first_clip_mask = false;
+			element_clip.clip_geometry->SetClipMask(element_clip.clip_mask, element_clip.absolute_offset);
 		}
 
 		// Apply the initially set transform in case it was changed.
