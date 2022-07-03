@@ -30,6 +30,7 @@
 #define RMLUI_CORE_RENDERSTATE_H
 
 #include "Box.h"
+#include "RenderInterface.h"
 #include "Types.h"
 
 namespace Rml {
@@ -39,13 +40,14 @@ class RenderInterface;
 class RenderStateSession;
 
 struct ElementClip {
+	ClipMask clip_mask;
 	Geometry* clip_geometry;
-	const Matrix4f* transform;
 	Vector2f absolute_offset;
+	const Matrix4f* transform;
 };
 inline bool operator==(const ElementClip& a, const ElementClip& b)
 {
-	return a.clip_geometry == b.clip_geometry && a.transform == b.transform && a.absolute_offset == b.absolute_offset;
+	return a.clip_mask == b.clip_mask && a.clip_geometry == b.clip_geometry && a.absolute_offset == b.absolute_offset && a.transform == b.transform;
 }
 inline bool operator!=(const ElementClip& a, const ElementClip& b)
 {
@@ -72,7 +74,9 @@ public:
 	void DisableScissorRegion();
 	void EnableScissorRegion(Vector2i origin, Vector2i dimensions);
 
+	void DisableClipMask();
 	void SetClipMask(ElementClipList clip_elements);
+	void SetClipMask(ClipMask clip_mask, Geometry* geometry, Vector2f translation);
 
 	void SetTransform(const Matrix4f* new_transform);
 
