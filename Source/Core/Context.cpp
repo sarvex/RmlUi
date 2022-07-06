@@ -125,6 +125,7 @@ void Context::SetDimensions(const Vector2i _dimensions)
 	if (dimensions != _dimensions)
 	{
 		dimensions = _dimensions;
+		render_state.SetViewport(dimensions);
 		root->SetBox(Box(Vector2f(dimensions)));
 		root->DirtyLayout();
 
@@ -1173,14 +1174,9 @@ Element* Context::GetElementAtPoint(Vector2f point, const Element* ignore_elemen
 	bool within_element = (projection_result && element->IsPointWithinElement(point));
 	if (within_element)
 	{
-		Vector2i clip_origin, clip_dimensions;
-		if (ElementUtilities::GetClippingRegion(clip_origin, clip_dimensions, element))
-		{
-			within_element = point.x >= clip_origin.x &&
-							 point.y >= clip_origin.y &&
-							 point.x <= (clip_origin.x + clip_dimensions.x) &&
-							 point.y <= (clip_origin.y + clip_dimensions.y);
-		}
+		Rectanglei clip_region;
+		if (ElementUtilities::GetClippingRegion(clip_region, element))
+			within_element = clip_region.Contains(Vector2i(point));
 	}
 
 	if (within_element)

@@ -72,7 +72,7 @@ public:
 	void Reset();
 
 	void DisableScissorRegion();
-	void EnableScissorRegion(Vector2i origin, Vector2i dimensions);
+	void EnableScissorRegion(Rectanglei region);
 
 	void DisableClipMask();
 	void SetClipMask(ElementClipList clip_elements);
@@ -80,16 +80,17 @@ public:
 
 	void SetTransform(const Matrix4f* new_transform);
 
-	// Returns true if the scissor region is active.
-	bool GetScissorState(Vector2i& out_scissor_origin, Vector2i& out_scissor_dimensions) const;
+	// Returns the scissor region if it is enabled, otherwise an invalid rectangle.
+	Rectanglei GetScissorState() const;
 
 	bool SupportsClipMask() const { return supports_clip_mask; }
 	RenderInterface* GetRenderInterface() const { return render_interface; }
 
+	void SetViewport(Vector2i dimensions);
+
 private:
 	struct State {
-		Vector2i scissor_origin = {-1, -1};
-		Vector2i scissor_dimensions = {-1, -1};
+		Rectanglei scissor_region = Rectanglei::CreateInvalid();
 		ElementClipList clip_mask_elements;
 		const Matrix4f* transform_pointer = nullptr;
 		Matrix4f transform;
@@ -102,6 +103,7 @@ private:
 	void ApplyClipMask(const ElementClipList& clip_elements);
 
 	RenderInterface* render_interface = nullptr;
+	Vector2i viewport_dimensions;
 	Vector<State> stack;
 	bool supports_clip_mask = false;
 

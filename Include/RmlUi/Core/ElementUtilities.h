@@ -89,14 +89,12 @@ public:
 	static int GetStringWidth(Element* element, const String& string, Character prior_character = Character::Null);
 
 	/// Generates the clipping region for an element.
-	/// @param[out] clip_origin The origin, in context coordinates, of the origin of the element's clipping window.
-	/// @param[out] clip_dimensions The size, in context coordinates, of the element's clipping window.
+	/// @param[out] clip_region The element's clipping window in context coordinates.
 	/// @param[in] element The element to generate the clipping region for.
 	/// @param[out] clip_mask_list Optional, returns a list of elements that should have their clip mask applied.
 	/// @param[in] force_clip_self If true, also clips to the border area of the provided element regardless.
 	/// @return True if a scissor region exists for the element and clip_origin and clip_dimensions were set, otherwise false.
-	static bool GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementClipList* clip_mask_list = nullptr,
-		bool force_clip_self = false);
+	static bool GetClippingRegion(Rectanglei& clip_region, Element* element, ElementClipList* clip_mask_list = nullptr, bool force_clip_self = false);
 	/// Sets the clipping region from an element and its ancestors.
 	/// @param[in] element The element to generate the clipping region from.
 	/// @param[in] force_clip_self If true, also clips to the border area of the provided element regardless.
@@ -106,7 +104,7 @@ public:
 	/// Returns a rectangle covering the element's area in window coordinate space.
 	/// @return True on success, otherwise false.
 	/// @note When area is Auto the element's box-shadow area is also included.
-	static bool GetBoundingBox(Vector2f& out_offset, Vector2f& out_size, Element* element, PaintArea area, Vector2f expand_top_left = Vector2f(0),
+	static bool GetBoundingBox(Rectanglef& out_rectangle, Element* element, PaintArea area, Vector2f expand_top_left = Vector2f(0),
 		Vector2f expand_bottom_right = Vector2f(0));
 
 	/// Formats the contents of an element. This does not need to be called for ordinary elements, but can be useful

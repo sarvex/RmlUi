@@ -114,33 +114,23 @@ void ElementText::OnRender()
 	}
 
 	const Vector2f translation = GetAbsoluteOffset();
-	
+
 	bool render = true;
 	const RenderState& render_state = GetContext()->GetRenderState();
-	
-	Vector2i clip_origin, clip_dimensions;
-	if (render_state.GetScissorState(clip_origin, clip_dimensions))
+
+	Rectanglei scissor_region = render_state.GetScissorState();
+	if (scissor_region.Valid())
 	{
-		float clip_top = (float)clip_origin.y;
-		float clip_left = (float)clip_origin.x;
-		float clip_right = (float)(clip_origin.x + clip_dimensions.x);
-		float clip_bottom = (float)(clip_origin.y + clip_dimensions.y);
-		float line_height = (float)GetFontEngineInterface()->GetLineHeight(GetFontFaceHandle());
-		
+		const int line_height = GetFontEngineInterface()->GetLineHeight(GetFontFaceHandle());
+
 		render = false;
 		for (size_t i = 0; i < lines.size(); ++i)
-		{			
+		{
 			const Line& line = lines[i];
-			float x = translation.x + line.position.x;
-			float y = translation.y + line.position.y;
-			
-			bool render_line = !(x > clip_right);
-			render_line = render_line && !(x + line.width < clip_left);
-			
-			render_line = render_line && !(y - line_height > clip_bottom);
-			render_line = render_line && !(y < clip_top);
-			
-			if (render_line)
+			const Vector2i position = Vector2i(translation + line.position);
+
+			const Rectanglei line_region = Rectanglei::FromPositionSize(position, {line.width, line_height});
+			if (scissor_region.Intersects(line_region))
 			{
 				render = true;
 				break;
