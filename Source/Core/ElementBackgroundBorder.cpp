@@ -171,22 +171,22 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 			}
 		}
 
-		Vector2f boxes_min;
-		Vector2f boxes_max;
+		Rectanglef texture_region;
 
 		// Extend the render-texture further to cover all the element's boxes.
 		for (int i = 0; i < element->GetNumBoxes(); i++)
 		{
 			Vector2f offset;
 			const Box& box = element->GetBox(i, offset);
-			boxes_min = Math::Min(boxes_min, offset);
-			boxes_max = Math::Max(boxes_max, offset + box.GetSize(Box::BORDER));
+			texture_region.Join(Rectanglef::FromPositionSize(offset, box.GetSize(Box::BORDER)));
 		}
 
-		auto RoundUp = [](Vector2f v) { return Vector2f(Math::RoundUpFloat(v.x), Math::RoundUpFloat(v.y)); };
+		texture_region.ExtendTopLeft(-extend_min);
+		texture_region.ExtendBottomRight(extend_max);
+		Math::ExpandToPixelGrid(texture_region);
 
-		element_offset_in_texture = -RoundUp(extend_min + boxes_min);
-		texture_dimensions = Vector2i(RoundUp(element_offset_in_texture + extend_max + boxes_max));
+		element_offset_in_texture = -texture_region.TopLeft();
+		texture_dimensions = Vector2i(texture_region.Size());
 	}
 
 	Geometry& main_geometry = *GetGeometry(BackgroundType::Main);
@@ -231,7 +231,7 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 		RenderState& render_state = context->GetRenderState();
 		RenderStateSession render_state_session(render_state);
 		render_state.Reset();
-		render_state.EnableScissorRegion(Vector2i(0), texture_dimensions);
+		render_state.EnableScissorRegion(Rectanglei::FromSize(texture_dimensions));
 
 		render_interface->StackPush();
 

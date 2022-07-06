@@ -182,11 +182,11 @@ void ElementInfo::RenderSourceElement()
 		{
 			context->GetRenderState().SetTransform(nullptr);
 
-			Vector2f region_offset, region_size;
-			ElementUtilities::GetBoundingBox(region_offset, region_size, source_element, PaintArea::Auto);
+			Rectanglef bounding_box;
+			ElementUtilities::GetBoundingBox(bounding_box, source_element, PaintArea::Auto);
+			bounding_box.Extend(1.f);
 
-			// Bounding box
-			Geometry::RenderOutline(region_offset - Vector2f(1.f), region_size + Vector2f(2.f), Colourb(255, 255, 255, 200), 1.f);
+			Geometry::RenderOutline(bounding_box.Position(), bounding_box.Size(), Colourb(255, 255, 255, 200), 1.f);
 		}
 	}
 }

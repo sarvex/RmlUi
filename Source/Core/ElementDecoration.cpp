@@ -213,8 +213,8 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			ElementUtilities::ApplyTransform(element);
 			ElementUtilities::SetClippingRegion(element, true);
 
-			Vector2f filter_origin, filter_size;
-			ElementUtilities::GetBoundingBox(filter_origin, filter_size, element, PaintArea::Border);
+			Rectanglef filter_rectangle;
+			ElementUtilities::GetBoundingBox(filter_rectangle, element, PaintArea::Border);
 			// @performance Shrink scissor region to element region
 
 			const int i0 = num_backgrounds;
@@ -225,7 +225,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			}
 
 			// ElementUtilities::ForceClippingRegion(element, Box::BORDER);
-			render_interface->StackApply(BlitDestination::Stack, Vector2i(filter_origin), Vector2i(filter_size));
+			render_interface->StackApply(BlitDestination::Stack, Vector2i(filter_rectangle.Position()), Vector2i(filter_rectangle.Size()));
 			ElementUtilities::SetClippingRegion(element);
 		}
 	}
@@ -253,8 +253,8 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				max_bottom_right = Math::Max(max_bottom_right, bottom_right);
 			}
 
-			Vector2f filter_origin, filter_size;
-			ElementUtilities::GetBoundingBox(filter_origin, filter_size, element, PaintArea::Auto, max_top_left, max_bottom_right);
+			Rectanglef filter_rectangle;
+			ElementUtilities::GetBoundingBox(filter_rectangle, element, PaintArea::Auto, max_top_left, max_bottom_right);
 
 			for (int i = i0; i < i0 + num_filters; i++)
 			{
@@ -273,11 +273,11 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 					decorator.decorator->RenderElement(element, decorator.decorator_data);
 				}
 
-				render_interface->AttachMask(Vector2i(filter_origin), Vector2i(filter_size));
+				render_interface->AttachMask(Vector2i(filter_rectangle.Position()), Vector2i(filter_rectangle.Size()));
 				render_interface->StackPop();
 			}
 
-			render_interface->StackApply(BlitDestination::BlendStackBelow, Vector2i(filter_origin), Vector2i(filter_size));
+			render_interface->StackApply(BlitDestination::BlendStackBelow, Vector2i(filter_rectangle.Position()), Vector2i(filter_rectangle.Size()));
 			render_interface->StackPop();
 		}
 	}

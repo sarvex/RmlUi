@@ -165,14 +165,9 @@ int ElementUtilities::GetStringWidth(Element* element, const String& string, Cha
 	return GetFontEngineInterface()->GetStringWidth(font_face_handle, string, prior_character);
 }
 
-// Generates the clipping region for an element.
-bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_dimensions, Element* element, ElementClipList* clip_mask_list,
-	bool force_clip_self)
+bool ElementUtilities::GetClippingRegion(Rectanglei& clip_region, Element* element, ElementClipList* clip_mask_list, bool force_clip_self)
 {
 	using Style::Clip;
-	clip_origin = Vector2i(-1, -1);
-	clip_dimensions = Vector2i(-1, -1);
-
 	Clip target_element_clip = element->GetComputedValues().clip();
 	if (target_element_clip == Clip::Type::None && !force_clip_self)
 		return false;
@@ -270,8 +265,9 @@ bool ElementUtilities::GetClippingRegion(Vector2i& clip_origin, Vector2i& clip_d
 
 	if (clip_region_set)
 	{
-		clip_origin = Vector2i(clip_top_left.Round());
-		clip_dimensions = Math::Max(Vector2i(0), Vector2i(clip_bottom_right.Round()) - clip_origin);
+		const Vector2i top_left = Vector2i(clip_top_left.Round());
+		const Vector2i bottom_right = Math::Max(top_left, Vector2i(clip_bottom_right.Round()));
+		clip_region = Rectanglei::FromCorners(top_left, bottom_right);
 	}
 
 	return clip_region_set;
@@ -289,16 +285,13 @@ bool ElementUtilities::SetClippingRegion(Element* element, bool force_clip_self)
 
 	RenderState& render_state = context->GetRenderState();
 
-	Vector2i clip_origin = {-1, -1};
-	Vector2i clip_dimensions = {-1, -1};
+	Rectanglei clip_region;
 	ElementClipList clip_mask_list;
 	ElementClipList* clip_mask_list_ptr = (render_state.SupportsClipMask() ? &clip_mask_list : nullptr);
 
-	GetClippingRegion(clip_origin, clip_dimensions, element, clip_mask_list_ptr, force_clip_self);
-
-	const bool scissoring_enabled = (clip_dimensions != Vector2i(-1, -1));
+	const bool scissoring_enabled = GetClippingRegion(clip_region, element, clip_mask_list_ptr, force_clip_self);
 	if (scissoring_enabled)
-		render_state.EnableScissorRegion(clip_origin, clip_dimensions);
+		render_state.EnableScissorRegion(clip_region);
 	else
 		render_state.DisableScissorRegion();
 
@@ -307,14 +300,10 @@ bool ElementUtilities::SetClippingRegion(Element* element, bool force_clip_self)
 	return true;
 }
 
-bool ElementUtilities::GetBoundingBox(Vector2f& out_offset, Vector2f& out_size, Element* element, PaintArea area, Vector2f expand_top_left,
+bool ElementUtilities::GetBoundingBox(Rectanglef& out_rectangle, Element* element, PaintArea area, Vector2f expand_top_left,
 	Vector2f expand_bottom_right)
 {
 	RMLUI_ASSERT(element);
-
-	const Box::Area box_area = ToBoxArea(area);
-	const Vector2f element_origin = element->GetAbsoluteOffset(box_area);
-	const Vector2f element_size = element->GetBox().GetSize(box_area);
 
 	if (area == PaintArea::Auto)
 	{
@@ -340,15 +329,18 @@ bool ElementUtilities::GetBoundingBox(Vector2f& out_offset, Vector2f& out_size, 
 		}
 	}
 
+	const Box::Area box_area = ToBoxArea(area);
+	const Vector2f element_origin = element->GetAbsoluteOffset(box_area);
+	const Vector2f element_size = element->GetBox().GetSize(box_area);
+
 	const TransformState* transform_state = element->GetTransformState();
 	const Matrix4f* transform = (transform_state ? transform_state->GetTransform() : nullptr);
 
 	// Early exit in the common case of no transform.
 	if (!transform)
 	{
-		out_offset = element_origin - expand_top_left;
-		out_size = element_size + expand_top_left + expand_bottom_right;
-		Math::ExpandToPixelGrid(out_offset, out_size);
+		out_rectangle = Rectanglef::FromCorners(element_origin - expand_top_left, element_origin + element_size + expand_bottom_right);
+		Math::ExpandToPixelGrid(out_rectangle);
 		return true;
 	}
 
@@ -357,8 +349,12 @@ bool ElementUtilities::GetBoundingBox(Vector2f& out_offset, Vector2f& out_size, 
 		return false;
 
 	constexpr int num_corners = 4;
-	Vector2f corners[num_corners] = {element_origin, element_origin + Vector2f(element_size.x, 0), element_origin + element_size,
-		element_origin + Vector2f(0, element_size.y)};
+	Vector2f corners[num_corners] = {
+		element_origin,
+		element_origin + Vector2f(element_size.x, 0),
+		element_origin + element_size,
+		element_origin + Vector2f(0, element_size.y),
+	};
 
 	// Transform and project corners to window coordinates.
 	const Vector2f window_size = Vector2f(context->GetDimensions());
@@ -374,17 +370,13 @@ bool ElementUtilities::GetBoundingBox(Vector2f& out_offset, Vector2f& out_size, 
 	}
 
 	// Find the rectangle covering the projected corners.
-	Vector2f pos_min = corners[0];
-	Vector2f pos_max = corners[0];
+	out_rectangle = Rectanglef::FromPosition(corners[0]);
 	for (int i = 1; i < num_corners; i++)
-	{
-		pos_min = Math::Min(pos_min, corners[i]);
-		pos_max = Math::Max(pos_max, corners[i]);
-	}
+		out_rectangle.Join(corners[i]);
 
-	out_offset = pos_min - expand_top_left;
-	out_size = pos_max + expand_bottom_right - out_offset;
-	Math::ExpandToPixelGrid(out_offset, out_size);
+	out_rectangle.ExtendTopLeft(expand_top_left);
+	out_rectangle.ExtendBottomRight(expand_bottom_right);
+	Math::ExpandToPixelGrid(out_rectangle);
 
 	return true;
 }

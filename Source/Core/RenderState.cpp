@@ -58,28 +58,27 @@ void RenderState::Reset()
 void RenderState::DisableScissorRegion()
 {
 	State& state = stack.back();
-	const bool scissor_enabled = (state.scissor_dimensions.x >= 0);
+	const bool scissor_enabled = state.scissor_region.Valid();
 	if (scissor_enabled)
 	{
-		state.scissor_dimensions = {-1, -1};
+		state.scissor_region = Rectanglei::CreateInvalid();
 		render_interface->EnableScissorRegion(false);
 	}
 }
 
-void RenderState::EnableScissorRegion(Vector2i origin, Vector2i dimensions)
+void RenderState::EnableScissorRegion(Rectanglei new_region)
 {
-	RMLUI_ASSERT(dimensions.x >= 0 && dimensions.y >= 0);
+	new_region.Intersect(Rectanglei::FromSize(viewport_dimensions));
 	State& state = stack.back();
 
-	const bool scissor_enabled = (state.scissor_dimensions.x >= 0);
+	const bool scissor_enabled = state.scissor_region.Valid();
 	if (!scissor_enabled)
 		render_interface->EnableScissorRegion(true);
 
-	if (!scissor_enabled || state.scissor_origin != origin || state.scissor_dimensions != dimensions)
+	if (!scissor_enabled || state.scissor_region != new_region)
 	{
-		state.scissor_origin = origin;
-		state.scissor_dimensions = dimensions;
-		render_interface->SetScissorRegion(origin.x, origin.y, dimensions.x, dimensions.y);
+		state.scissor_region = new_region;
+		render_interface->SetScissorRegion(new_region.Left(), new_region.Top(), new_region.Width(), new_region.Height());
 	}
 }
 
@@ -134,16 +133,9 @@ void RenderState::SetTransform(const Matrix4f* p_new_transform)
 	}
 }
 
-bool RenderState::GetScissorState(Vector2i& out_scissor_origin, Vector2i& out_scissor_dimensions) const
+Rectanglei RenderState::GetScissorState() const
 {
-	const State& state = stack.back();
-	const bool scissor_enabled = (state.scissor_dimensions.x >= 0);
-	if (!scissor_enabled)
-		return false;
-
-	out_scissor_origin = state.scissor_origin;
-	out_scissor_dimensions = state.scissor_dimensions;
-	return true;
+	return stack.back().scissor_region;
 }
 
 void RenderState::ApplyClipMask(const ElementClipList& clip_elements)
@@ -167,6 +159,11 @@ void RenderState::ApplyClipMask(const ElementClipList& clip_elements)
 	}
 }
 
+void RenderState::SetViewport(Vector2i dimensions)
+{
+	viewport_dimensions = dimensions;
+}
+
 void RenderState::Push()
 {
 	stack.push_back(State(stack.back()));
@@ -188,9 +185,9 @@ void RenderState::Pop()
 
 void RenderState::Set(const State& next)
 {
-	const bool scissor_enable = (next.scissor_dimensions.x >= 0);
+	const bool scissor_enable = next.scissor_region.Valid();
 	if (scissor_enable)
-		EnableScissorRegion(next.scissor_origin, next.scissor_dimensions);
+		EnableScissorRegion(next.scissor_region);
 	else
 		DisableScissorRegion();
 

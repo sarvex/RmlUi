@@ -218,6 +218,13 @@ RMLUICORE_API void ExpandToPixelGrid(Vector2f& position, Vector2f& size)
 	size = Vector2f(std::ceil(bottom_right.x), std::ceil(bottom_right.y)) - position;
 }
 
+RMLUICORE_API void ExpandToPixelGrid(Rectanglef& rectangle)
+{
+	const Vector2f top_left = {std::floor(rectangle.Left()), std::floor(rectangle.Top())};
+	const Vector2f bottom_right = {std::ceil(rectangle.Right()), std::ceil(rectangle.Bottom())};
+	rectangle = Rectanglef::FromCorners(top_left, bottom_right);
+}
+
 // Converts the given number to a power of two, rounding up if necessary.
 RMLUICORE_API int ToPowerOfTwo(int number)
 {
