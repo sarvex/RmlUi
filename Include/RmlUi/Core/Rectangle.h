@@ -102,7 +102,7 @@ public:
 	template <typename U>
 	explicit operator Rectangle<U>() const
 	{
-		return Rectangle<U>(static_cast<Vector2<U>>(p0), static_cast<Vector2<U>>(p1));
+		return Rectangle<U>::FromCorners(static_cast<Vector2<U>>(p0), static_cast<Vector2<U>>(p1));
 	}
 
 private:
