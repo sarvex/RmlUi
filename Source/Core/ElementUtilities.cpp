@@ -291,7 +291,7 @@ bool ElementUtilities::SetClippingRegion(Element* element, bool force_clip_self)
 
 	const bool scissoring_enabled = GetClippingRegion(clip_region, element, clip_mask_list_ptr, force_clip_self);
 	if (scissoring_enabled)
-		render_state.EnableScissorRegion(clip_region);
+		render_state.SetScissorRegion(clip_region);
 	else
 		render_state.DisableScissorRegion();
 

@@ -205,17 +205,20 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 	RenderInterface* render_interface = context ? context->GetRenderInterface() : nullptr;
 	if (!context || !render_interface)
 		return;
+	RenderState& render_state = context->GetRenderState();
 
 	if (num_backdrop_filters > 0)
 	{
 		if (render_stage == RenderStage::Enter)
 		{
-			ElementUtilities::ApplyTransform(element);
 			ElementUtilities::SetClippingRegion(element, true);
 
 			Rectanglef filter_rectangle;
 			ElementUtilities::GetBoundingBox(filter_rectangle, element, PaintArea::Border);
-			// @performance Shrink scissor region to element region
+
+			Rectanglei scissor_region = render_state.GetScissorState();
+			scissor_region.Intersect(Rectanglei(filter_rectangle));
+			render_state.SetScissorRegion(scissor_region);
 
 			const int i0 = num_backgrounds;
 			for (int i = i0; i < i0 + num_backdrop_filters; i++)
@@ -224,9 +227,8 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				decorator.decorator->RenderElement(element, decorator.decorator_data);
 			}
 
-			// ElementUtilities::ForceClippingRegion(element, Box::BORDER);
+
 			render_interface->StackApply(BlitDestination::Stack, Vector2i(filter_rectangle.Position()), Vector2i(filter_rectangle.Size()));
-			ElementUtilities::SetClippingRegion(element);
 		}
 	}
 
@@ -253,8 +255,13 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				max_bottom_right = Math::Max(max_bottom_right, bottom_right);
 			}
 
-			Rectanglef filter_rectangle;
-			ElementUtilities::GetBoundingBox(filter_rectangle, element, PaintArea::Auto, max_top_left, max_bottom_right);
+			Rectanglef filter_region;
+			ElementUtilities::GetBoundingBox(filter_region, element, PaintArea::Auto, max_top_left, max_bottom_right);
+			Math::ExpandToPixelGrid(filter_region);
+
+			Rectanglei scissor_region = render_state.GetScissorState();
+			scissor_region.Intersect(Rectanglei(filter_region));
+			render_state.SetScissorRegion(scissor_region);
 
 			for (int i = i0; i < i0 + num_filters; i++)
 			{
@@ -273,11 +280,11 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 					decorator.decorator->RenderElement(element, decorator.decorator_data);
 				}
 
-				render_interface->AttachMask(Vector2i(filter_rectangle.Position()), Vector2i(filter_rectangle.Size()));
+				render_interface->AttachMask(Vector2i(filter_region.Position()), Vector2i(filter_region.Size()));
 				render_interface->StackPop();
 			}
 
-			render_interface->StackApply(BlitDestination::BlendStackBelow, Vector2i(filter_rectangle.Position()), Vector2i(filter_rectangle.Size()));
+			render_interface->StackApply(BlitDestination::BlendStackBelow, Vector2i(filter_region.Position()), Vector2i(filter_region.Size()));
 			render_interface->StackPop();
 		}
 	}
