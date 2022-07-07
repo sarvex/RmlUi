@@ -57,29 +57,27 @@ void RenderState::Reset()
 
 void RenderState::DisableScissorRegion()
 {
-	State& state = stack.back();
-	const bool scissor_enabled = state.scissor_region.Valid();
-	if (scissor_enabled)
-	{
-		state.scissor_region = Rectanglei::CreateInvalid();
-		render_interface->EnableScissorRegion(false);
-	}
+	SetScissorRegion(Rectanglei::CreateInvalid());
 }
 
-void RenderState::EnableScissorRegion(Rectanglei new_region)
+void RenderState::SetScissorRegion(Rectanglei new_region)
 {
-	new_region.Intersect(Rectanglei::FromSize(viewport_dimensions));
 	State& state = stack.back();
+	const bool old_scissor_enable = state.scissor_region.Valid();
+	const bool new_scissor_enable = new_region.Valid();
 
-	const bool scissor_enabled = state.scissor_region.Valid();
-	if (!scissor_enabled)
-		render_interface->EnableScissorRegion(true);
+	if (new_scissor_enable != old_scissor_enable)
+		render_interface->EnableScissorRegion(new_scissor_enable);
 
-	if (!scissor_enabled || state.scissor_region != new_region)
+	if (new_scissor_enable)
 	{
-		state.scissor_region = new_region;
-		render_interface->SetScissorRegion(new_region.Left(), new_region.Top(), new_region.Width(), new_region.Height());
+		new_region.Intersect(Rectanglei::FromSize(viewport_dimensions));
+
+		if (new_region != state.scissor_region)
+			render_interface->SetScissorRegion(new_region.Left(), new_region.Top(), new_region.Width(), new_region.Height());
 	}
+
+	state.scissor_region = new_region;
 }
 
 void RenderState::DisableClipMask()
@@ -185,12 +183,8 @@ void RenderState::Pop()
 
 void RenderState::Set(const State& next)
 {
-	const bool scissor_enable = next.scissor_region.Valid();
-	if (scissor_enable)
-		EnableScissorRegion(next.scissor_region);
-	else
-		DisableScissorRegion();
-
+	SetScissorRegion(next.scissor_region);
+	
 	SetClipMask(next.clip_mask_elements);
 
 	// TODO: Is it safe to submit an old pointer here (e.g. in case of Pop())?

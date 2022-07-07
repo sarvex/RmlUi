@@ -72,7 +72,7 @@ public:
 	void Reset();
 
 	void DisableScissorRegion();
-	void EnableScissorRegion(Rectanglei region);
+	void SetScissorRegion(Rectanglei region);
 
 	void DisableClipMask();
 	void SetClipMask(ElementClipList clip_elements);

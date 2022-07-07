@@ -231,7 +231,7 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 		RenderState& render_state = context->GetRenderState();
 		RenderStateSession render_state_session(render_state);
 		render_state.Reset();
-		render_state.EnableScissorRegion(Rectanglei::FromSize(texture_dimensions));
+		render_state.SetScissorRegion(Rectanglei::FromSize(texture_dimensions));
 
 		render_interface->StackPush();
 
