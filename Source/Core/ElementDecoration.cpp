@@ -213,7 +213,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 		{
 			ElementUtilities::SetClippingRegion(element, true);
 
-			Rectanglef filter_rectangle;
+			Rectanglef filter_rectangle = Rectanglef::FromSize(Vector2f(context->GetDimensions()));
 			ElementUtilities::GetBoundingBox(filter_rectangle, element, PaintArea::Border);
 
 			Rectanglei scissor_region = render_state.GetScissorState();
@@ -255,7 +255,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				max_bottom_right = Math::Max(max_bottom_right, bottom_right);
 			}
 
-			Rectanglef filter_region;
+			Rectanglef filter_region = Rectanglef::FromSize(Vector2f(context->GetDimensions()));
 			ElementUtilities::GetBoundingBox(filter_region, element, PaintArea::Auto, max_top_left, max_bottom_right);
 			Math::ExpandToPixelGrid(filter_region);
 

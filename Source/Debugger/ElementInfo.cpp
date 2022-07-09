@@ -183,10 +183,11 @@ void ElementInfo::RenderSourceElement()
 			context->GetRenderState().SetTransform(nullptr);
 
 			Rectanglef bounding_box;
-			ElementUtilities::GetBoundingBox(bounding_box, source_element, PaintArea::Auto);
-			bounding_box.Extend(1.f);
-
-			Geometry::RenderOutline(bounding_box.Position(), bounding_box.Size(), Colourb(255, 255, 255, 200), 1.f);
+			if (ElementUtilities::GetBoundingBox(bounding_box, source_element, PaintArea::Auto))
+			{
+				bounding_box.Extend(1.f);
+				Geometry::RenderOutline(bounding_box.Position(), bounding_box.Size(), Colourb(255, 255, 255, 200), 1.f);
+			}
 		}
 	}
 }
