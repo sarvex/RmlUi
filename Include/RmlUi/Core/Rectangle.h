@@ -87,8 +87,16 @@ public:
 
 	void Intersect(Rectangle other)
 	{
+		RMLUI_ASSERT(Valid() && other.Valid());
 		p0 = Math::Max(p0, other.p0);
 		p1 = Math::Max(Math::Min(p1, other.p1), p0);
+	}
+	void IntersectValid(Rectangle other)
+	{
+		if (!Valid())
+			*this = other;
+		else if (other.Valid())
+			Intersect(other);
 	}
 
 	bool Intersects(Rectangle other) const { return p0.x < other.p1.x && p1.x > other.p0.x && p0.y < other.p1.y && p1.y > other.p0.y; }
