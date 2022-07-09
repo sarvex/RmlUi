@@ -213,11 +213,11 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 		{
 			ElementUtilities::SetClippingRegion(element, true);
 
-			Rectanglef filter_rectangle = Rectanglef::FromSize(Vector2f(context->GetDimensions()));
+			Rectanglef filter_rectangle = Rectanglef::CreateInvalid();
 			ElementUtilities::GetBoundingBox(filter_rectangle, element, PaintArea::Border);
 
 			Rectanglei scissor_region = render_state.GetScissorState();
-			scissor_region.Intersect(Rectanglei(filter_rectangle));
+			scissor_region.IntersectValid(Rectanglei(filter_rectangle));
 			render_state.SetScissorRegion(scissor_region);
 
 			const int i0 = num_backgrounds;
@@ -255,12 +255,11 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				max_bottom_right = Math::Max(max_bottom_right, bottom_right);
 			}
 
-			Rectanglef filter_region = Rectanglef::FromSize(Vector2f(context->GetDimensions()));
+			Rectanglef filter_region = Rectanglef::CreateInvalid();
 			ElementUtilities::GetBoundingBox(filter_region, element, PaintArea::Auto, max_top_left, max_bottom_right);
-			Math::ExpandToPixelGrid(filter_region);
 
 			Rectanglei scissor_region = render_state.GetScissorState();
-			scissor_region.Intersect(Rectanglei(filter_region));
+			scissor_region.IntersectValid(Rectanglei(filter_region));
 			render_state.SetScissorRegion(scissor_region);
 
 			for (int i = i0; i < i0 + num_filters; i++)
