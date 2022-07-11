@@ -117,8 +117,8 @@ handle.size:hover, handle.size:active {
 	box-sizing: border-box;
 }
 #submenu div:hover {
-	color: #555;
-	border-bottom-color: #ccc;
+	color: #000;
+	border-bottom-color: #555;
 }
 #submenu div.selected {
 	font-weight: bold;
