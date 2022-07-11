@@ -306,7 +306,7 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 
 			if (blur)
 			{
-				render_interface->StackApply(BlitDestination::BlendStackBelow, {}, texture_dimensions);
+				render_interface->StackApply(BlitDestination::BlendStackBelow);
 				render_interface->StackPop();
 				render_interface->ReleaseCompiledFilter(blur);
 			}

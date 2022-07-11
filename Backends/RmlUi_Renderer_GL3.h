@@ -68,9 +68,9 @@ public:
 
 	void StackPush() override;
 	void StackPop() override;
-	void StackApply(Rml::BlitDestination destination, Rml::Vector2i offset, Rml::Vector2i dimensions) override;
+	void StackApply(Rml::BlitDestination destination) override;
 
-	void AttachMask(Rml::Vector2i offset, Rml::Vector2i dimensions) override;
+	void AttachMask() override;
 
 	Rml::TextureHandle RenderToTexture(Rml::Vector2i offset, Rml::Vector2i dimensions) override;
 
