@@ -845,6 +845,7 @@ void RenderInterface_GL3::SetScissorRegion(int x, int y, int width, int height)
 	scissor_state.y = y;
 	scissor_state.width = width;
 	scissor_state.height = height;
+	Gfx::CheckGLError("SetScissorRegion");
 }
 
 bool RenderInterface_GL3::EnableClipMask(bool enable)
@@ -1773,7 +1774,7 @@ void RenderInterface_GL3::StackPop()
 	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetStackTop().framebuffer);
 }
 
-void RenderInterface_GL3::StackApply(const Rml::BlitDestination blit_destination, const Rml::Vector2i offset, const Rml::Vector2i dimensions)
+void RenderInterface_GL3::StackApply(const Rml::BlitDestination blit_destination, const Rml::Vector2i /*offset*/, const Rml::Vector2i /*dimensions*/)
 {
 	using Rml::BlitDestination;
 
@@ -1781,53 +1782,28 @@ void RenderInterface_GL3::StackApply(const Rml::BlitDestination blit_destination
 	if (blit_destination == BlitDestination::Stack && !has_mask && attached_filters.empty())
 		return;
 
-	const ScissorState pre_filter_scissor_state = scissor_state;
-
 	{
-		// -- Blit stack to filter rendering buffer --
-		// Do this regardless of whether we actually have any filters to be applied, because we need to resolve the multi-sampled framebuffer in
-		// any case.
-
-		const Rml::Vector2i filter_size = (dimensions == Rml::Vector2i(0) ? Rml::Vector2i(viewport_width, viewport_height) : dimensions);
-
-		// Set the scissor region during filtering to the intersection of the destination scissor (equivalent to the current scissor state) and
-		// the filtering region provided by the function arguments.
-		const Rectangle2i rect_viewport = {0, 0, viewport_width, viewport_height};
-		const Rectangle2i rect_filter = {offset, filter_size};
-		const Rectangle2i rect_scissor = {scissor_state.x, scissor_state.y, scissor_state.width, scissor_state.height};
-		const Rectangle2i rect_filter_scissor = scissor_state.enabled ? RectangleIntersection(rect_filter, rect_scissor) : rect_filter;
-		const Rectangle2i rect_new_scissor = RectangleIntersection(rect_viewport, rect_filter_scissor);
-
-		EnableScissorRegion(true);
-		SetScissorRegion(rect_new_scissor.pos.x, rect_new_scissor.pos.y, rect_new_scissor.size.x, rect_new_scissor.size.y);
-
+		// Blit stack to filter rendering buffer. Do this regardless of whether we actually have any filters to be applied, because we need to resolve
+		// the multi-sampled framebuffer in any case.
 		const Gfx::FramebufferData& source = render_state.GetStackTop();
 		const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
 
-#if 0
-		// Debug clear
-		EnableScissorRegion(false);
-		glClearColor(0, 1, 0, 1);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glClearColor(0, 0, 0, 0);
-		EnableScissorRegion(true);
-#endif
-
+		// Any active scissor state will restrict the size of the blit region.
 		glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, destination.width, destination.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	}
 
+	// Render the filters, the PostprocessPrimary framebuffer is used for both input and output.
 	RenderFilters();
 
-	// Blit filter to stack. Apply any mask if active.
+	// Blit filter back to stack. Apply any mask if active.
 	const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
 	const Gfx::FramebufferData& destination =
 		(blit_destination == BlitDestination::Stack ? render_state.GetStackTop() : render_state.GetStackBelow());
 
 	glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
 	Gfx::BindTexture(source);
-
 	if (has_mask)
 	{
 		has_mask = false;
@@ -1853,28 +1829,20 @@ void RenderInterface_GL3::StackApply(const Rml::BlitDestination blit_destination
 	if (blit_destination == BlitDestination::Stack)
 		glEnable(GL_BLEND);
 
-	EnableScissorRegion(pre_filter_scissor_state.enabled);
-	SetScissorRegion(pre_filter_scissor_state.x, pre_filter_scissor_state.y, pre_filter_scissor_state.width, pre_filter_scissor_state.height);
+	Gfx::CheckGLError("StackApply");
 }
 
-void RenderInterface_GL3::AttachMask(Rml::Vector2i offset, Rml::Vector2i dimensions)
+void RenderInterface_GL3::AttachMask(Rml::Vector2i /*offset*/, Rml::Vector2i /*dimensions*/)
 {
-	ScissorState scissor_state_initial = scissor_state;
-	const Rml::Vector2i scissor_size = (dimensions == Rml::Vector2i(0) ? Rml::Vector2i(viewport_width, viewport_height) : dimensions);
-	EnableScissorRegion(true);
-	SetScissorRegion(offset.x, offset.y, scissor_size.x, scissor_size.y);
-
 	const Gfx::FramebufferData& source = render_state.GetStackTop();
 	const Gfx::FramebufferData& destination = render_state.GetMask();
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
 
+	// Blit the mask to the destination buffer, any active scissor state will restrict the size of the blit region.
 	glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, destination.width, destination.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
-	EnableScissorRegion(scissor_state_initial.enabled);
-	SetScissorRegion(scissor_state_initial.x, scissor_state_initial.y, scissor_state_initial.width, scissor_state_initial.height);
-
 	has_mask = true;
+	Gfx::CheckGLError("AttachMask");
 }
 
 Rml::TextureHandle RenderInterface_GL3::RenderToTexture(Rml::Vector2i offset, Rml::Vector2i dimensions)
@@ -1942,7 +1910,7 @@ Rml::TextureHandle RenderInterface_GL3::RenderToTexture(Rml::Vector2i offset, Rm
 		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, dimensions.x, dimensions.y);
 	}
 
-	Gfx::CheckGLError("StackToTexture");
+	Gfx::CheckGLError("RenderToTexture");
 
 	EnableScissorRegion(scissor_initially_enabled);
 
