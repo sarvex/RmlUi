@@ -27,17 +27,18 @@
  */
 
 #include "../../Include/RmlUi/Core/ElementText.h"
-#include "ElementDefinition.h"
-#include "ElementStyle.h"
-#include "../../Include/RmlUi/Core/Core.h"
 #include "../../Include/RmlUi/Core/Context.h"
+#include "../../Include/RmlUi/Core/Core.h"
 #include "../../Include/RmlUi/Core/ElementDocument.h"
 #include "../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../Include/RmlUi/Core/Event.h"
 #include "../../Include/RmlUi/Core/FontEngineInterface.h"
 #include "../../Include/RmlUi/Core/GeometryUtilities.h"
-#include "../../Include/RmlUi/Core/Property.h"
 #include "../../Include/RmlUi/Core/Profiling.h"
+#include "../../Include/RmlUi/Core/Property.h"
+#include "ElementDefinition.h"
+#include "ElementStyle.h"
+#include "TransformState.h"
 
 namespace Rml {
 
@@ -118,18 +119,18 @@ void ElementText::OnRender()
 	bool render = true;
 	const RenderState& render_state = GetContext()->GetRenderState();
 
-	Rectanglei scissor_region = render_state.GetScissorState();
-	if (scissor_region.Valid())
+	// Do a visibility test against the scissor region to avoid unnecessary render calls, but only if no transforms are applied for simplicity sake.
+	const Rectanglei scissor_region = render_state.GetScissorState();
+	if (scissor_region.Valid() && (!GetTransformState() || !GetTransformState()->GetTransform()))
 	{
 		const int line_height = GetFontEngineInterface()->GetLineHeight(GetFontFaceHandle());
 
 		render = false;
-		for (size_t i = 0; i < lines.size(); ++i)
+		for (const Line& line : lines)
 		{
-			const Line& line = lines[i];
-			const Vector2i position = Vector2i(translation + line.position);
-
+			const Vector2i position = Vector2i(translation + line.position) - Vector2i(0, line_height);
 			const Rectanglei line_region = Rectanglei::FromPositionSize(position, {line.width, line_height});
+
 			if (scissor_region.Intersects(line_region))
 			{
 				render = true;
