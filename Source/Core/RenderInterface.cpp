@@ -111,9 +111,9 @@ void RenderInterface::StackPush() {}
 
 void RenderInterface::StackPop() {}
 
-void RenderInterface::StackApply(BlitDestination /*destination*/, Vector2i /*offset*/, Vector2i /*dimensions*/) {}
+void RenderInterface::StackApply(BlitDestination /*destination*/) {}
 
-void RenderInterface::AttachMask(Vector2i /*offset*/, Vector2i /*dimensions*/) {}
+void RenderInterface::AttachMask() {}
 
 TextureHandle RenderInterface::RenderToTexture(Vector2i /*offset*/, Vector2i /*dimensions*/)
 {

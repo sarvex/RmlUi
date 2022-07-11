@@ -1774,7 +1774,7 @@ void RenderInterface_GL3::StackPop()
 	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetStackTop().framebuffer);
 }
 
-void RenderInterface_GL3::StackApply(const Rml::BlitDestination blit_destination, const Rml::Vector2i /*offset*/, const Rml::Vector2i /*dimensions*/)
+void RenderInterface_GL3::StackApply(const Rml::BlitDestination blit_destination)
 {
 	using Rml::BlitDestination;
 
@@ -1832,7 +1832,7 @@ void RenderInterface_GL3::StackApply(const Rml::BlitDestination blit_destination
 	Gfx::CheckGLError("StackApply");
 }
 
-void RenderInterface_GL3::AttachMask(Rml::Vector2i /*offset*/, Rml::Vector2i /*dimensions*/)
+void RenderInterface_GL3::AttachMask()
 {
 	const Gfx::FramebufferData& source = render_state.GetStackTop();
 	const Gfx::FramebufferData& destination = render_state.GetMask();

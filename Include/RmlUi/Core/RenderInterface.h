@@ -146,10 +146,10 @@ public:
 	virtual void StackPop();
 	// Apply filters, clipping, and mask to the current stack top, and render back to the stack top or below. 
 	/// @note Affected by transform: No. Affected by scissor: Yes. Affected by clip mask: Yes.
-	virtual void StackApply(BlitDestination destination, Vector2i offset, Vector2i dimensions);
+	virtual void StackApply(BlitDestination destination);
 
 	// Attach mask from the current stack top.
-	virtual void AttachMask(Vector2i offset, Vector2i dimensions);
+	virtual void AttachMask();
 
 	// Render to texture from the current stack top.
 	virtual TextureHandle RenderToTexture(Vector2i offset, Vector2i dimensions);

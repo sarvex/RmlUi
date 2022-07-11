@@ -228,7 +228,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			}
 
 
-			render_interface->StackApply(BlitDestination::Stack, Vector2i(filter_rectangle.Position()), Vector2i(filter_rectangle.Size()));
+			render_interface->StackApply(BlitDestination::Stack);
 		}
 	}
 
@@ -279,11 +279,11 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 					decorator.decorator->RenderElement(element, decorator.decorator_data);
 				}
 
-				render_interface->AttachMask(Vector2i(filter_region.Position()), Vector2i(filter_region.Size()));
+				render_interface->AttachMask();
 				render_interface->StackPop();
 			}
 
-			render_interface->StackApply(BlitDestination::BlendStackBelow, Vector2i(filter_region.Position()), Vector2i(filter_region.Size()));
+			render_interface->StackApply(BlitDestination::BlendStackBelow);
 			render_interface->StackPop();
 		}
 	}
