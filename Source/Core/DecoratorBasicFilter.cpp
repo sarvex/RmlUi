@@ -32,19 +32,9 @@
 #include "../../Include/RmlUi/Core/PropertyDefinition.h"
 #include "../../Include/RmlUi/Core/RenderInterface.h"
 #include "ComputeProperty.h"
+#include "DecoratorElementData.h"
 
 namespace Rml {
-
-Pool<BasicFilterElementData>& GetBasicFilterElementDataPool()
-{
-	static Pool<BasicFilterElementData> basic_efilter_element_data_pool(20, true);
-	return basic_efilter_element_data_pool;
-}
-Pool<BasicEffectElementData>& GetBasicEffectElementDataPool()
-{
-	static Pool<BasicEffectElementData> basic_effect_element_data_pool(20, true);
-	return basic_effect_element_data_pool;
-}
 
 DecoratorBasicFilter::DecoratorBasicFilter() {}
 

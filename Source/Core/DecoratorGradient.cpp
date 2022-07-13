@@ -36,7 +36,7 @@
 #include "../../Include/RmlUi/Core/PropertyDefinition.h"
 #include "../../Include/RmlUi/Core/RenderInterface.h"
 #include "ComputeProperty.h"
-#include "DecoratorBasicFilter.h"
+#include "DecoratorElementData.h"
 
 /*
 Gradient decorator usage in CSS:
@@ -298,7 +298,7 @@ void DecoratorLinearGradient::ReleaseElementData(DecoratorDataHandle handle) con
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
 	RenderInterface* render_interface = element_data->geometry.GetRenderInterface();
 	render_interface->ReleaseCompiledEffect(element_data->effect);
-	
+
 	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
 }
 

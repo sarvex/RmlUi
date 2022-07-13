@@ -13,6 +13,7 @@ set(Core_HDR_FILES
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorBasicFilter.h
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorBlur.h
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorDropShadow.h
+    ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorElementData.h
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorGradient.h
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorNinePatch.h
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorShader.h
@@ -267,6 +268,7 @@ set(Core_SRC_FILES
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorBasicFilter.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorBlur.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorDropShadow.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorElementData.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorGradient.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorInstancer.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/DecoratorNinePatch.cpp

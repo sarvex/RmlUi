@@ -26,48 +26,32 @@
  *
  */
 
-#ifndef RMLUI_CORE_DECORATORBASICFILTER_H
-#define RMLUI_CORE_DECORATORBASICFILTER_H
+#ifndef RMLUI_CORE_DECORATORELEMENTDATA_H
+#define RMLUI_CORE_DECORATORELEMENTDATA_H
 
-#include "../../Include/RmlUi/Core/Decorator.h"
-#include "../../Include/RmlUi/Core/DecoratorInstancer.h"
-#include "../../Include/RmlUi/Core/Property.h"
+#include "../../Include/RmlUi/Core/Geometry.h"
+#include "../../Include/RmlUi/Core/Types.h"
+#include "Pool.h"
 
 namespace Rml {
 
-class DecoratorBasicFilter : public Decorator {
-public:
-	DecoratorBasicFilter();
-	virtual ~DecoratorBasicFilter();
+class RenderInterface;
 
-	bool Initialise(const String& name, float value);
-
-	DecoratorDataHandle GenerateElementData(Element* element) const override;
-	void ReleaseElementData(DecoratorDataHandle element_data) const override;
-
-	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
-
-private:
-	String name;
-	float value = 0.f;
+struct BasicFilterElementData {
+	BasicFilterElementData(RenderInterface* render_interface, CompiledFilterHandle filter) : render_interface(render_interface), filter(filter) {}
+	RenderInterface* render_interface;
+	CompiledFilterHandle filter;
 };
 
-class DecoratorBasicFilterInstancer : public DecoratorInstancer {
-public:
-	enum class ValueType { NumberPercent, Angle };
+Pool<BasicFilterElementData>& GetBasicFilterElementDataPool();
 
-	DecoratorBasicFilterInstancer(ValueType value_type = ValueType::NumberPercent);
-	~DecoratorBasicFilterInstancer();
-
-	SharedPtr<Decorator> InstanceDecorator(const String& name, const PropertyDictionary& properties,
-		const DecoratorInstancerInterface& instancer_interface) override;
-
-private:
-	struct BasicFilterPropertyIds {
-		PropertyId value;
-	};
-	BasicFilterPropertyIds ids;
+struct BasicEffectElementData {
+	BasicEffectElementData(Geometry&& geometry, CompiledEffectHandle effect) : geometry(std::move(geometry)), effect(effect) {}
+	Geometry geometry;
+	CompiledEffectHandle effect;
 };
+
+Pool<BasicEffectElementData>& GetBasicEffectElementDataPool();
 
 } // namespace Rml
 #endif

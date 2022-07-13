@@ -32,7 +32,7 @@
 #include "../../Include/RmlUi/Core/PropertyDefinition.h"
 #include "../../Include/RmlUi/Core/RenderInterface.h"
 #include "ComputeProperty.h"
-#include "DecoratorBasicFilter.h"
+#include "DecoratorElementData.h"
 
 namespace Rml {
 

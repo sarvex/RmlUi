@@ -26,48 +26,19 @@
  *
  */
 
-#ifndef RMLUI_CORE_DECORATORBASICFILTER_H
-#define RMLUI_CORE_DECORATORBASICFILTER_H
-
-#include "../../Include/RmlUi/Core/Decorator.h"
-#include "../../Include/RmlUi/Core/DecoratorInstancer.h"
-#include "../../Include/RmlUi/Core/Property.h"
+#include "DecoratorElementData.h"
 
 namespace Rml {
 
-class DecoratorBasicFilter : public Decorator {
-public:
-	DecoratorBasicFilter();
-	virtual ~DecoratorBasicFilter();
-
-	bool Initialise(const String& name, float value);
-
-	DecoratorDataHandle GenerateElementData(Element* element) const override;
-	void ReleaseElementData(DecoratorDataHandle element_data) const override;
-
-	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
-
-private:
-	String name;
-	float value = 0.f;
-};
-
-class DecoratorBasicFilterInstancer : public DecoratorInstancer {
-public:
-	enum class ValueType { NumberPercent, Angle };
-
-	DecoratorBasicFilterInstancer(ValueType value_type = ValueType::NumberPercent);
-	~DecoratorBasicFilterInstancer();
-
-	SharedPtr<Decorator> InstanceDecorator(const String& name, const PropertyDictionary& properties,
-		const DecoratorInstancerInterface& instancer_interface) override;
-
-private:
-	struct BasicFilterPropertyIds {
-		PropertyId value;
-	};
-	BasicFilterPropertyIds ids;
-};
+Pool<BasicFilterElementData>& GetBasicFilterElementDataPool()
+{
+	static Pool<BasicFilterElementData> basic_efilter_element_data_pool(20, true);
+	return basic_efilter_element_data_pool;
+}
+Pool<BasicEffectElementData>& GetBasicEffectElementDataPool()
+{
+	static Pool<BasicEffectElementData> basic_effect_element_data_pool(20, true);
+	return basic_effect_element_data_pool;
+}
 
 } // namespace Rml
-#endif
