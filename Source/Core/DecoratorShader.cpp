@@ -34,7 +34,7 @@
 #include "../../Include/RmlUi/Core/Math.h"
 #include "../../Include/RmlUi/Core/PropertyDefinition.h"
 #include "../../Include/RmlUi/Core/RenderInterface.h"
-#include "DecoratorBasicFilter.h"
+#include "DecoratorElementData.h"
 
 namespace Rml {
 
