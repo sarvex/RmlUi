@@ -302,7 +302,7 @@ public:
 		else if (value == "change_color")
 		{
 			Colourb color((byte)Math::RandomInteger(255), (byte)Math::RandomInteger(255), (byte)Math::RandomInteger(255));
-			element->Animate("image-color", Property(color, Property::COLOUR), tweening_parameters.duration, Tween(tweening_parameters.type, tweening_parameters.direction));
+			element->Animate("image-color", Property(color, Unit::COLOUR), tweening_parameters.duration, Tween(tweening_parameters.type, tweening_parameters.direction));
 			event.StopPropagation();
 		}
 		else if (value == "move_child")

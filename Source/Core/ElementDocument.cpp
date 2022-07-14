@@ -454,23 +454,23 @@ void ElementDocument::UpdatePosition()
 
 		Vector2f position;
 		// Work out our containing block; relative offsets are calculated against it.
-		Vector2f containing_block = root->GetBox().GetSize(Box::CONTENT);
+		Vector2f containing_block = root->GetBox().GetSize(BoxArea::Content);
 
 		auto& computed = GetComputedValues();
 
 		if (computed.left().type != Style::Left::Auto)
 			position.x = ResolveValue(computed.left(), containing_block.x);
 		else if (computed.right().type != Style::Right::Auto)
-			position.x = (containing_block.x - GetBox().GetSize(Box::MARGIN).x) - ResolveValue(computed.right(), containing_block.x);
+			position.x = (containing_block.x - GetBox().GetSize(BoxArea::Margin).x) - ResolveValue(computed.right(), containing_block.x);
 		else
-			position.x = GetBox().GetEdge(Box::MARGIN, Box::LEFT);
+			position.x = GetBox().GetEdge(BoxArea::Margin, BoxEdge::Left);
 
 		if (computed.top().type != Style::Top::Auto)
 			position.y = ResolveValue(computed.top(), containing_block.y);
 		else if (computed.bottom().type != Style::Bottom::Auto)
-			position.y = (containing_block.y - GetBox().GetSize(Box::MARGIN).y) - ResolveValue(computed.bottom(), containing_block.y);
+			position.y = (containing_block.y - GetBox().GetSize(BoxArea::Margin).y) - ResolveValue(computed.bottom(), containing_block.y);
 		else
-			position.y = GetBox().GetEdge(Box::MARGIN, Box::TOP);
+			position.y = GetBox().GetEdge(BoxArea::Margin, BoxEdge::Top);
 
 		SetOffset(position, nullptr);
 	}
@@ -493,7 +493,7 @@ bool ElementDocument::IsLayoutDirty()
 
 void ElementDocument::DirtyVwAndVhProperties()
 {
-	GetStyle()->DirtyPropertiesWithUnitsRecursive(Property::VW | Property::VH);
+	GetStyle()->DirtyPropertiesWithUnitsRecursive(Unit::VW | Unit::VH);
 }
 
 // Repositions the document if necessary.
@@ -503,7 +503,7 @@ void ElementDocument::OnPropertyChange(const PropertyIdSet& changed_properties)
 
 	// If the document's font-size has been changed, we need to dirty all rem properties.
 	if (changed_properties.Contains(PropertyId::FontSize))
-		GetStyle()->DirtyPropertiesWithUnitsRecursive(Property::REM);
+		GetStyle()->DirtyPropertiesWithUnitsRecursive(Unit::REM);
 
 	if (changed_properties.Contains(PropertyId::Top) ||
 		changed_properties.Contains(PropertyId::Right) ||

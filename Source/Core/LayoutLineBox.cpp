@@ -31,7 +31,6 @@
 #include "../../Include/RmlUi/Core/ElementText.h"
 #include "../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../Include/RmlUi/Core/Profiling.h"
-#include "../../Include/RmlUi/Core/Property.h"
 #include "LayoutBlockBox.h"
 #include "LayoutEngine.h"
 #include "LayoutInlineBoxText.h"
@@ -39,11 +38,11 @@
 
 namespace Rml {
 
-static float GetSpacing(const Box& box, Box::Edge edge)
+static float GetSpacing(const Box& box, BoxEdge edge)
 {
-	return box.GetEdge(Box::PADDING, edge) +
-		   box.GetEdge(Box::BORDER, edge) +
-		   box.GetEdge(Box::MARGIN, edge);
+	return box.GetEdge(BoxArea::Padding, edge) +
+		   box.GetEdge(BoxArea::Border, edge) +
+		   box.GetEdge(BoxArea::Margin, edge);
 }
 
 LayoutLineBox::LayoutLineBox(LayoutBlockBox* _parent) : position(-1, -1), dimensions(-1, -1)
@@ -187,7 +186,7 @@ void LayoutLineBox::CloseInlineBox(LayoutInlineBox* inline_box)
 	RMLUI_ASSERT(open_inline_box == inline_box);
 
 	open_inline_box = inline_box->GetParent();
-	box_cursor += GetSpacing(inline_box->GetBox(), Box::RIGHT);
+	box_cursor += GetSpacing(inline_box->GetBox(), BoxEdge::Right);
 }
 
 // Attempts to add a new element to this line box.
@@ -233,14 +232,14 @@ LayoutInlineBox* LayoutLineBox::AddBox(UniquePtr<LayoutInlineBox> box_ptr)
 			minimum_dimensions.x += box_cursor;
 
 			// Calculate the right spacing for the element.
-			right_spacing = GetSpacing(box->GetBox(), Box::RIGHT);
+			right_spacing = GetSpacing(box->GetBox(), BoxEdge::Right);
 			// Add the right spacing for any ancestor elements that must close immediately after it.
 			LayoutInlineBox* closing_box = box;
 			while (closing_box && closing_box->IsLastChild())
 			{
 				closing_box = closing_box->GetParent();
 				if (closing_box)
-					right_spacing += GetSpacing(closing_box->GetBox(), Box::RIGHT);
+					right_spacing += GetSpacing(closing_box->GetBox(), BoxEdge::Right);
 			}
 
 			if (!box->CanOverflow())
@@ -263,7 +262,7 @@ LayoutInlineBox* LayoutLineBox::AddBox(UniquePtr<LayoutInlineBox> box_ptr)
 
 		// Build up the spacing required on the right side of this element. This consists of the right spacing on the
 		// new element, and the right spacing on all parent element that will close next.
-		right_spacing = GetSpacing(box->GetBox(), Box::RIGHT);
+		right_spacing = GetSpacing(box->GetBox(), BoxEdge::Right);
 		if (open_inline_box != nullptr &&
 			box->IsLastChild())
 		{
@@ -273,12 +272,12 @@ LayoutInlineBox* LayoutLineBox::AddBox(UniquePtr<LayoutInlineBox> box_ptr)
 			{
 				closing_box = closing_box->GetParent();
 				if (closing_box != nullptr)
-					right_spacing += GetSpacing(closing_box->GetBox(), Box::RIGHT);
+					right_spacing += GetSpacing(closing_box->GetBox(), BoxEdge::Right);
 			}
 		}
 
 		// Determine the inline box's spacing requirements (before we get onto it's actual content width).
-		float element_width = box->GetBox().GetPosition(Box::CONTENT).x;
+		float element_width = box->GetBox().GetPosition(BoxArea::Content).x;
 		if (!box->CanOverflow())
 			element_width += right_spacing;
 
@@ -302,7 +301,7 @@ LayoutInlineBox* LayoutLineBox::AddBox(UniquePtr<LayoutInlineBox> box_ptr)
 
 	float available_width = -1;
 	if (wrap_content)
-		available_width = Math::RoundUpFloat(dimensions.x - (open_inline_box->GetPosition().x + open_inline_box->GetBox().GetPosition(Box::CONTENT).x));
+		available_width = Math::RoundUpFloat(dimensions.x - (open_inline_box->GetPosition().x + open_inline_box->GetBox().GetPosition(BoxArea::Content).x));
 
 	// Flow the box's content into the line.
 	UniquePtr<LayoutInlineBox> overflow_box = open_inline_box->FlowContent(first_box, available_width, right_spacing);
@@ -398,8 +397,8 @@ LayoutInlineBox* LayoutLineBox::AppendBox(UniquePtr<LayoutInlineBox> box_ptr)
 
 	box->SetParent(open_inline_box);
 	box->SetLine(this);
-	box->SetHorizontalPosition(box_cursor + box->GetBox().GetEdge(Box::MARGIN, Box::LEFT));
-	box_cursor += GetSpacing(box->GetBox(), Box::LEFT);
+	box->SetHorizontalPosition(box_cursor + box->GetBox().GetEdge(BoxArea::Margin, BoxEdge::Left));
+	box_cursor += GetSpacing(box->GetBox(), BoxEdge::Left);
 
 	open_inline_box = box;
 	return box;

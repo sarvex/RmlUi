@@ -37,15 +37,15 @@ namespace Rml {
 
 PropertyParserDecorator::PropertyParserDecorator() :
 	decorator_class_map{
-		{"background", DecoratorClasses::Background},
-		{"filter", DecoratorClasses::Filter},
-		{"backdrop-filter", DecoratorClasses::BackdropFilter},
-		{"mask-image", DecoratorClasses::MaskImage},
+		{"background", DecoratorClass::Background},
+		{"filter", DecoratorClass::Filter},
+		{"backdrop-filter", DecoratorClass::BackdropFilter},
+		{"mask-image", DecoratorClass::MaskImage},
 	},
 	area_keywords{
-		{"border-box", PaintArea::Border},
-		{"padding-box", PaintArea::Padding},
-		{"content-box", PaintArea::Content},
+		{"border-box", BoxArea::Border},
+		{"padding-box", BoxArea::Padding},
+		{"content-box", BoxArea::Content},
 	}
 {}
 
@@ -65,7 +65,7 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 	if (decorator_string_value.empty() || decorator_string_value == "none")
 	{
 		property.value = Variant();
-		property.unit = Property::UNKNOWN;
+		property.unit = Unit::UNKNOWN;
 		return true;
 	}
 
@@ -77,7 +77,7 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 		RMLUI_ERRORMSG("Invalid decorator parser parameter.");
 		return false;
 	}
-	const DecoratorClasses decorator_class = it_decorator_class->second;
+	const DecoratorClass decorator_class = it_decorator_class->second;
 
 	DecoratorDeclarationList decorators;
 
@@ -96,22 +96,24 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 		const bool invalid_parenthesis = (shorthand_open == String::npos || shorthand_close == String::npos || shorthand_open >= shorthand_close);
 
 		// Find the paint area for the decorator.
-		PaintArea paint_area = PaintArea::Auto;
+		BoxArea paint_area = BoxArea::Auto;
 		bool paint_area_configurable = false;
 
 		switch (decorator_class)
 		{
-		case DecoratorClasses::Background:
-			paint_area = PaintArea::Padding;
+		case DecoratorClass::Background:
+			paint_area = BoxArea::Padding;
 			paint_area_configurable = true;
 			break;
-		case DecoratorClasses::MaskImage:
-			paint_area = PaintArea::Border;
+		case DecoratorClass::MaskImage:
+			paint_area = BoxArea::Border;
 			paint_area_configurable = true;
 			break;
-		case DecoratorClasses::BackdropFilter:
-		case DecoratorClasses::Filter:
-		case DecoratorClasses::Invalid:
+		case DecoratorClass::BackdropFilter:
+			paint_area = BoxArea::Border;
+			break;
+		case DecoratorClass::Filter:
+		case DecoratorClass::Invalid:
 			break;
 		}
 
@@ -155,7 +157,7 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 				return false;
 			}
 
-			if ((instancer->GetDecoratorClasses() & decorator_class) == DecoratorClasses::Invalid)
+			if ((instancer->GetDecoratorClasses() & decorator_class) == DecoratorClass::Invalid)
 			{
 				Log::Message(Log::LT_WARNING, "Decorator type '%s' used in unsupported property.", type.c_str());
 				return false;
@@ -182,7 +184,7 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 		return false;
 
 	property.value = Variant(MakeShared<DecoratorDeclarationList>(std::move(decorators)));
-	property.unit = Property::DECORATOR;
+	property.unit = Unit::DECORATOR;
 
 	return true;
 }

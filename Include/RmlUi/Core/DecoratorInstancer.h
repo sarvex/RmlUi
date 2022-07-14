@@ -29,6 +29,7 @@
 #ifndef RMLUI_CORE_DECORATORINSTANCER_H
 #define RMLUI_CORE_DECORATORINSTANCER_H
 
+#include "DecorationTypes.h"
 #include "Header.h"
 #include "PropertyDictionary.h"
 #include "PropertySpecification.h"
@@ -54,7 +55,7 @@ class PropertyDefinition;
 class RMLUICORE_API DecoratorInstancer
 {
 public:
-	DecoratorInstancer(DecoratorClasses decorator_classes = DecoratorClasses::Background);
+	DecoratorInstancer(DecoratorClass decorator_classes = DecoratorClass::Background);
 	virtual ~DecoratorInstancer();
 
 	/// Instances a decorator given the property tag and attributes from the RCSS file.
@@ -68,7 +69,7 @@ public:
 	const PropertySpecification& GetPropertySpecification() const;
 
 	/// Returns the decorator classes supported by this decorator.
-	DecoratorClasses GetDecoratorClasses() const;
+	DecoratorClass GetDecoratorClasses() const;
 
 protected:
 	/// Registers a property for the decorator.
@@ -84,7 +85,7 @@ protected:
 	ShorthandId RegisterShorthand(const String& shorthand_name, const String& property_names, ShorthandType type);
 
 private:
-	DecoratorClasses decorator_classes;
+	DecoratorClass decorator_classes;
 	PropertySpecification properties;
 };
 

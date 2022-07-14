@@ -32,7 +32,7 @@
 #include "../../Include/RmlUi/Core/Box.h"
 #include "../../Include/RmlUi/Core/Decorator.h"
 #include "../../Include/RmlUi/Core/DecoratorInstancer.h"
-#include "../../Include/RmlUi/Core/Property.h"
+#include "../../Include/RmlUi/Core/ID.h"
 
 namespace Rml {
 
@@ -43,7 +43,7 @@ public:
 
 	bool Initialise(String&& value);
 
-	DecoratorDataHandle GenerateElementData(Element* element, PaintArea paint_area) const override;
+	DecoratorDataHandle GenerateElementData(Element* element, BoxArea paint_area) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
 
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;

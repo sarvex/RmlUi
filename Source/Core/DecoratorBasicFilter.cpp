@@ -75,7 +75,7 @@ void DecoratorBasicFilter::RenderElement(Element* /*element*/, DecoratorDataHand
 }
 
 DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer(ValueType value_type) :
-	DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter), ids{}
+	DecoratorInstancer(DecoratorClass::Filter | DecoratorClass::BackdropFilter), ids{}
 {
 	switch (value_type)
 	{
@@ -100,9 +100,9 @@ SharedPtr<Decorator> DecoratorBasicFilterInstancer::InstanceDecorator(const Stri
 		return nullptr;
 
 	float value = p_value->Get<float>();
-	if (p_value->unit == Property::PERCENT)
+	if (p_value->unit == Unit::PERCENT)
 		value *= 0.01f;
-	else if (p_value->unit == Property::DEG)
+	else if (p_value->unit == Unit::DEG)
 		value = Rml::Math::DegreesToRadians(value);
 
 	auto decorator = MakeShared<DecoratorBasicFilter>();

@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -26,29 +26,31 @@
  *
  */
 
-#include "PropertyParserKeyword.h"
+#ifndef RMLUI_CORE_NUMERICVALUE_H
+#define RMLUI_CORE_NUMERICVALUE_H
+
+#include "Unit.h"
 
 namespace Rml {
 
-PropertyParserKeyword::PropertyParserKeyword()
+/**
+    A numeric value is a number combined with a unit.
+ */
+struct NumericValue {
+	NumericValue() noexcept : number(0.f), unit(Unit::UNKNOWN) {}
+	NumericValue(float number, Unit unit) noexcept : number(number), unit(unit) {}
+	float number;
+	Unit unit;
+};
+inline bool operator==(const NumericValue& a, const NumericValue& b)
 {
+	return a.number == b.number && a.unit == b.unit;
 }
-
-PropertyParserKeyword::~PropertyParserKeyword()
+inline bool operator!=(const NumericValue& a, const NumericValue& b)
 {
-}
-
-// Called to parse a RCSS keyword declaration.
-bool PropertyParserKeyword::ParseValue(Property& property, const String& value, const ParameterMap& parameters) const
-{
-	ParameterMap::const_iterator iterator = parameters.find(StringUtilities::ToLower(value));
-	if (iterator == parameters.end())
-		return false;
-
-	property.value = Variant((*iterator).second);
-	property.unit = Unit::KEYWORD;
-
-	return true;
+	return !(a == b);
 }
 
 } // namespace Rml
+
+#endif

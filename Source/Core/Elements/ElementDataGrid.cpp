@@ -245,7 +245,7 @@ void ElementDataGrid::OnResize()
 	for (int i = 0; i < header->GetNumChildren(); i++)
 	{
 		Element* child = header->GetChild(i);
-		columns[i].current_width = child->GetBox().GetSize(Box::MARGIN).x;
+		columns[i].current_width = child->GetBox().GetSize(BoxArea::Margin).x;
 	}
 }
 

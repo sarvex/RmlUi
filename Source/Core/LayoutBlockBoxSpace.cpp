@@ -65,7 +65,7 @@ void LayoutBlockBoxSpace::PositionBox(Vector2f& box_position, float& box_width, 
 // Generates and sets the position for a floating box of a given size within our block box.
 float LayoutBlockBoxSpace::PositionBox(float cursor, Element* element)
 {
-	Vector2f element_size = element->GetBox().GetSize(Box::MARGIN);
+	Vector2f element_size = element->GetBox().GetSize(BoxArea::Margin);
 	Style::Float float_property = element->GetComputedValues().float_();
 
 	// Shift the cursor down (if necessary) so it isn't placed any higher than a previously-floated box.
@@ -93,7 +93,7 @@ float LayoutBlockBoxSpace::PositionBox(float cursor, Element* element)
 	dimensions.y = Math::Max(dimensions.y, normalised_offset.y + element_size.y);
 
 	// Shift the offset into the correct space relative to the element's offset parent.
-	element_offset += Vector2f(element->GetBox().GetEdge(Box::MARGIN, Box::LEFT), element->GetBox().GetEdge(Box::MARGIN, Box::TOP));
+	element_offset += Vector2f(element->GetBox().GetEdge(BoxArea::Margin, BoxEdge::Left), element->GetBox().GetEdge(BoxArea::Margin, BoxEdge::Top));
 	element->SetOffset(element_offset - parent->GetOffsetParent()->GetPosition(), parent->GetOffsetParent()->GetElement());
 
 	return element_offset.y + element_size.y;
@@ -127,7 +127,7 @@ float LayoutBlockBoxSpace::ClearBoxes(float cursor, Style::Clear clear_property)
 float LayoutBlockBoxSpace::PositionBox(Vector2f& box_position, float cursor, const Vector2f dimensions, Style::Float float_property) const
 {
 	float parent_scrollbar_width = parent->GetElement()->GetElementScroll()->GetScrollbarSize(ElementScroll::VERTICAL);
-	float parent_origin = parent->GetPosition().x + parent->GetBox().GetPosition(Box::CONTENT).x;
+	float parent_origin = parent->GetPosition().x + parent->GetBox().GetPosition(BoxArea::Content).x;
 	float parent_edge = parent->GetBox().GetSize().x + parent_origin - parent_scrollbar_width;
 
 	AnchorEdge box_edge = float_property == Style::Float::Right ? RIGHT : LEFT;

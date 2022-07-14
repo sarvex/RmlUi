@@ -31,7 +31,7 @@
 
 namespace Rml {
 
-DecoratorInstancer::DecoratorInstancer(DecoratorClasses decorator_classes) : decorator_classes(decorator_classes), properties(10, 10) {}
+DecoratorInstancer::DecoratorInstancer(DecoratorClass decorator_classes) : decorator_classes(decorator_classes), properties(10, 10) {}
 
 DecoratorInstancer::~DecoratorInstancer() {}
 
@@ -41,7 +41,7 @@ const PropertySpecification& DecoratorInstancer::GetPropertySpecification() cons
 	return properties;
 }
 
-DecoratorClasses DecoratorInstancer::GetDecoratorClasses() const
+DecoratorClass DecoratorInstancer::GetDecoratorClasses() const
 {
 	return decorator_classes;
 }

@@ -31,7 +31,7 @@
 
 namespace Rml {
 
-Property::Property() : unit(UNKNOWN), specificity(-1)
+Property::Property() : unit(Unit::UNKNOWN), specificity(-1)
 {
 	definition = nullptr;
 	parser_index = -1;
@@ -45,6 +45,17 @@ String Property::ToString() const
 	String string;
 	definition->GetValue(string, *this);
 	return string;
+}
+
+NumericValue Property::GetNumericValue() const
+{
+	NumericValue result;
+	if (Any(unit & Unit::NUMERIC))
+	{
+		if (value.GetInto(result.number))
+			result.unit = unit;
+	}
+	return result;
 }
 
 } // namespace Rml

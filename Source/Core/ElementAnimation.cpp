@@ -84,9 +84,9 @@ static bool CombineAndDecompose(Transform& t, Element& e)
 }
 
 
-static Property InterpolateProperties(const Property & p0, const Property& p1, float alpha, Element& element, const PropertyDefinition* definition)
+static Property InterpolateProperties(const Property& p0, const Property& p1, float alpha, Element& element, const PropertyDefinition* definition)
 {
-	if ((p0.unit & Property::NUMBER_LENGTH_PERCENT) && (p1.unit & Property::NUMBER_LENGTH_PERCENT))
+	if (Any(p0.unit & Unit::NUMBER_LENGTH_PERCENT) && Any(p1.unit & Unit::NUMBER_LENGTH_PERCENT))
 	{
 		if (p0.unit == p1.unit || !definition)
 		{
@@ -100,14 +100,14 @@ static Property InterpolateProperties(const Property & p0, const Property& p1, f
 		else
 		{
 			// Otherwise, convert units to pixels.
-			float f0 = element.GetStyle()->ResolveLength(&p0, definition->GetRelativeTarget());
-			float f1 = element.GetStyle()->ResolveLength(&p1, definition->GetRelativeTarget());
+			float f0 = element.GetStyle()->ResolveLength(p0.GetNumericValue(), definition->GetRelativeTarget());
+			float f1 = element.GetStyle()->ResolveLength(p1.GetNumericValue(), definition->GetRelativeTarget());
 			float f = (1.0f - alpha) * f0 + alpha * f1;
-			return Property{ f, Property::PX };
+			return Property{ f, Unit::PX };
 		}
 	}
 
-	if (p0.unit == Property::KEYWORD && p1.unit == Property::KEYWORD)
+	if (p0.unit == Unit::KEYWORD && p1.unit == Unit::KEYWORD)
 	{
 		// Discrete interpolation, swap at alpha = 0.5.
 		// Special case for the 'visibility' property as in the CSS specs: 
@@ -123,17 +123,17 @@ static Property InterpolateProperties(const Property & p0, const Property& p1, f
 		return alpha < 0.5f ? p0 : p1;
 	}
 
-	if (p0.unit == Property::COLOUR && p1.unit == Property::COLOUR)
+	if (p0.unit == Unit::COLOUR && p1.unit == Unit::COLOUR)
 	{
 		Colourf c0 = ColourToLinearSpace(p0.value.Get<Colourb>());
 		Colourf c1 = ColourToLinearSpace(p1.value.Get<Colourb>());
 
 		Colourf c = c0 * (1.0f - alpha) + c1 * alpha;
 
-		return Property{ ColourFromLinearSpace(c), Property::COLOUR };
+		return Property{ ColourFromLinearSpace(c), Unit::COLOUR };
 	}
 
-	if (p0.unit == Property::TRANSFORM && p1.unit == Property::TRANSFORM)
+	if (p0.unit == Unit::TRANSFORM && p1.unit == Unit::TRANSFORM)
 	{
 		auto& t0 = p0.value.GetReference<TransformPtr>();
 		auto& t1 = p1.value.GetReference<TransformPtr>();
@@ -144,7 +144,7 @@ static Property InterpolateProperties(const Property & p0, const Property& p1, f
 		if (prim0.size() != prim1.size())
 		{
 			RMLUI_ERRORMSG("Transform primitives not of same size during interpolation. Were the transforms properly prepared for interpolation?");
-			return Property{ t0, Property::TRANSFORM };
+			return Property{ t0, Unit::TRANSFORM };
 		}
 
 		// Build the new, interpolating transform
@@ -157,12 +157,12 @@ static Property InterpolateProperties(const Property & p0, const Property& p1, f
 			if (!TransformUtilities::InterpolateWith(p, prim1[i], alpha))
 			{
 				RMLUI_ERRORMSG("Transform primitives can not be interpolated. Were the transforms properly prepared for interpolation?");
-				return Property{ t0, Property::TRANSFORM };
+				return Property{ t0, Unit::TRANSFORM };
 			}
 			t->AddPrimitive(p);
 		}
 
-		return Property{ TransformPtr(std::move(t)), Property::TRANSFORM };
+		return Property{ TransformPtr(std::move(t)), Unit::TRANSFORM };
 	}
 
 	// Fall back to discrete interpolation for incompatible units.
@@ -364,7 +364,7 @@ static bool PrepareTransforms(Vector<AnimationKey>& keys, Element& element, int 
 		auto& prop0 = keys[i - 1].property;
 		auto& prop1 = keys[i].property;
 
-		if(prop0.unit != Property::TRANSFORM || prop1.unit != Property::TRANSFORM)
+		if(prop0.unit != Unit::TRANSFORM || prop1.unit != Unit::TRANSFORM)
 			return false;
 
 		auto& t0 = prop0.value.GetReference<TransformPtr>();
@@ -407,9 +407,9 @@ ElementAnimation::ElementAnimation(PropertyId property_id, ElementAnimationOrigi
 
 bool ElementAnimation::InternalAddKey(float time, const Property& in_property, Element& element, Tween tween)
 {
-	int valid_properties = (Property::NUMBER_LENGTH_PERCENT | Property::ANGLE | Property::COLOUR | Property::TRANSFORM | Property::KEYWORD);
+	const Units valid_units = (Unit::NUMBER_LENGTH_PERCENT | Unit::ANGLE | Unit::COLOUR | Unit::TRANSFORM | Unit::KEYWORD);
 
-	if (!(in_property.unit & valid_properties))
+	if (!Any(in_property.unit & valid_units))
 	{
 		Log::Message(Log::LT_WARNING, "Property value '%s' is not a valid target for interpolation.", in_property.ToString().c_str());
 		return false;
@@ -418,7 +418,7 @@ bool ElementAnimation::InternalAddKey(float time, const Property& in_property, E
 	keys.emplace_back(time, in_property, tween);
 	bool result = true;
 
-	if (keys.back().property.unit == Property::TRANSFORM)
+	if (keys.back().property.unit == Unit::TRANSFORM)
 	{
 		result = PrepareTransforms(keys, element, (int)keys.size() - 1);
 	}

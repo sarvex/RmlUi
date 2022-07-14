@@ -38,7 +38,7 @@ Decorator::Decorator() {}
 
 Decorator::~Decorator() {}
 
-DecoratorDataHandle Decorator::GenerateElementData(Element* element, PaintArea /*paint_area*/) const
+DecoratorDataHandle Decorator::GenerateElementData(Element* element, BoxArea /*paint_area*/) const
 {
 	// For backward compatibility.
 	return GenerateElementData(element);

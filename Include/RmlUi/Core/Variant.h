@@ -26,8 +26,8 @@
  *
  */
 
-#ifndef RMLUIVARIANT_H
-#define RMLUIVARIANT_H
+#ifndef RMLUI_CORE_VARIANT_H
+#define RMLUI_CORE_VARIANT_H
 
 #include "Header.h"
 #include "Types.h"

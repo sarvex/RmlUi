@@ -48,13 +48,11 @@ bool DecoratorShader::Initialise(String&& in_value)
 	return true;
 }
 
-DecoratorDataHandle DecoratorShader::GenerateElementData(Element* element, PaintArea paint_area) const
+DecoratorDataHandle DecoratorShader::GenerateElementData(Element* element, BoxArea render_area) const
 {
 	RenderInterface* render_interface = element->GetRenderInterface();
 	if (!render_interface)
 		return INVALID_DECORATORDATAHANDLE;
-
-	const Box::Area render_area = ToBoxArea(paint_area);
 
 	const Box& box = element->GetBox();
 	const Vector2f dimensions = box.GetSize(render_area);
@@ -89,10 +87,10 @@ void DecoratorShader::ReleaseElementData(DecoratorDataHandle handle) const
 void DecoratorShader::RenderElement(Element* element, DecoratorDataHandle handle) const
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
-	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(Box::BORDER));
+	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
 }
 
-DecoratorShaderInstancer::DecoratorShaderInstancer() : DecoratorInstancer(DecoratorClasses::Background), ids{}
+DecoratorShaderInstancer::DecoratorShaderInstancer() : DecoratorInstancer(DecoratorClass::Background), ids{}
 {
 	ids.value = RegisterProperty("value", String()).AddParser("string").GetId();
 	RegisterShorthand("decorator", "value", ShorthandType::FallThrough);

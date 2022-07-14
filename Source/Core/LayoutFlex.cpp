@@ -836,7 +836,7 @@ void LayoutFlex::Format()
 
 			// The cell contents may overflow, propagate this to the flex container.
 			const Vector2f overflow_size = item_offset + cell_visible_overflow_size -
-				Vector2f(item.box.GetEdge(Box::MARGIN, Box::LEFT), item.box.GetEdge(Box::MARGIN, Box::TOP));
+				Vector2f(item.box.GetEdge(BoxArea::Margin, BoxEdge::Left), item.box.GetEdge(BoxArea::Margin, BoxEdge::Top));
 
 			flex_content_overflow_size.x = Math::Max(flex_content_overflow_size.x, overflow_size.x);
 			flex_content_overflow_size.y = Math::Max(flex_content_overflow_size.y, overflow_size.y);

@@ -37,6 +37,7 @@
 #include "../../Include/RmlUi/Core/RenderInterface.h"
 #include "ComputeProperty.h"
 #include "DecoratorElementData.h"
+#include <algorithm>
 
 /*
 Gradient decorator usage in CSS:
@@ -62,11 +63,10 @@ bool DecoratorGradient::Initialise(const Direction dir_, const Colourb start_, c
 	return true;
 }
 
-DecoratorDataHandle DecoratorGradient::GenerateElementData(Element* element, PaintArea paint_area) const
+DecoratorDataHandle DecoratorGradient::GenerateElementData(Element* element, BoxArea box_area) const
 {
 	Geometry* geometry = new Geometry(element);
 	const Box& box = element->GetBox();
-	const Box::Area box_area = ToBoxArea(paint_area);
 
 	const ComputedValues& computed = element->GetComputedValues();
 	const float opacity = computed.opacity();
@@ -112,10 +112,10 @@ void DecoratorGradient::ReleaseElementData(DecoratorDataHandle element_data) con
 void DecoratorGradient::RenderElement(Element* element, DecoratorDataHandle element_data) const
 {
 	auto* data = reinterpret_cast<Geometry*>(element_data);
-	data->Render(element->GetAbsoluteOffset(Box::BORDER));
+	data->Render(element->GetAbsoluteOffset(BoxArea::Border));
 }
 
-DecoratorGradientInstancer::DecoratorGradientInstancer() : DecoratorInstancer(DecoratorClasses::Background | DecoratorClasses::MaskImage)
+DecoratorGradientInstancer::DecoratorGradientInstancer() : DecoratorInstancer(DecoratorClass::Background | DecoratorClass::MaskImage)
 {
 	ids.direction = RegisterProperty("direction", "horizontal").AddParser("keyword", "horizontal, vertical").GetId();
 	ids.start = RegisterProperty("start-color", "#ffffff").AddParser("color").GetId();
@@ -183,7 +183,7 @@ static GradientPoints CalculateGradientPoints(float angle, Vector2f dim)
 	return {starting_point, ending_point, distance};
 }
 
-DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* element, PaintArea paint_area) const
+DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* element, BoxArea box_area) const
 {
 	RenderInterface* render_interface = element->GetRenderInterface();
 	if (!render_interface)
@@ -191,40 +191,41 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 
 	RMLUI_ASSERT(!color_stops.empty());
 
-	const Box::Area box_area = ToBoxArea(paint_area);
 	const Box& box = element->GetBox();
 	const Vector2f dimensions = box.GetSize(box_area);
 	GradientPoints gradient_points = CalculateGradientPoints(angle, dimensions);
 	const float length = gradient_points.length;
 
-	using StopPosition = ColorStop::Position;
 	ColorStopList stops = color_stops;
 	const int num_stops = (int)stops.size();
 
-	// Resolve all lengths to numbers.
+	// Resolve all lengths and percentages to numbers. After this step all stops with a unit other than Number are considered as Auto.
 	for (ColorStop& stop : stops)
 	{
-		if (stop.position == StopPosition::Length)
+		if (Any(stop.position.unit & Unit::LENGTH))
 		{
-			stop.position_value = stop.position_value / length;
-			stop.position = StopPosition::Number;
+			const float resolved_position = element->ResolveLength(stop.position);
+			stop.position = NumericValue(resolved_position / length, Unit::NUMBER);
+		}
+		else if (stop.position.unit == Unit::PERCENT)
+		{
+			stop.position = NumericValue(stop.position.number * 0.01f, Unit::NUMBER);
 		}
 	}
 
 	// Resolve auto positions of the first and last color stops.
 	auto resolve_edge_stop = [](ColorStop& stop, float auto_to_number) {
-		if (stop.position == StopPosition::Auto)
-			stop.position_value = auto_to_number;
-		stop.position = StopPosition::Number;
+		if (stop.position.unit != Unit::NUMBER)
+			stop.position = NumericValue(auto_to_number, Unit::NUMBER);
 	};
 	resolve_edge_stop(stops[0], 0.f);
 	resolve_edge_stop(stops[num_stops - 1], 1.f);
 
 	// Ensures that color stop positions are strictly increasing, and have at least 1px spacing to avoid aliasing.
-	auto nudge_stop = [prev_position = stops[0].position_value, pixel = 1.f / length](ColorStop& stop, bool update_prev = true) mutable {
-		stop.position_value = Math::Max(stop.position_value, prev_position + pixel);
+	auto nudge_stop = [prev_position = stops[0].position.number, pixel = 1.f / length](ColorStop& stop, bool update_prev = true) mutable {
+		stop.position.number = Math::Max(stop.position.number, prev_position + pixel);
 		if (update_prev)
-			prev_position = stop.position_value;
+			prev_position = stop.position.number;
 	};
 	int auto_begin_i = -1;
 
@@ -232,8 +233,9 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 	for (int i = 1; i < num_stops; i++)
 	{
 		ColorStop& stop = stops[i];
-		if (stop.position == StopPosition::Auto)
+		if (stop.position.unit != Unit::NUMBER)
 		{
+			// Mark the first of any consecutive auto stops.
 			if (auto_begin_i < 0)
 				auto_begin_i = i;
 		}
@@ -247,14 +249,13 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 			// Space out all the previous auto stops, indices [auto_begin_i, i).
 			nudge_stop(stop, false);
 			const int num_auto_stops = i - auto_begin_i;
-			const float t0 = stops[auto_begin_i - 1].position_value;
-			const float t1 = stop.position_value;
+			const float t0 = stops[auto_begin_i - 1].position.number;
+			const float t1 = stop.position.number;
 
 			for (int j = 0; j < num_auto_stops; j++)
 			{
 				const float fraction_along_t0_t1 = float(j + 1) / float(num_auto_stops + 1);
-				stops[j + auto_begin_i].position_value = t0 + (t1 - t0) * fraction_along_t0_t1;
-				stops[j + auto_begin_i].position = StopPosition::Number;
+				stops[j + auto_begin_i].position = NumericValue(t0 + (t1 - t0) * fraction_along_t0_t1, Unit::NUMBER);
 				nudge_stop(stops[j + auto_begin_i]);
 			}
 
@@ -263,12 +264,7 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 		}
 	}
 
-#ifdef RMLUI_DEBUG
-	for (const ColorStop& stop : stops)
-	{
-		RMLUI_ASSERT(stop.position == StopPosition::Number);
-	}
-#endif
+	RMLUI_ASSERT(std::all_of(stops.begin(), stops.end(), [](auto&& stop) { return stop.position.unit == Unit::NUMBER; }));
 
 	CompiledEffectHandle effect_handle = render_interface->CompileEffect("linear-gradient",
 		Dictionary{
@@ -305,10 +301,10 @@ void DecoratorLinearGradient::ReleaseElementData(DecoratorDataHandle handle) con
 void DecoratorLinearGradient::RenderElement(Element* element, DecoratorDataHandle handle) const
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
-	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(Box::BORDER));
+	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
 }
 
-DecoratorLinearGradientInstancer::DecoratorLinearGradientInstancer() : DecoratorInstancer(DecoratorClasses::Background | DecoratorClasses::MaskImage)
+DecoratorLinearGradientInstancer::DecoratorLinearGradientInstancer() : DecoratorInstancer(DecoratorClass::Background | DecoratorClass::MaskImage)
 {
 	ids.angle = RegisterProperty("angle", "180deg").AddParser("angle").GetId();
 	ids.color_stop_list = RegisterProperty("color-stops", "").AddParser("color_stop_list").GetId();
@@ -322,13 +318,13 @@ SharedPtr<Decorator> DecoratorLinearGradientInstancer::InstanceDecorator(const S
 	const DecoratorInstancerInterface& /*interface_*/)
 {
 	const Property* p_angle = properties_.GetProperty(ids.angle);
-	if (!p_angle || !(p_angle->unit & Property::ANGLE))
+	if (!p_angle || !Any(p_angle->unit & Unit::ANGLE))
 		return nullptr;
 	const Property* p_color_stop_list = properties_.GetProperty(ids.color_stop_list);
-	if (!p_color_stop_list || p_color_stop_list->unit != Property::COLORSTOPLIST)
+	if (!p_color_stop_list || p_color_stop_list->unit != Unit::COLORSTOPLIST)
 		return nullptr;
 
-	const float angle = ComputeAngle(*p_angle);
+	const float angle = ComputeAngle(p_angle->GetNumericValue());
 
 	const ColorStopList& color_stop_list = p_color_stop_list->value.GetReference<ColorStopList>();
 

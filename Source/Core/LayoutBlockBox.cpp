@@ -32,7 +32,6 @@
 #include "../../Include/RmlUi/Core/ElementScroll.h"
 #include "../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../Include/RmlUi/Core/Profiling.h"
-#include "../../Include/RmlUi/Core/Property.h"
 #include "LayoutBlockBoxSpace.h"
 #include "LayoutDetails.h"
 #include "LayoutEngine.h"
@@ -108,12 +107,12 @@ LayoutBlockBox::LayoutBlockBox(LayoutBlockBox* _parent, Element* _element, const
 		overflow_y_property = computed.overflow_y();
 
 		if (overflow_x_property == Style::Overflow::Scroll)
-			element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(Box::PADDING).x);
+			element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(BoxArea::Padding).x);
 		else
 			element->GetElementScroll()->DisableScrollbar(ElementScroll::HORIZONTAL);
 
 		if (overflow_y_property == Style::Overflow::Scroll)
-			element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSize(Box::PADDING).x);
+			element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSize(BoxArea::Padding).x);
 		else
 			element->GetElementScroll()->DisableScrollbar(ElementScroll::VERTICAL);
 
@@ -189,7 +188,7 @@ LayoutBlockBox::CloseResult LayoutBlockBox::Close()
 	}
 
 	// Set this box's height, if necessary.
-	if (box.GetSize(Box::CONTENT).y < 0)
+	if (box.GetSize(BoxArea::Content).y < 0)
 	{
 		Vector2f content_area = box.GetSize();
 		content_area.y = Math::Clamp(box_cursor, min_height, max_height);
@@ -223,7 +222,7 @@ LayoutBlockBox::CloseResult LayoutBlockBox::Close()
 		{
 			if (overflow_x_property == Style::Overflow::Auto)
 			{
-				element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(Box::PADDING).x);
+				element->GetElementScroll()->EnableScrollbar(ElementScroll::HORIZONTAL, box.GetSize(BoxArea::Padding).x);
 
 				if (!CatchVerticalOverflow())
 					return LAYOUT_SELF;
@@ -236,26 +235,26 @@ LayoutBlockBox::CloseResult LayoutBlockBox::Close()
 			return LAYOUT_SELF;
 
 		const Vector2f padding_edges = Vector2f(
-			box.GetEdge(Box::PADDING, Box::LEFT) + box.GetEdge(Box::PADDING, Box::RIGHT),
-			box.GetEdge(Box::PADDING, Box::TOP) + box.GetEdge(Box::PADDING, Box::BOTTOM)
+			box.GetEdge(BoxArea::Padding, BoxEdge::Left) + box.GetEdge(BoxArea::Padding, BoxEdge::Right),
+			box.GetEdge(BoxArea::Padding, BoxEdge::Top) + box.GetEdge(BoxArea::Padding, BoxEdge::Bottom)
 		);
 
 		element->SetBox(box);
 		element->SetContentBox(space->GetOffset(), content_box + padding_edges);
 
-		const Vector2f margin_size = box.GetSize(Box::MARGIN);
+		const Vector2f margin_size = box.GetSize(BoxArea::Margin);
 
 		// Set the visible overflow size so that ancestors can catch any overflow produced by us. That is, hiding it or providing a scrolling mechanism.
 		// If we catch our own overflow here, then just use the normal margin box as that will effectively remove the overflow from our ancestor's perspective.
 		if (overflow_x_property != Style::Overflow::Visible)
 			visible_overflow_size.x = margin_size.x;
 		else
-			visible_overflow_size.x = Math::Max(margin_size.x, content_box.x + box.GetEdge(Box::MARGIN, Box::LEFT) + box.GetEdge(Box::BORDER, Box::LEFT) + box.GetEdge(Box::PADDING, Box::LEFT));
+			visible_overflow_size.x = Math::Max(margin_size.x, content_box.x + box.GetEdge(BoxArea::Margin, BoxEdge::Left) + box.GetEdge(BoxArea::Border, BoxEdge::Left) + box.GetEdge(BoxArea::Padding, BoxEdge::Left));
 
 		if (overflow_y_property != Style::Overflow::Visible)
 			visible_overflow_size.y = margin_size.y;
 		else
-			visible_overflow_size.y = Math::Max(margin_size.y, content_box.y + box.GetEdge(Box::MARGIN, Box::TOP) + box.GetEdge(Box::BORDER, Box::TOP) + box.GetEdge(Box::PADDING, Box::TOP));
+			visible_overflow_size.y = Math::Max(margin_size.y, content_box.y + box.GetEdge(BoxArea::Margin, BoxEdge::Top) + box.GetEdge(BoxArea::Border, BoxEdge::Top) + box.GetEdge(BoxArea::Padding, BoxEdge::Top));
 
 		// Format any scrollbars which were enabled on this element.
 		element->GetElementScroll()->FormatScrollbars();
@@ -333,9 +332,9 @@ bool LayoutBlockBox::CloseBlockBox(LayoutBlockBox* child)
 {
 	RMLUI_ASSERT(context == BLOCK);
 	
-	const float child_position_y = child->GetPosition().y - child->box.GetEdge(Box::MARGIN, Box::TOP) - (box.GetPosition().y + position.y);
+	const float child_position_y = child->GetPosition().y - child->box.GetEdge(BoxArea::Margin, BoxEdge::Top) - (box.GetPosition().y + position.y);
 	
-	box_cursor = child_position_y + child->GetBox().GetSize(Box::MARGIN).y;
+	box_cursor = child_position_y + child->GetBox().GetSize(BoxArea::Margin).y;
 	
 	// Extend the inner content size. The vertical size can be larger than the box_cursor due to overflow.
 	inner_content_size.x = Math::Max(inner_content_size.x, child->visible_overflow_size.x);
@@ -524,7 +523,7 @@ void LayoutBlockBox::CloseAbsoluteElements()
 	if (!absolute_elements.empty())
 	{
 		// The size of the containing box, including the padding. This is used to resolve relative offsets.
-		Vector2f containing_block = GetBox().GetSize(Box::PADDING);
+		Vector2f containing_block = GetBox().GetSize(BoxArea::Padding);
 
 		for (size_t i = 0; i < absolute_elements.size(); i++)
 		{
@@ -538,8 +537,8 @@ void LayoutBlockBox::CloseAbsoluteElements()
 			// Now that the element's box has been built, we can offset the position we determined was appropriate for
 			// it by the element's margin. This is necessary because the coordinate system for the box begins at the
 			// border, not the margin.
-			absolute_position.x += absolute_element->GetBox().GetEdge(Box::MARGIN, Box::LEFT);
-			absolute_position.y += absolute_element->GetBox().GetEdge(Box::MARGIN, Box::TOP);
+			absolute_position.x += absolute_element->GetBox().GetEdge(BoxArea::Margin, BoxEdge::Left);
+			absolute_position.y += absolute_element->GetBox().GetEdge(BoxArea::Margin, BoxEdge::Top);
 
 			// Set the offset of the element; the element itself will take care of any RCSS-defined positional offsets.
 			absolute_element->SetOffset(absolute_position, element);
@@ -566,7 +565,7 @@ void LayoutBlockBox::PositionBox(Vector2f& box_position, float top_margin, Style
 		if (!block_boxes.empty() &&
 			block_boxes.back()->context == BLOCK)
 		{
-			const float bottom_margin = block_boxes.back()->GetBox().GetEdge(Box::MARGIN, Box::BOTTOM);
+			const float bottom_margin = block_boxes.back()->GetBox().GetEdge(BoxArea::Margin, BoxEdge::Bottom);
 
 			const int num_negative_margins = int(top_margin < 0.f) + int(bottom_margin < 0.f);
 			switch (num_negative_margins)
@@ -591,9 +590,9 @@ void LayoutBlockBox::PositionBox(Vector2f& box_position, float top_margin, Style
 // dimensions, will be positioned at. This will include the margins on the new block box.
 void LayoutBlockBox::PositionBlockBox(Vector2f& box_position, const Box& box, Style::Clear clear_property) const
 {
-	PositionBox(box_position, box.GetEdge(Box::MARGIN, Box::TOP), clear_property);
-	box_position.x += box.GetEdge(Box::MARGIN, Box::LEFT);
-	box_position.y += box.GetEdge(Box::MARGIN, Box::TOP);
+	PositionBox(box_position, box.GetEdge(BoxArea::Margin, BoxEdge::Top), clear_property);
+	box_position.x += box.GetEdge(BoxArea::Margin, BoxEdge::Left);
+	box_position.y += box.GetEdge(BoxArea::Margin, BoxEdge::Top);
 }
 
 // Returns the offset from the top-left corner of this box for the next line.
@@ -620,7 +619,7 @@ float LayoutBlockBox::GetShrinkToFitWidth() const
 			for (size_t i = 0; i < block_boxes.size(); i++)
 			{
 				const Box& box = block_boxes[i]->GetBox();
-				const float edge_size = box.GetCumulativeEdge(Box::PADDING, Box::LEFT) + box.GetCumulativeEdge(Box::PADDING, Box::RIGHT);
+				const float edge_size = box.GetCumulativeEdge(BoxArea::Padding, BoxEdge::Left) + box.GetCumulativeEdge(BoxArea::Padding, BoxEdge::Right);
 				content_width = Math::Max(content_width, block_boxes[i]->GetShrinkToFitWidth() + edge_size);
 			}
 		};
@@ -630,7 +629,7 @@ float LayoutBlockBox::GetShrinkToFitWidth() const
 		if (element)
 		{
 			auto& computed = element->GetComputedValues();
-			const float block_width = box.GetSize(Box::CONTENT).x;
+			const float block_width = box.GetSize(BoxArea::Content).x;
 
 			if (computed.width().type == Style::Width::Auto)
 			{
@@ -663,7 +662,7 @@ float LayoutBlockBox::GetShrinkToFitWidth() const
 			LayoutLineBox* line_box = line_boxes[i].get();
 			content_width = Math::Max(content_width, line_box->GetBoxCursor());
 		}
-		content_width = Math::Min(content_width, box.GetSize(Box::CONTENT).x);
+		content_width = Math::Min(content_width, box.GetSize(BoxArea::Content).x);
 	}
 
 	return content_width;
@@ -771,7 +770,7 @@ bool LayoutBlockBox::CatchVerticalOverflow(float cursor)
 		{
 			RMLUI_ZoneScopedC(0xDD3322);
 			vertical_overflow = true;
-			element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSize(Box::PADDING).x);
+			element->GetElementScroll()->EnableScrollbar(ElementScroll::VERTICAL, box.GetSize(BoxArea::Padding).x);
 
 			block_boxes.clear();
 

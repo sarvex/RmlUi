@@ -28,6 +28,7 @@
 
 #include "PropertyParserColorStopList.h"
 #include "../../Include/RmlUi/Core/ComputedValues.h"
+#include "../../Include/RmlUi/Core/DecorationTypes.h"
 #include <string.h>
 
 namespace Rml {
@@ -80,35 +81,16 @@ bool PropertyParserColorStopList::ParseValue(Property& property, const String& v
 				return false;
 		}
 
-		switch (p_position.unit)
-		{
-		case Property::KEYWORD:
-			color_stop.position = ColorStop::Position::Auto;
-			break;
-		case Property::NUMBER:
-			color_stop.position = ColorStop::Position::Number;
-			color_stop.position_value = p_position.Get<float>();
-			break;
-		case Property::PERCENT:
-			color_stop.position = ColorStop::Position::Number;
-			color_stop.position_value = 0.01f * p_position.Get<float>();
-			break;
-		case Property::PX:
-			color_stop.position = ColorStop::Position::Length;
-			color_stop.position_value = p_position.Get<float>();
-			break;
-		default:
-			Log::Message(Log::LT_WARNING,
-				"Unsupported color stop position unit encountered in '%s'. Only number, percent, 'px' and 'auto' values supported.",
-				p_position.ToString().c_str());
+		if (Any(p_position.unit & Unit::NUMBER_LENGTH_PERCENT))
+			color_stop.position = NumericValue(p_position.Get<float>(), p_position.unit);
+		else if (p_position.unit != Unit::KEYWORD)
 			return false;
-		}
 
 		color_stops.push_back(color_stop);
 	}
 
 	property.value = Variant(std::move(color_stops));
-	property.unit = Property::COLORSTOPLIST;
+	property.unit = Unit::COLORSTOPLIST;
 
 	return true;
 }

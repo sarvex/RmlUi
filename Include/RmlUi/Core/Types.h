@@ -43,8 +43,8 @@ using byte = unsigned char;
 using ScriptObject = void*;
 using std::size_t;
 
-// Unicode code point
-enum class Character : char32_t { Null, Replacement = 0xfffd };
+enum class Character : char32_t { Null, Replacement = 0xfffd }; // Unicode code point
+enum class BoxArea { Margin, Border, Padding, Content, Auto };
 
 }
 
@@ -55,6 +55,7 @@ enum class Character : char32_t { Null, Replacement = 0xfffd };
 #include "Rectangle.h"
 #include "Matrix4.h"
 #include "ObserverPtr.h"
+#include "Unit.h"
 
 namespace Rml {
 
@@ -90,10 +91,13 @@ struct Animation;
 struct Transition;
 struct TransitionList;
 struct DecoratorDeclarationList;
+struct ColorStop;
+struct Shadow;
 enum class EventId : uint16_t;
 enum class PropertyId : uint8_t;
 enum class MediaQueryId : uint8_t;
 enum class FamilyId : int;
+enum class DecoratorClass : byte;
 
 // Types for external interfaces.
 using FileHandle = uintptr_t;
@@ -128,60 +132,8 @@ struct FontEffects {
 	FontEffectList list;
 	String value;
 };
-
-// TODO, move
-struct ColorStop {
-	enum class Position { Auto, Number, Length };
-	Colourb color;
-	Position position;
-	float position_value;
-};
-inline bool operator==(const ColorStop& a, const ColorStop& b)
-{
-	return a.color == b.color && a.position == b.position && a.position_value == b.position_value;
-}
-inline bool operator!=(const ColorStop& a, const ColorStop& b)
-{
-	return !(a == b);
-}
 using ColorStopList = Vector<ColorStop>;
-
-// TODO, move
-struct Shadow {
-	Colourb color;
-	Vector2f offset;
-	float blur_radius = 0;
-	float spread_distance = 0;
-	bool inset = false;
-};
 using ShadowList = Vector<Shadow>;
-inline bool operator==(const Shadow& a, const Shadow& b)
-{
-	return a.color == b.color && a.offset == b.offset && a.blur_radius == b.blur_radius && a.spread_distance == b.spread_distance &&
-		a.inset == b.inset;
-}
-inline bool operator!=(const Shadow& a, const Shadow& b)
-{
-	return !(a == b);
-}
-// The values should correspond to a subset of Box::Area using the same underlying numeric values.
-enum class PaintArea { Auto, Border, Padding, Content };
-
-enum class DecoratorClasses : byte {
-	Invalid = 0,
-	Background = 1 << 0,
-	Filter = 1 << 1,
-	BackdropFilter = 1 << 2,
-	MaskImage = 1 << 3,
-};
-inline DecoratorClasses operator|(DecoratorClasses a, DecoratorClasses b)
-{
-	return DecoratorClasses(byte(a) | byte(b));
-}
-inline DecoratorClasses operator&(DecoratorClasses a, DecoratorClasses b)
-{
-	return DecoratorClasses(byte(a) & byte(b));
-}
 
 // Additional smart pointers
 using TransformPtr = SharedPtr< Transform >;

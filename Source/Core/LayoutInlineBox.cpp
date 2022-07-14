@@ -32,7 +32,6 @@
 #include "../../Include/RmlUi/Core/ElementText.h"
 #include "../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../Include/RmlUi/Core/FontEngineInterface.h"
-#include "../../Include/RmlUi/Core/Property.h"
 #include "LayoutBlockBox.h"
 #include "LayoutEngine.h"
 
@@ -51,8 +50,8 @@ LayoutInlineBox::LayoutInlineBox(Element* _element, const Box& _box) : position(
 	// If this box has intrinsic dimensions, then we set our height to the total height of the element; otherwise, it is zero height.
 	if (box.GetSize().y > 0)
 	{
-		height = box.GetSize(Box::MARGIN).y;
-		baseline = element->GetBaseline() + box.GetCumulativeEdge(Box::CONTENT, Box::BOTTOM);
+		height = box.GetSize(BoxArea::Margin).y;
+		baseline = element->GetBaseline() + box.GetCumulativeEdge(BoxArea::Content, BoxEdge::Bottom);
 	}
 	else
 	{
@@ -93,9 +92,9 @@ LayoutInlineBox::LayoutInlineBox(LayoutInlineBox* _chain) : position(0, 0), box(
 	chained = true;
 
 	// As we're a split box, our left side is cleared and content set back to (-1, -1).
-	box.SetEdge(Box::PADDING, Box::LEFT, 0);
-	box.SetEdge(Box::BORDER, Box::LEFT, 0);
-	box.SetEdge(Box::MARGIN, Box::LEFT, 0);
+	box.SetEdge(BoxArea::Padding, BoxEdge::Left, 0);
+	box.SetEdge(BoxArea::Border, BoxEdge::Left, 0);
+	box.SetEdge(BoxArea::Margin, BoxEdge::Left, 0);
 	box.SetContent(Vector2f(-1, -1));
 }
 
@@ -155,7 +154,7 @@ UniquePtr<LayoutInlineBox> LayoutInlineBox::FlowContent(bool RMLUI_UNUSED_PARAME
 	// If we're representing a sized element, then add our element's width onto our parent's.
 	if (parent != nullptr &&
 		box.GetSize().x > 0)
-		parent->width += box.GetSize(Box::MARGIN).x;
+		parent->width += box.GetSize(BoxArea::Margin).x;
 
 	// Nothing else to do here; static elements will automatically be 'flowed' into their lines when they are placed.
 	return nullptr;
@@ -313,12 +312,12 @@ void LayoutInlineBox::PositionElement()
 	{
 		// If this unsised element has any top margins, border or padding, then shift the position up so the borders
 		// and background will render in the right place.
-		position.y -= box.GetCumulativeEdge(Box::CONTENT, Box::TOP);
+		position.y -= box.GetCumulativeEdge(BoxArea::Content, BoxEdge::Top);
 	}
 	// Otherwise; we're a sized element (replaced or inline-block), so we need to offset our element's vertical
 	// position by our top margin (as the origin of an element is the top-left of the border, not the margin).
 	else
-		position.y += box.GetEdge(Box::MARGIN, Box::TOP);
+		position.y += box.GetEdge(BoxArea::Margin, BoxEdge::Top);
 
 	if (!chained)
 		element->SetOffset(line->GetRelativePosition() + position, line->GetBlockBox()->GetOffsetParent()->GetElement());
@@ -338,15 +337,15 @@ void LayoutInlineBox::SizeElement(bool split)
 	Box element_box = box;
 	if (split)
 	{
-		element_box.SetEdge(Box::MARGIN, Box::RIGHT, 0);
-		element_box.SetEdge(Box::BORDER, Box::RIGHT, 0);
-		element_box.SetEdge(Box::PADDING, Box::RIGHT, 0);
+		element_box.SetEdge(BoxArea::Margin, BoxEdge::Right, 0);
+		element_box.SetEdge(BoxArea::Border, BoxEdge::Right, 0);
+		element_box.SetEdge(BoxArea::Padding, BoxEdge::Right, 0);
 	}
 
 	// The elements of a chained box have already had their positions set by the first link.
 	if (chained)
 	{
-		const Vector2f box_offset = (line->GetPosition() + position) - element->GetRelativeOffset(Box::BORDER);
+		const Vector2f box_offset = (line->GetPosition() + position) - element->GetRelativeOffset(BoxArea::Border);
 		element->AddBox(element_box, box_offset);
 
 		if (chain != nullptr)

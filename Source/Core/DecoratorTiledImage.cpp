@@ -58,7 +58,7 @@ DecoratorDataHandle DecoratorTiledImage::GenerateElementData(Element* element) c
 	data->SetTexture(GetTexture());
 
 	// Generate the geometry for the tile.
-	tile.GenerateGeometry(data->GetVertices(), data->GetIndices(), element, Vector2f(0, 0), element->GetBox().GetSize(Box::PADDING), tile.GetNaturalDimensions(element));
+	tile.GenerateGeometry(data->GetVertices(), data->GetIndices(), element, Vector2f(0, 0), element->GetBox().GetSize(BoxArea::Padding), tile.GetNaturalDimensions(element));
 
 	return reinterpret_cast<DecoratorDataHandle>(data);
 }
@@ -73,7 +73,7 @@ void DecoratorTiledImage::ReleaseElementData(DecoratorDataHandle element_data) c
 void DecoratorTiledImage::RenderElement(Element* element, DecoratorDataHandle element_data) const
 {
 	Geometry* data = reinterpret_cast< Geometry* >(element_data);
-	data->Render(element->GetAbsoluteOffset(Box::PADDING).Round());
+	data->Render(element->GetAbsoluteOffset(BoxArea::Padding).Round());
 }
 
 } // namespace Rml

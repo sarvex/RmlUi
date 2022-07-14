@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -39,15 +39,12 @@ GeometryBackgroundBorder::GeometryBackgroundBorder(Vector<Vertex>& vertices, Vec
 BorderMetrics GeometryBackgroundBorder::ComputeBorderMetrics(Vector2f outer_position, EdgeSizes edge_sizes, Vector2f inner_size,
 	Vector4f outer_radii_def)
 {
-	using Edge = Box::Edge;
-
 	BorderMetrics metrics = {};
 
 	// -- Find the corner positions --
 
-	const Vector2f inner_position = outer_position + Vector2f(edge_sizes[Edge::LEFT], edge_sizes[Edge::TOP]);
-	const Vector2f outer_size =
-		inner_size + Vector2f(edge_sizes[Edge::LEFT] + edge_sizes[Edge::RIGHT], edge_sizes[Edge::TOP] + edge_sizes[Edge::BOTTOM]);
+	const Vector2f inner_position = outer_position + Vector2f(edge_sizes[LEFT], edge_sizes[TOP]);
+	const Vector2f outer_size = inner_size + Vector2f(edge_sizes[LEFT] + edge_sizes[RIGHT], edge_sizes[TOP] + edge_sizes[BOTTOM]);
 
 	metrics.positions_outer = {
 		outer_position,
@@ -93,10 +90,10 @@ BorderMetrics GeometryBackgroundBorder::ComputeBorderMetrics(Vector2f outer_posi
 		};
 
 		metrics.inner_radii = {
-			Vector2f(outer_radii[TOP_LEFT]) - Vector2f(edge_sizes[Edge::LEFT], edge_sizes[Edge::TOP]),
-			Vector2f(outer_radii[TOP_RIGHT]) - Vector2f(edge_sizes[Edge::RIGHT], edge_sizes[Edge::TOP]),
-			Vector2f(outer_radii[BOTTOM_RIGHT]) - Vector2f(edge_sizes[Edge::RIGHT], edge_sizes[Edge::BOTTOM]),
-			Vector2f(outer_radii[BOTTOM_LEFT]) - Vector2f(edge_sizes[Edge::LEFT], edge_sizes[Edge::BOTTOM]),
+			Vector2f(outer_radii[TOP_LEFT]) - Vector2f(edge_sizes[LEFT], edge_sizes[TOP]),
+			Vector2f(outer_radii[TOP_RIGHT]) - Vector2f(edge_sizes[RIGHT], edge_sizes[TOP]),
+			Vector2f(outer_radii[BOTTOM_RIGHT]) - Vector2f(edge_sizes[RIGHT], edge_sizes[BOTTOM]),
+			Vector2f(outer_radii[BOTTOM_LEFT]) - Vector2f(edge_sizes[LEFT], edge_sizes[BOTTOM]),
 		};
 	}
 
@@ -118,21 +115,20 @@ void GeometryBackgroundBorder::DrawBorder(const BorderMetrics& metrics, EdgeSize
 {
 	RMLUI_ASSERT(border_colors);
 
-	using Edge = Box::Edge;
 	const int offset_vertices = (int)vertices.size();
 
 	const bool draw_edge[4] = {
-		edge_sizes[Edge::TOP] > 0 && border_colors[Edge::TOP].alpha > 0,
-		edge_sizes[Edge::RIGHT] > 0 && border_colors[Edge::RIGHT].alpha > 0,
-		edge_sizes[Edge::BOTTOM] > 0 && border_colors[Edge::BOTTOM].alpha > 0,
-		edge_sizes[Edge::LEFT] > 0 && border_colors[Edge::LEFT].alpha > 0,
+		edge_sizes[TOP] > 0 && border_colors[TOP].alpha > 0,
+		edge_sizes[RIGHT] > 0 && border_colors[RIGHT].alpha > 0,
+		edge_sizes[BOTTOM] > 0 && border_colors[BOTTOM].alpha > 0,
+		edge_sizes[LEFT] > 0 && border_colors[LEFT].alpha > 0,
 	};
 
 	const bool draw_corner[4] = {
-		draw_edge[Edge::TOP] || draw_edge[Edge::LEFT],
-		draw_edge[Edge::TOP] || draw_edge[Edge::RIGHT],
-		draw_edge[Edge::BOTTOM] || draw_edge[Edge::RIGHT],
-		draw_edge[Edge::BOTTOM] || draw_edge[Edge::LEFT],
+		draw_edge[TOP] || draw_edge[LEFT],
+		draw_edge[TOP] || draw_edge[RIGHT],
+		draw_edge[BOTTOM] || draw_edge[RIGHT],
+		draw_edge[BOTTOM] || draw_edge[LEFT],
 	};
 
 	for (int corner = 0; corner < 4; corner++)
@@ -152,7 +148,7 @@ void GeometryBackgroundBorder::DrawBorder(const BorderMetrics& metrics, EdgeSize
 			RMLUI_ASSERTMSG(draw_corner[corner] && draw_corner[(corner + 1) % 4],
 				"Border edges can only be drawn if both of its connected corners are drawn.");
 
-			FillEdge(edge1 == Edge::LEFT ? offset_vertices : (int)vertices.size());
+			FillEdge(edge1 == LEFT ? offset_vertices : (int)vertices.size());
 		}
 	}
 }
@@ -220,7 +216,8 @@ void GeometryBackgroundBorder::FillBackground(int index_start)
 	}
 }
 
-void GeometryBackgroundBorder::DrawBorderCorner(Corner corner, Vector2f pos_outer, Vector2f pos_inner, Vector2f pos_circle_center, float R, Vector2f r, Colourb color0, Colourb color1)
+void GeometryBackgroundBorder::DrawBorderCorner(Corner corner, Vector2f pos_outer, Vector2f pos_inner, Vector2f pos_circle_center, float R,
+	Vector2f r, Colourb color0, Colourb color1)
 {
 	const float a0 = float((int)corner + 2) * 0.5f * Math::RMLUI_PI;
 	const float a1 = float((int)corner + 3) * 0.5f * Math::RMLUI_PI;
@@ -255,7 +252,8 @@ void GeometryBackgroundBorder::DrawPointPoint(Vector2f pos_outer, Vector2f pos_i
 	}
 }
 
-void GeometryBackgroundBorder::DrawArcArc(Vector2f pos_center, float R, Vector2f r, float a0, float a1, Colourb color0, Colourb color1, int num_points)
+void GeometryBackgroundBorder::DrawArcArc(Vector2f pos_center, float R, Vector2f r, float a0, float a1, Colourb color0, Colourb color1,
+	int num_points)
 {
 	RMLUI_ASSERT(num_points >= 2 && R > 0 && r.x > 0 && r.y > 0);
 
@@ -293,7 +291,8 @@ void GeometryBackgroundBorder::DrawArcArc(Vector2f pos_center, float R, Vector2f
 	}
 }
 
-void GeometryBackgroundBorder::DrawArcPoint(Vector2f pos_center, Vector2f pos_inner, float R, float a0, float a1, Colourb color0, Colourb color1, int num_points)
+void GeometryBackgroundBorder::DrawArcPoint(Vector2f pos_center, Vector2f pos_inner, float R, float a0, float a1, Colourb color0, Colourb color1,
+	int num_points)
 {
 	RMLUI_ASSERT(R > 0 && num_points >= 2);
 
@@ -307,7 +306,8 @@ void GeometryBackgroundBorder::DrawArcPoint(Vector2f pos_center, Vector2f pos_in
 
 	RMLUI_ASSERT((int)vertices.size() - offset_vertices == num_points + 2);
 
-	// Swap the last two vertices such that the outer edge vertex is last, see the comment for the border drawing functions. Their colors should already be the same.
+	// Swap the last two vertices such that the outer edge vertex is last, see the comment for the border drawing functions. Their colors should
+	// already be the same.
 	const int last_vertex = (int)vertices.size() - 1;
 	std::swap(vertices[last_vertex - 1].position, vertices[last_vertex].position);
 

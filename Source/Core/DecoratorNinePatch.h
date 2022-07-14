@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -31,18 +31,18 @@
 
 #include "../../Include/RmlUi/Core/Decorator.h"
 #include "../../Include/RmlUi/Core/DecoratorInstancer.h"
-#include "../../Include/RmlUi/Core/Property.h"
+#include "../../Include/RmlUi/Core/ID.h"
 #include "../../Include/RmlUi/Core/Spritesheet.h"
 
 namespace Rml {
 
-class DecoratorNinePatch : public Decorator
-{
+class DecoratorNinePatch : public Decorator {
 public:
 	DecoratorNinePatch();
 	virtual ~DecoratorNinePatch();
 
-	bool Initialise(const Rectanglef& rect_outer, const Rectanglef& rect_inner, const Array<Property, 4>* _edges, const Texture& texture, float display_scale);
+	bool Initialise(const Rectanglef& rect_outer, const Rectanglef& rect_inner, const Array<NumericValue, 4>* _edges, const Texture& texture,
+		float display_scale);
 
 	DecoratorDataHandle GenerateElementData(Element* element) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
@@ -52,23 +52,20 @@ public:
 private:
 	Rectanglef rect_outer, rect_inner;
 	float display_scale = 1;
-	UniquePtr<Array<Property,4>> edges;
+	UniquePtr<Array<NumericValue, 4>> edges;
 };
 
-
-
-class DecoratorNinePatchInstancer : public DecoratorInstancer
-{
+class DecoratorNinePatchInstancer : public DecoratorInstancer {
 public:
 	DecoratorNinePatchInstancer();
 	~DecoratorNinePatchInstancer();
 
-	SharedPtr<Decorator> InstanceDecorator(const String& name, const PropertyDictionary& properties, const DecoratorInstancerInterface& instancer_interface) override;
+	SharedPtr<Decorator> InstanceDecorator(const String& name, const PropertyDictionary& properties,
+		const DecoratorInstancerInterface& instancer_interface) override;
 
 private:
 	PropertyId sprite_outer_id, sprite_inner_id;
 	PropertyId edge_ids[4];
-
 };
 
 } // namespace Rml

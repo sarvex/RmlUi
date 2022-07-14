@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -31,32 +31,28 @@
 
 namespace Rml {
 
-static const UnorderedMap<String, Property::Unit> g_property_unit_string_map =
-{
-	{"", Property::NUMBER},
-	{"%", Property::PERCENT},
-	{"px", Property::PX},
-	{"dp", Property::DP},
-	{"x", Property::X},
-	{"vw", Property::VW},
-	{"vh", Property::VH},
-	{"em", Property::EM},
-	{"rem", Property::REM},
-	{"in", Property::INCH},
-	{"cm", Property::CM},
-	{"mm", Property::MM},
-	{"pt", Property::PT},
-	{"pc", Property::PC},
-	{"deg", Property::DEG},
-	{"rad", Property::RAD},
+static const UnorderedMap<String, Unit> g_property_unit_string_map = {
+	{"", Unit::NUMBER},
+	{"%", Unit::PERCENT},
+	{"px", Unit::PX},
+	{"dp", Unit::DP},
+	{"x", Unit::X},
+	{"vw", Unit::VW},
+	{"vh", Unit::VH},
+	{"em", Unit::EM},
+	{"rem", Unit::REM},
+	{"in", Unit::INCH},
+	{"cm", Unit::CM},
+	{"mm", Unit::MM},
+	{"pt", Unit::PT},
+	{"pc", Unit::PC},
+	{"deg", Unit::DEG},
+	{"rad", Unit::RAD},
 };
 
-PropertyParserNumber::PropertyParserNumber(int units, Property::Unit zero_unit)
-	: units(units), zero_unit(zero_unit)
-{}
+PropertyParserNumber::PropertyParserNumber(Units units, Unit zero_unit) : units(units), zero_unit(zero_unit) {}
 
-PropertyParserNumber::~PropertyParserNumber()
-{}
+PropertyParserNumber::~PropertyParserNumber() {}
 
 // Called to parse a RCSS number declaration.
 bool PropertyParserNumber::ParseValue(Property& property, const String& value, const ParameterMap& RMLUI_UNUSED_PARAMETER(parameters)) const
@@ -93,9 +89,9 @@ bool PropertyParserNumber::ParseValue(Property& property, const String& value, c
 		return false;
 	}
 
-	const Property::Unit unit = it->second;
+	const Unit unit = it->second;
 
-	if (unit & units)
+	if (Any(unit & units))
 	{
 		property.value = float_value;
 		property.unit = unit;
@@ -104,9 +100,9 @@ bool PropertyParserNumber::ParseValue(Property& property, const String& value, c
 
 	// Detected unit not allowed.
 	// However, we allow a value of "0" if zero_unit is set and no unit specified (that is, unit is a pure NUMBER).
-	if (unit == Property::NUMBER)
+	if (unit == Unit::NUMBER)
 	{
-		if (zero_unit != Property::UNKNOWN && float_value == 0.0f)
+		if (zero_unit != Unit::UNKNOWN && float_value == 0.0f)
 		{
 			property.unit = zero_unit;
 			property.value = Variant(0.0f);

@@ -71,6 +71,11 @@ inline T FromString(const String& string, T default_value = T()) {
 
 // Some more complex types are defined in cpp-file
 
+template <> class TypeConverter<Unit, String> {
+public:
+	RMLUICORE_API static bool Convert(const Unit& src, String& dest);
+};
+
 template<> class TypeConverter< TransformPtr, TransformPtr > {
 public:
 	RMLUICORE_API static bool Convert(const TransformPtr& src, TransformPtr& dest);

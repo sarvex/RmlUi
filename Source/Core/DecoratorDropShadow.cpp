@@ -40,18 +40,13 @@ DecoratorDropShadow::DecoratorDropShadow() {}
 
 DecoratorDropShadow::~DecoratorDropShadow() {}
 
-bool DecoratorDropShadow::Initialise(Colourb in_color, Vector2f in_offset, float in_sigma)
+bool DecoratorDropShadow::Initialise(Colourb in_color, NumericValue in_offset_x, const NumericValue in_offset_y, NumericValue in_sigma)
 {
 	color = in_color;
-	offset = in_offset;
-	sigma = in_sigma;
-
-	// Position and expand the clipping region to cover both the native element *and* its offset shadow w/blur.
-	const float blur_radius = 2.f * sigma;
-	extend_top_left = Math::Max(-offset, Vector2f(0.f)) + Vector2f(blur_radius);
-	extend_bottom_right = Math::Max(offset, Vector2f(0.f)) + Vector2f(blur_radius);
-
-	return sigma >= 0.f;
+	value_offset_x = in_offset_x;
+	value_offset_y = in_offset_y;
+	value_sigma = in_sigma;
+	return Any(in_offset_x.unit & Unit::LENGTH) && Any(in_offset_y.unit & Unit::LENGTH) && Any(in_sigma.unit & Unit::LENGTH);
 }
 
 DecoratorDataHandle DecoratorDropShadow::GenerateElementData(Element* element) const
@@ -59,6 +54,12 @@ DecoratorDataHandle DecoratorDropShadow::GenerateElementData(Element* element) c
 	RenderInterface* render_interface = element->GetRenderInterface();
 	if (!render_interface)
 		return INVALID_DECORATORDATAHANDLE;
+
+	const float sigma = element->ResolveLength(value_sigma);
+	const Vector2f offset = {
+		element->ResolveLength(value_offset_x),
+		element->ResolveLength(value_offset_y),
+	};
 
 	CompiledFilterHandle handle =
 		render_interface->CompileFilter("drop-shadow", Dictionary{{"color", Variant(color)}, {"offset", Variant(offset)}, {"sigma", Variant(sigma)}});
@@ -82,13 +83,23 @@ void DecoratorDropShadow::RenderElement(Element* /*element*/, DecoratorDataHandl
 	element_data->render_interface->AttachFilter(element_data->filter);
 }
 
-void DecoratorDropShadow::ModifyScissorRegion(Element* /*element*/, Rectanglef& scissor_region) const
+void DecoratorDropShadow::ModifyScissorRegion(Element* element, Rectanglef& scissor_region) const
 {
-	scissor_region.ExtendTopLeft(extend_top_left);
-	scissor_region.ExtendBottomRight(extend_bottom_right);
+	// Expand the scissor region to cover both the native element *and* its offset shadow w/blur.
+
+	const float sigma = element->ResolveLength(value_sigma);
+	const Vector2f offset = {
+		element->ResolveLength(value_offset_x),
+		element->ResolveLength(value_offset_y),
+	};
+
+	const float blur_radius = 2.f * sigma;
+	const float blur_extent = 1.5f * blur_radius;
+	scissor_region.ExtendTopLeft(Math::Max(-offset, Vector2f(0.f)) + Vector2f(blur_extent));
+	scissor_region.ExtendBottomRight(Math::Max(offset, Vector2f(0.f)) + Vector2f(blur_extent));
 }
 
-DecoratorDropShadowInstancer::DecoratorDropShadowInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)
+DecoratorDropShadowInstancer::DecoratorDropShadowInstancer() : DecoratorInstancer(DecoratorClass::Filter | DecoratorClass::BackdropFilter)
 {
 	ids.color = RegisterProperty("color", "black").AddParser("color").GetId();
 	ids.offset_x = RegisterProperty("offset-x", "0px").AddParser("length").GetId();
@@ -109,14 +120,8 @@ SharedPtr<Decorator> DecoratorDropShadowInstancer::InstanceDecorator(const Strin
 	if (!p_color || !p_offset_x || !p_offset_y || !p_sigma)
 		return nullptr;
 
-	// TODO dp/vp
-	const Colourb color = p_color->Get<Colourb>();
-	const float offset_x = ComputeAbsoluteLength(*p_offset_x, 1.f, Vector2f(0.f));
-	const float offset_y = ComputeAbsoluteLength(*p_offset_y, 1.f, Vector2f(0.f));
-	const float sigma = ComputeAbsoluteLength(*p_sigma, 1.f, Vector2f(0.f));
-
 	auto decorator = MakeShared<DecoratorDropShadow>();
-	if (decorator->Initialise(color, Vector2f(offset_x, offset_y), sigma))
+	if (decorator->Initialise(p_color->Get<Colourb>(), p_offset_x->GetNumericValue(), p_offset_y->GetNumericValue(), p_sigma->GetNumericValue()))
 		return decorator;
 
 	return nullptr;

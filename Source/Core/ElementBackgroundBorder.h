@@ -45,7 +45,7 @@ public:
 	void DirtyBackground();
 	void DirtyBorder();
 
-	Geometry* GetClipGeometry(Element* element, Box::Area clip_area);
+	Geometry* GetClipGeometry(Element* element, BoxArea clip_area);
 
 private:
 	enum class BackgroundType { Main, BoxShadow, ClipBorder, ClipPadding, ClipContent, Count };
@@ -56,7 +56,7 @@ private:
 	};
 
 	void GenerateGeometry(Element* element);
-	void GenerateBoxShadow(Element* element, const ShadowList& shadow_list, Vector4f border_radius, float opacity);
+	void GenerateBoxShadow(Element* element, ShadowList shadow_list, Vector4f border_radius, float opacity);
 
 	Geometry* GetGeometry(BackgroundType type);
 	Background& GetOrCreateBackground(Element* element, BackgroundType type);

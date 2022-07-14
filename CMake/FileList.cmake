@@ -151,6 +151,7 @@ set(Core_PUB_HDR_FILES
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/DataTypes.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/DataVariable.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Debug.h
+    ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/DecorationTypes.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Decorator.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/DecoratorInstancer.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Dictionary.h
@@ -196,6 +197,7 @@ set(Core_PUB_HDR_FILES
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Math.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Matrix4.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Matrix4.inl
+    ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/NumericValue.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/ObserverPtr.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Platform.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Plugin.h
@@ -229,6 +231,7 @@ set(Core_PUB_HDR_FILES
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/TypeConverter.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/TypeConverter.inl
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Types.h
+    ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Unit.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/URL.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Utilities.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Variant.h

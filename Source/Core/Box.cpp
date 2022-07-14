@@ -27,6 +27,7 @@
  */
 
 #include "../../Include/RmlUi/Core/Box.h"
+#include "../../Include/RmlUi/Core/DecorationTypes.h"
 #include <string.h>
 
 namespace Rml {
@@ -48,13 +49,14 @@ Box::~Box()
 }
 
 // Returns the top-left position of one of the areas.
-Vector2f Box::GetPosition(Area area) const
+Vector2f Box::GetPosition(BoxArea area) const
 {
-	Vector2f area_position(-area_edges[MARGIN][LEFT], -area_edges[MARGIN][TOP]);
-	for (int i = 0; i < area; i++)
+	RMLUI_ASSERT(area != BoxArea::Auto);
+	Vector2f area_position(-GetEdge(BoxArea::Margin, BoxEdge::Left), -GetEdge(BoxArea::Margin, BoxEdge::Top));
+	for (int i = 0; i < (int)area; i++)
 	{
-		area_position.x += area_edges[i][LEFT];
-		area_position.y += area_edges[i][TOP];
+		area_position.x += area_edges[i][(int)BoxEdge::Left];
+		area_position.y += area_edges[i][(int)BoxEdge::Top];
 	}
 
 	return area_position;
@@ -65,13 +67,14 @@ Vector2f Box::GetSize() const
 	return content;
 }
 
-Vector2f Box::GetSize(Area area) const
+Vector2f Box::GetSize(BoxArea area) const
 {
+	RMLUI_ASSERT(area != BoxArea::Auto);
 	Vector2f area_size(content);
-	for (int i = area; i <= PADDING; i++)
+	for (int i = (int)area; i <= (int)BoxArea::Padding; i++)
 	{
-		area_size.x += (area_edges[i][LEFT] + area_edges[i][RIGHT]);
-		area_size.y += (area_edges[i][TOP] + area_edges[i][BOTTOM]);
+		area_size.x += (area_edges[i][(int)BoxEdge::Left] + area_edges[i][(int)BoxEdge::Right]);
+		area_size.y += (area_edges[i][(int)BoxEdge::Top] + area_edges[i][(int)BoxEdge::Bottom]);
 	}
 
 	return area_size;
@@ -84,40 +87,43 @@ void Box::SetContent(Vector2f _content)
 }
 
 // Sets the size of one of the segments of one of the box's outer areas.
-void Box::SetEdge(Area area, Edge edge, float size)
+void Box::SetEdge(BoxArea area, BoxEdge edge, float size)
 {
-	area_edges[area][edge] = size;
+	RMLUI_ASSERT(area != BoxArea::Auto);
+	area_edges[(int)area][(int)edge] = size;
 }
 
 // Returns the size of one of the area segments.
-float Box::GetEdge(Area area, Edge edge) const
+float Box::GetEdge(BoxArea area, BoxEdge edge) const
 {
-	return area_edges[area][edge];
+	RMLUI_ASSERT(area != BoxArea::Auto);
+	return area_edges[(int)area][(int)edge];
 }
 
 // Returns the cumulative size of one edge up to one of the box's areas.
-float Box::GetCumulativeEdge(Area area, Edge edge) const
+float Box::GetCumulativeEdge(BoxArea area, BoxEdge edge) const
 {
+	RMLUI_ASSERT(area != BoxArea::Auto);
 	float size = 0;
-	int max_area = Math::Min((int)area, (int)PADDING);
+	int max_area = Math::Min((int)area, (int)BoxArea::Padding);
 	for (int i = 0; i <= max_area; i++)
-		size += area_edges[i][edge];
+		size += area_edges[i][(int)edge];
 
 	return size;
 }
 
-float Box::GetSizeAcross(Direction direction, Area area, Area area_end) const
+float Box::GetSizeAcross(BoxDirection direction, BoxArea area, BoxArea area_end) const
 {
-	static_assert(HORIZONTAL == 1 && VERTICAL == 0, "");
-	RMLUI_ASSERT(area <= area_end && direction <= 1);
+	static_assert((int)BoxDirection::Horizontal == 1 && (int)BoxDirection::Vertical == 0, "");
+	RMLUI_ASSERT((int)area <= (int)area_end && (int)direction <= 1 && area_end != BoxArea::Auto);
 
 	float size = 0.0f;
 
-	if (area_end == CONTENT)
-		size = (direction == HORIZONTAL ? content.x : content.y);
+	if (area_end == BoxArea::Content)
+		size = (direction == BoxDirection::Horizontal ? content.x : content.y);
 	
-	for (int i = area; i <= area_end && i < CONTENT; i++)
-		size += (area_edges[i][TOP + (int)direction] + area_edges[i][BOTTOM + (int)direction]);
+	for (int i = (int)area; i <= (int)area_end && i < (int)BoxArea::Content; i++)
+		size += (area_edges[i][(int)BoxEdge::Top + (int)direction] + area_edges[i][(int)BoxEdge::Bottom + (int)direction]);
 
 	return size;
 }
@@ -132,16 +138,6 @@ bool Box::operator==(const Box& rhs) const
 bool Box::operator!=(const Box& rhs) const
 {
 	return !(*this == rhs);
-}
-
-Box::Area ToBoxArea(PaintArea paint_area, Box::Area clamp_outer, Box::Area clamp_inner)
-{
-	RMLUI_ASSERT(clamp_outer <= clamp_inner);
-	static_assert((int)PaintArea::Border == (int)Box::BORDER && (int)PaintArea::Padding == (int)Box::PADDING &&
-			(int)PaintArea::Content == (int)Box::CONTENT,
-		"Ensure PaintArea values correspond to Box::Area");
-
-	return (Box::Area)Math::Clamp((int)paint_area, (int)clamp_outer, (int)clamp_inner);
 }
 
 } // namespace Rml

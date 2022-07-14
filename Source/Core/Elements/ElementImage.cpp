@@ -91,7 +91,7 @@ void ElementImage::OnRender()
 		GenerateGeometry();
 
 	// Render the geometry beginning at this element's content region.
-	geometry.Render(GetAbsoluteOffset(Box::CONTENT).Round());
+	geometry.Render(GetAbsoluteOffset(BoxArea::Content).Round());
 }
 
 // Called when attributes on the element are changed.
@@ -204,7 +204,7 @@ void ElementImage::GenerateGeometry()
 	Colourb quad_colour = computed.image_color();
     quad_colour.alpha = (byte)(opacity * (float)quad_colour.alpha);
 	
-	Vector2f quad_size = GetBox().GetSize(Box::CONTENT).Round();
+	Vector2f quad_size = GetBox().GetSize(BoxArea::Content).Round();
 
 	GeometryUtilities::GenerateQuad(&vertices[0], &indices[0], Vector2f(0, 0), quad_size, quad_colour, texcoords[0], texcoords[1]);
 
