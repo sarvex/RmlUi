@@ -50,7 +50,7 @@ DecoratorDataHandle Decorator::GenerateElementData(Element* /*element*/) const
 	return INVALID_DECORATORDATAHANDLE;
 }
 
-void Decorator::GetClipExtension(Vector2f& /*top_left*/, Vector2f& /*bottom_right*/) const {}
+void Decorator::ModifyScissorRegion(Element* /*element*/, Rectanglef& /*scissor_region*/) const {}
 
 int Decorator::AddTexture(const Texture& texture)
 {

@@ -47,7 +47,7 @@ public:
 
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
 
-	void GetClipExtension(Vector2f& top_left, Vector2f& bottom_right) const override;
+	void ModifyScissorRegion(Element* element, Rectanglef& scissor_region) const override;
 
 private:
 	float radius = 0.f;

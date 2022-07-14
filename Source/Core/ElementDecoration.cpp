@@ -98,7 +98,7 @@ void ElementDecoration::ReloadDecorators()
 				source = &document_source;
 			}
 		}
-		
+
 		const DecoratorPtrList& decorator_list = style_sheet->InstanceDecorators(*decorators_ptr, source);
 		RMLUI_ASSERT(decorator_list.empty() || decorator_list.size() == decorators_ptr->list.size());
 
@@ -127,7 +127,6 @@ void ElementDecoration::ReloadDecorators()
 			RMLUI_ERROR;
 			break;
 		}
-
 
 		for (size_t i = 0; i < decorator_list.size() && i < decorators_ptr->list.size(); i++)
 		{
@@ -215,6 +214,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 
 			Rectanglef filter_rectangle = Rectanglef::CreateInvalid();
 			ElementUtilities::GetBoundingBox(filter_rectangle, element, PaintArea::Border);
+			Math::ExpandToPixelGrid(filter_rectangle);
 
 			Rectanglei scissor_region = render_state.GetScissorState();
 			scissor_region.IntersectValid(Rectanglei(filter_rectangle));
@@ -226,7 +226,6 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				DecoratorHandle& decorator = decorators[i];
 				decorator.decorator->RenderElement(element, decorator.decorator_data);
 			}
-
 
 			render_interface->StackApply(BlitDestination::Stack);
 		}
@@ -242,21 +241,15 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 		{
 			ElementUtilities::SetClippingRegion(element);
 
-			Vector2f max_top_left, max_bottom_right;
+			// Find the region being affected by the active filters and apply it as a scissor.
+			Rectanglef filter_region = Rectanglef::CreateInvalid();
+			ElementUtilities::GetBoundingBox(filter_region, element, PaintArea::Auto);
+
 			const int i0 = num_backgrounds + num_backdrop_filters;
 			for (int i = i0; i < i0 + num_filters; i++)
-			{
-				DecoratorHandle& decorator = decorators[i];
-				Vector2f top_left, bottom_right;
+				decorators[i].decorator->ModifyScissorRegion(element, filter_region);
 
-				decorator.decorator->GetClipExtension(top_left, bottom_right);
-
-				max_top_left = Math::Max(max_top_left, top_left);
-				max_bottom_right = Math::Max(max_bottom_right, bottom_right);
-			}
-
-			Rectanglef filter_region = Rectanglef::CreateInvalid();
-			ElementUtilities::GetBoundingBox(filter_region, element, PaintArea::Auto, max_top_left, max_bottom_right);
+			Math::ExpandToPixelGrid(filter_region);
 
 			Rectanglei scissor_region = render_state.GetScissorState();
 			scissor_region.IntersectValid(Rectanglei(filter_region));
