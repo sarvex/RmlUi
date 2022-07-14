@@ -300,11 +300,11 @@ bool ElementUtilities::SetClippingRegion(Element* element, bool force_clip_self)
 	return true;
 }
 
-bool ElementUtilities::GetBoundingBox(Rectanglef& out_rectangle, Element* element, PaintArea area, Vector2f expand_top_left,
-	Vector2f expand_bottom_right)
+bool ElementUtilities::GetBoundingBox(Rectanglef& out_rectangle, Element* element, PaintArea area)
 {
 	RMLUI_ASSERT(element);
 
+	Vector2f shadow_extent_neg, shadow_extent_pos;
 	if (area == PaintArea::Auto)
 	{
 		// Extend the bounding box to include the element's box-shadow.
@@ -313,19 +313,15 @@ bool ElementUtilities::GetBoundingBox(Rectanglef& out_rectangle, Element* elemen
 			RMLUI_ASSERT(p_box_shadow->value.GetType() == Variant::SHADOWLIST);
 			const ShadowList& shadow_list = p_box_shadow->value.GetReference<ShadowList>();
 
-			Vector2f extend_min;
-			Vector2f extend_max;
 			for (const Shadow& shadow : shadow_list)
 			{
 				if (!shadow.inset)
 				{
 					const float extend = shadow.blur_radius + shadow.spread_distance;
-					extend_min = Math::Min(extend_min, shadow.offset - Vector2f(extend));
-					extend_max = Math::Max(extend_max, shadow.offset + Vector2f(extend));
+					shadow_extent_neg = Math::Min(shadow_extent_neg, shadow.offset - Vector2f(extend));
+					shadow_extent_pos = Math::Max(shadow_extent_pos, shadow.offset + Vector2f(extend));
 				}
 			}
-			expand_top_left -= extend_min;
-			expand_bottom_right += extend_max;
 		}
 	}
 
@@ -339,8 +335,7 @@ bool ElementUtilities::GetBoundingBox(Rectanglef& out_rectangle, Element* elemen
 	// Early exit in the common case of no transform.
 	if (!transform)
 	{
-		out_rectangle = Rectanglef::FromCorners(element_origin - expand_top_left, element_origin + element_size + expand_bottom_right);
-		Math::ExpandToPixelGrid(out_rectangle);
+		out_rectangle = Rectanglef::FromCorners(element_origin + shadow_extent_neg, element_origin + element_size + shadow_extent_pos);
 		return true;
 	}
 
@@ -383,9 +378,8 @@ bool ElementUtilities::GetBoundingBox(Rectanglef& out_rectangle, Element* elemen
 	for (int i = 1; i < num_corners; i++)
 		out_rectangle.Join(corners[i]);
 
-	out_rectangle.ExtendTopLeft(expand_top_left);
-	out_rectangle.ExtendBottomRight(expand_bottom_right);
-	Math::ExpandToPixelGrid(out_rectangle);
+	out_rectangle.ExtendTopLeft(-shadow_extent_neg);
+	out_rectangle.ExtendBottomRight(shadow_extent_pos);
 
 	return true;
 }

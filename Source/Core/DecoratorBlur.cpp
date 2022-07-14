@@ -73,11 +73,10 @@ void DecoratorBlur::RenderElement(Element* /*element*/, DecoratorDataHandle hand
 	element_data->render_interface->AttachFilter(element_data->filter);
 }
 
-void DecoratorBlur::GetClipExtension(Vector2f& top_left, Vector2f& bottom_right) const
+void DecoratorBlur::ModifyScissorRegion(Element* /*element*/, Rectanglef& scissor_region) const
 {
 	const float blur_radius = Math::Max(2.f * radius, 3.f);
-	top_left = Vector2f(blur_radius);
-	bottom_right = Vector2f(blur_radius);
+	scissor_region.Extend(blur_radius);
 }
 
 DecoratorBlurInstancer::DecoratorBlurInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)

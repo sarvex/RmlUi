@@ -47,11 +47,11 @@ public:
 
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
 
-	void GetClipExtension(Vector2f& top_left, Vector2f& bottom_right) const override;
+	void ModifyScissorRegion(Element* element, Rectanglef& scissor_region) const override;
 
 private:
 	Colourb color;
-	Vector2f offset, expand_top_left, expand_bottom_right;
+	Vector2f offset, extend_top_left, extend_bottom_right;
 	float sigma = 0;
 };
 

@@ -104,8 +104,7 @@ public:
 	/// Returns a rectangle covering the element's area in window coordinate space.
 	/// @return True on success, otherwise false.
 	/// @note When area is Auto the element's box-shadow area is also included.
-	static bool GetBoundingBox(Rectanglef& out_rectangle, Element* element, PaintArea area, Vector2f expand_top_left = Vector2f(0),
-		Vector2f expand_bottom_right = Vector2f(0));
+	static bool GetBoundingBox(Rectanglef& out_rectangle, Element* element, PaintArea area);
 
 	/// Formats the contents of an element. This does not need to be called for ordinary elements, but can be useful
 	/// for non-DOM elements of custom elements.

@@ -48,8 +48,8 @@ bool DecoratorDropShadow::Initialise(Colourb in_color, Vector2f in_offset, float
 
 	// Position and expand the clipping region to cover both the native element *and* its offset shadow w/blur.
 	const float blur_radius = 2.f * sigma;
-	expand_top_left = Math::Max(-offset, Vector2f(0.f)) + Vector2f(blur_radius);
-	expand_bottom_right = Math::Max(offset, Vector2f(0.f)) + Vector2f(blur_radius);
+	extend_top_left = Math::Max(-offset, Vector2f(0.f)) + Vector2f(blur_radius);
+	extend_bottom_right = Math::Max(offset, Vector2f(0.f)) + Vector2f(blur_radius);
 
 	return sigma >= 0.f;
 }
@@ -82,10 +82,10 @@ void DecoratorDropShadow::RenderElement(Element* /*element*/, DecoratorDataHandl
 	element_data->render_interface->AttachFilter(element_data->filter);
 }
 
-void DecoratorDropShadow::GetClipExtension(Vector2f& top_left, Vector2f& bottom_right) const
+void DecoratorDropShadow::ModifyScissorRegion(Element* /*element*/, Rectanglef& scissor_region) const
 {
-	top_left = expand_top_left;
-	bottom_right = expand_bottom_right;
+	scissor_region.ExtendTopLeft(extend_top_left);
+	scissor_region.ExtendBottomRight(extend_bottom_right);
 }
 
 DecoratorDropShadowInstancer::DecoratorDropShadowInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)
