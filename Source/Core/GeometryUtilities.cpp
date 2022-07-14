@@ -117,13 +117,11 @@ void GeometryUtilities::GenerateBackgroundBorder(Geometry* out_geometry, const B
 	Vector<Vertex>& vertices = out_geometry->GetVertices();
 	Vector<int>& indices = out_geometry->GetIndices();
 
-	using Edge = Box::Edge;
-
 	EdgeSizes border_widths = {
-		Math::RoundFloat(box.GetEdge(Box::BORDER, Edge::TOP)),
-		Math::RoundFloat(box.GetEdge(Box::BORDER, Edge::RIGHT)),
-		Math::RoundFloat(box.GetEdge(Box::BORDER, Edge::BOTTOM)),
-		Math::RoundFloat(box.GetEdge(Box::BORDER, Edge::LEFT)),
+		Math::RoundFloat(box.GetEdge(BoxArea::Border, BoxEdge::Top)),
+		Math::RoundFloat(box.GetEdge(BoxArea::Border, BoxEdge::Right)),
+		Math::RoundFloat(box.GetEdge(BoxArea::Border, BoxEdge::Bottom)),
+		Math::RoundFloat(box.GetEdge(BoxArea::Border, BoxEdge::Left)),
 	};
 
 	int num_borders = 0;
@@ -132,7 +130,7 @@ void GeometryUtilities::GenerateBackgroundBorder(Geometry* out_geometry, const B
 		if (border_colors[i].alpha > 0 && border_widths[i] > 0)
 			num_borders += 1;
 
-	const Vector2f padding_size = box.GetSize(Box::PADDING).Round();
+	const Vector2f padding_size = box.GetSize(BoxArea::Padding).Round();
 
 	const bool has_background = (background_color.alpha > 0 && padding_size.x > 0 && padding_size.y > 0);
 	const bool has_border = (num_borders > 0);
@@ -184,22 +182,18 @@ void GeometryUtilities::GenerateBackgroundBorder(Geometry* out_geometry, const B
 }
 
 void GeometryUtilities::GenerateBackground(Geometry* out_geometry, const Box& box, Vector2f offset, Vector4f border_radius, Colourb color,
-	Box::Area fill_area)
+	BoxArea fill_area)
 {
-	RMLUI_ASSERTMSG(fill_area >= Box::BORDER && fill_area <= Box::CONTENT, "Rectangle geometry only supports border, padding and content boxes.");
-	using Edge = Box::Edge;
-
-	Vector<Vertex>& vertices = out_geometry->GetVertices();
-	Vector<int>& indices = out_geometry->GetIndices();
-
+	RMLUI_ASSERTMSG(fill_area >= BoxArea::Border && fill_area <= BoxArea::Content, "Rectangle geometry only supports border, padding and content boxes.");
+	
 	EdgeSizes edge_sizes = {};
-	for (int area = Box::BORDER; area < fill_area; area++)
+	for (int area = (int)BoxArea::Border; area < (int)fill_area; area++)
 	{
 		// TODO: Move rounding to computed values (round border only).
-		edge_sizes[0] += Math::RoundFloat(box.GetEdge(Box::Area(area), Edge::TOP));
-		edge_sizes[1] += Math::RoundFloat(box.GetEdge(Box::Area(area), Edge::RIGHT));
-		edge_sizes[2] += Math::RoundFloat(box.GetEdge(Box::Area(area), Edge::BOTTOM));
-		edge_sizes[3] += Math::RoundFloat(box.GetEdge(Box::Area(area), Edge::LEFT));
+		edge_sizes[0] += Math::RoundFloat(box.GetEdge(BoxArea(area), BoxEdge::Top));
+		edge_sizes[1] += Math::RoundFloat(box.GetEdge(BoxArea(area), BoxEdge::Right));
+		edge_sizes[2] += Math::RoundFloat(box.GetEdge(BoxArea(area), BoxEdge::Bottom));
+		edge_sizes[3] += Math::RoundFloat(box.GetEdge(BoxArea(area), BoxEdge::Left));
 	}
 
 	const Vector2f inner_size = box.GetSize(fill_area).Round();
@@ -209,6 +203,9 @@ void GeometryUtilities::GenerateBackground(Geometry* out_geometry, const Box& bo
 		return;
 
 	const BorderMetrics metrics = GeometryBackgroundBorder::ComputeBorderMetrics(offset.Round(), edge_sizes, inner_size, border_radius);
+
+	Vector<Vertex>& vertices = out_geometry->GetVertices();
+	Vector<int>& indices = out_geometry->GetIndices();
 
 	// Reserve geometry. A conservative estimate, does not take border-radii into account.
 	vertices.reserve((int)vertices.size() + 4);

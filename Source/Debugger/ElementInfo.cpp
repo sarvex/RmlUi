@@ -141,10 +141,10 @@ void ElementInfo::RenderHoverElement()
 			// Render the content area.
 			Vector2f box_offset;
 			const Box& element_box = hover_element->GetBox(i, box_offset);
-			Vector2f size = element_box.GetSize(Box::BORDER);
+			Vector2f size = element_box.GetSize(BoxArea::Border);
 			size = Vector2f(std::max(size.x, 2.0f), std::max(size.y, 2.0f));
 			Geometry::RenderOutline(
-				hover_element->GetAbsoluteOffset(Box::BORDER) + box_offset,
+				hover_element->GetAbsoluteOffset(BoxArea::Border) + box_offset,
 				size,
 				Colourb(255, 0, 0, 255), 
 				1
@@ -163,19 +163,19 @@ void ElementInfo::RenderSourceElement()
 		{
 			Vector2f box_offset;
 			const Box& element_box = source_element->GetBox(i, box_offset);
-			const Vector2f border_offset = box_offset + source_element->GetAbsoluteOffset(Box::BORDER);
+			const Vector2f border_offset = box_offset + source_element->GetAbsoluteOffset(BoxArea::Border);
 
 			// Content area:
-			Geometry::RenderBox(border_offset + element_box.GetPosition(Box::CONTENT), element_box.GetSize(), Colourb(158, 214, 237, 128));
+			Geometry::RenderBox(border_offset + element_box.GetPosition(BoxArea::Content), element_box.GetSize(), Colourb(158, 214, 237, 128));
 
 			// Padding area:
-			Geometry::RenderBox(border_offset + element_box.GetPosition(Box::PADDING), element_box.GetSize(Box::PADDING), border_offset + element_box.GetPosition(Box::CONTENT), element_box.GetSize(), Colourb(135, 122, 214, 128));
+			Geometry::RenderBox(border_offset + element_box.GetPosition(BoxArea::Padding), element_box.GetSize(BoxArea::Padding), border_offset + element_box.GetPosition(BoxArea::Content), element_box.GetSize(), Colourb(135, 122, 214, 128));
 
 			// Border area:
-			Geometry::RenderBox(border_offset + element_box.GetPosition(Box::BORDER), element_box.GetSize(Box::BORDER), border_offset + element_box.GetPosition(Box::PADDING), element_box.GetSize(Box::PADDING), Colourb(133, 133, 133, 128));
+			Geometry::RenderBox(border_offset + element_box.GetPosition(BoxArea::Border), element_box.GetSize(BoxArea::Border), border_offset + element_box.GetPosition(BoxArea::Padding), element_box.GetSize(BoxArea::Padding), Colourb(133, 133, 133, 128));
 
 			// Border area:
-			Geometry::RenderBox(border_offset + element_box.GetPosition(Box::MARGIN), element_box.GetSize(Box::MARGIN), border_offset + element_box.GetPosition(Box::BORDER), element_box.GetSize(Box::BORDER), Colourb(240, 255, 131, 128));
+			Geometry::RenderBox(border_offset + element_box.GetPosition(BoxArea::Margin), element_box.GetSize(BoxArea::Margin), border_offset + element_box.GetPosition(BoxArea::Border), element_box.GetSize(BoxArea::Border), Colourb(240, 255, 131, 128));
 		}
 
 		if (Context* context = source_element->GetContext())
@@ -183,7 +183,7 @@ void ElementInfo::RenderSourceElement()
 			context->GetRenderState().SetTransform(nullptr);
 
 			Rectanglef bounding_box;
-			if (ElementUtilities::GetBoundingBox(bounding_box, source_element, PaintArea::Auto))
+			if (ElementUtilities::GetBoundingBox(bounding_box, source_element, BoxArea::Auto))
 			{
 				bounding_box.Extend(1.f);
 				Math::ExpandToPixelGrid(bounding_box);
@@ -540,8 +540,8 @@ void ElementInfo::UpdateSourceElement()
 		// left, top, width, height.
 		if (source_element != nullptr)
 		{
-			const Vector2f element_offset = source_element->GetRelativeOffset(Box::BORDER);
-			const Vector2f element_size = source_element->GetBox().GetSize(Box::BORDER);
+			const Vector2f element_offset = source_element->GetRelativeOffset(BoxArea::Border);
+			const Vector2f element_size = source_element->GetBox().GetSize(BoxArea::Border);
 			Element* offset_parent = source_element->GetOffsetParent();
 			const String offset_parent_rml = (offset_parent ? StringUtilities::EncodeRml(offset_parent->GetAddress(false, false)) : String("<em>none</em>"));
 

@@ -119,7 +119,7 @@ DecoratorDataHandle DecoratorTiledBox::GenerateElementData(Element* element) con
 		tiles[i].CalculateDimensions(element, *GetTexture(tiles[i].texture_index));
 	}
 
-	Vector2f padded_size = element->GetBox().GetSize(Box::PADDING);
+	Vector2f padded_size = element->GetBox().GetSize(BoxArea::Padding);
 
 
 	// Calculate the natural dimensions of tile corners and edges.
@@ -299,7 +299,7 @@ void DecoratorTiledBox::ReleaseElementData(DecoratorDataHandle element_data) con
 // Called to render the decorator on an element.
 void DecoratorTiledBox::RenderElement(Element* element, DecoratorDataHandle element_data) const
 {
-	Vector2f translation = element->GetAbsoluteOffset(Box::PADDING).Round();
+	Vector2f translation = element->GetAbsoluteOffset(BoxArea::Padding).Round();
 	DecoratorTiledBoxData* data = reinterpret_cast< DecoratorTiledBoxData* >(element_data);
 
 	for (int i = 0; i < data->num_textures; i++)

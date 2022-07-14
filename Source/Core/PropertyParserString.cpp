@@ -44,7 +44,7 @@ bool PropertyParserString::ParseValue(Property& property, const String& value, c
 	RMLUI_UNUSED(parameters);
 
 	property.value = Variant(value);
-	property.unit = Property::STRING;
+	property.unit = Unit::STRING;
 
 	return true;
 }

@@ -94,7 +94,7 @@ public:
 	/// @param[in] border_radius The border radius in pixel units in the following order: top-left, top-right, bottom-right, bottom-left.
 	/// @param[in] colour The colour applied to the background.
 	/// @param[in] area Either the border, padding or content area to be filled.
-	static void GenerateBackground(Geometry* geometry, const Box& box, Vector2f offset, Vector4f border_radius, Colourb colour, Box::Area area = Box::PADDING);
+	static void GenerateBackground(Geometry* geometry, const Box& box, Vector2f offset, Vector4f border_radius, Colourb colour, BoxArea area = BoxArea::Padding);
 
 private:
 	GeometryUtilities();

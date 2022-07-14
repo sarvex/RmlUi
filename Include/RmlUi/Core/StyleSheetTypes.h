@@ -62,7 +62,7 @@ struct DecoratorDeclaration {
 	String type;
 	DecoratorInstancer* instancer;
 	PropertyDictionary properties;
-	PaintArea paint_area;
+	BoxArea paint_area;
 };
 struct DecoratorDeclarationList {
 	Vector<DecoratorDeclaration> list;
@@ -92,6 +92,7 @@ struct StyleSheetIndex {
 	NodeIndex ids, classes, tags;
 	NodeList other;
 };
+
 } // namespace Rml
 
 namespace std {

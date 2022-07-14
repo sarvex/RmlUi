@@ -61,7 +61,7 @@ WidgetTextInput::WidgetTextInput(ElementFormControl* _parent) : internal_dimensi
 	parent->SetProperty(PropertyId::OverflowX, Property(Style::Overflow::Hidden));
 	parent->SetProperty(PropertyId::OverflowY, Property(Style::Overflow::Hidden));
 	parent->SetProperty(PropertyId::Drag, Property(Style::Drag::Drag));
-	parent->SetClientArea(Box::CONTENT);
+	parent->SetClientArea(BoxArea::Content);
 
 	parent->AddEventListener(EventId::Keydown, this, true);
 	parent->AddEventListener(EventId::Textinput, this, true);
@@ -201,7 +201,7 @@ void WidgetTextInput::UpdateSelectionColours()
 	}
 
 	// Set the computed text colour on the element holding the selected text.
-	selected_text_element->SetProperty(PropertyId::Color, Property(colour, Property::COLOUR));
+	selected_text_element->SetProperty(PropertyId::Color, Property(colour, Unit::COLOUR));
 
 	// If the 'background-color' property has been set on the 'selection' element, use that as the
 	// background colour for the selected text. Otherwise, use the inverse of the selected text
@@ -237,11 +237,11 @@ void WidgetTextInput::OnResize()
 {
 	GenerateCursor();
 
-	Vector2f text_position = parent->GetBox().GetPosition(Box::CONTENT);
+	Vector2f text_position = parent->GetBox().GetPosition(BoxArea::Content);
 	text_element->SetOffset(text_position, parent);
 	selected_text_element->SetOffset(text_position, parent);
 
-	Vector2f new_internal_dimensions = parent->GetBox().GetSize(Box::CONTENT);
+	Vector2f new_internal_dimensions = parent->GetBox().GetSize(BoxArea::Content);
 	if (new_internal_dimensions != internal_dimensions)
 	{
 		internal_dimensions = new_internal_dimensions;
@@ -927,7 +927,7 @@ void WidgetTextInput::FormatElement()
 {
 	using namespace Style;
 	ElementScroll* scroll = parent->GetElementScroll();
-	float width = parent->GetBox().GetSize(Box::PADDING).x;
+	float width = parent->GetBox().GetSize(BoxArea::Padding).x;
 
 	Overflow x_overflow_property = parent->GetComputedValues().overflow_x();
 	Overflow y_overflow_property = parent->GetComputedValues().overflow_y();
@@ -1149,7 +1149,7 @@ void WidgetTextInput::GenerateCursor()
 
 	if (const Property* property = parent->GetProperty(PropertyId::CaretColor))
 	{
-		if (property->unit == Property::COLOUR)
+		if (property->unit == Unit::COLOUR)
 			color = property->Get<Colourb>();
 	}
 

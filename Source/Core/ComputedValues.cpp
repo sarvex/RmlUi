@@ -36,7 +36,7 @@ const AnimationList* Style::ComputedValues::animation() const
 {
 	if (auto p = element->GetLocalProperty(PropertyId::Animation))
 	{
-		if (p->unit == Property::ANIMATION)
+		if (p->unit == Unit::ANIMATION)
 			return &(p->value.GetReference<AnimationList>());
 	}
 	return nullptr;
@@ -46,7 +46,7 @@ const TransitionList* Style::ComputedValues::transition() const
 {
 	if (auto p = element->GetLocalProperty(PropertyId::Transition))
 	{
-		if (p->unit == Property::TRANSITION)
+		if (p->unit == Unit::TRANSITION)
 			return &(p->value.GetReference<TransitionList>());
 	}
 	return nullptr;

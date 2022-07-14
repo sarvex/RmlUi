@@ -27,16 +27,47 @@
  */
 
 #include "../../Include/RmlUi/Core/TypeConverter.h"
+#include "../../Include/RmlUi/Core/Animation.h"
+#include "../../Include/RmlUi/Core/DecorationTypes.h"
+#include "../../Include/RmlUi/Core/PropertyDictionary.h"
 #include "../../Include/RmlUi/Core/StyleSheetSpecification.h"
 #include "../../Include/RmlUi/Core/StyleSheetTypes.h"
-#include "../../Include/RmlUi/Core/Animation.h"
 #include "../../Include/RmlUi/Core/Transform.h"
 #include "../../Include/RmlUi/Core/TransformPrimitive.h"
-#include "../../Include/RmlUi/Core/PropertyDictionary.h"
 #include "../../Include/RmlUi/Core/Variant.h"
 #include "TransformUtilities.h"
 
 namespace Rml {
+
+bool TypeConverter<Unit, String>::Convert(const Unit& src, String& dest)
+{
+	switch (src)
+	{
+		case Unit::NUMBER:	dest = "";    return true;
+		case Unit::PERCENT:	dest = "%";   return true;
+
+		case Unit::PX:		dest = "px";  return true;
+		case Unit::DP:		dest = "dp";  return true;
+		case Unit::VW:		dest = "vw";  return true;
+		case Unit::VH:		dest = "vh";  return true;
+		case Unit::X:		dest = "x";   return true;
+		case Unit::EM:		dest = "em";  return true;
+		case Unit::REM:		dest = "rem"; return true;
+
+		case Unit::INCH:	dest = "in";  return true;
+		case Unit::CM:		dest = "cm";  return true;
+		case Unit::MM:		dest = "mm";  return true;
+		case Unit::PT:		dest = "pt";  return true;
+		case Unit::PC:		dest = "pc";  return true;
+
+		case Unit::DEG:		dest = "deg"; return true;
+		case Unit::RAD:		dest = "rad"; return true;
+
+		default: break;
+	}
+
+	return false;
+}
 
 bool TypeConverter<TransformPtr, TransformPtr>::Convert(const TransformPtr& src, TransformPtr& dest)
 {
@@ -164,17 +195,8 @@ bool TypeConverter<ColorStopList, String>::Convert(const ColorStopList& src, Str
 		const ColorStop& stop = src[i];
 		dest += ToString(stop.color);
 
-		switch (stop.position)
-		{
-		case ColorStop::Position::Auto:
-			break;
-		case ColorStop::Position::Length:
-			dest += " " + ToString(stop.position_value) + "px";
-			break;
-		case ColorStop::Position::Number:
-			dest += " " + ToString(stop.position_value);
-			break;
-		}
+		if (Any(stop.position.unit & Unit::NUMBER_LENGTH_PERCENT))
+			dest += " " + ToString(stop.position.number) + ToString(stop.position.unit);
 
 		if (i < src.size() - 1)
 			dest += ", ";
@@ -191,18 +213,26 @@ bool TypeConverter<ShadowList, ShadowList>::Convert(const ShadowList& src, Shado
 bool TypeConverter<ShadowList, String>::Convert(const ShadowList& src, String& dest)
 {
 	dest.clear();
-	String temp;
+	String temp, str_unit;
 	for (size_t i = 0; i < src.size(); i++)
 	{
 		const Shadow& shadow = src[i];
-		FormatString(temp, 512, " %.3f %.3f %.3f %.3f", shadow.offset.x, shadow.offset.y, shadow.blur_radius, shadow.spread_distance);
+		for (const NumericValue* value : {&shadow.offset_x, &shadow.offset_y, &shadow.blur_radius, &shadow.spread_distance})
+		{
+			if (TypeConverter<Unit, String>::Convert(value->unit, str_unit))
+				temp += " " + ToString(value->number) + str_unit;
+		}
+
 		if (shadow.inset)
 			temp += " inset";
 
-		dest += ToString(shadow.color) + temp;
+		dest += "rgba(" + ToString(shadow.color) + ')' + temp;
 
 		if (i < src.size() - 1)
+		{
 			dest += ", ";
+			temp.clear();
+		}
 	}
 	return true;
 }
@@ -233,5 +263,6 @@ bool TypeConverter<VariantList, String>::Convert(const VariantList& src, String&
 
 	return true;
 }
+
 
 } // namespace Rml

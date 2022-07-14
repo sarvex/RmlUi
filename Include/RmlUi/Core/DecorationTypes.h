@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -26,29 +26,59 @@
  *
  */
 
-#include "PropertyParserKeyword.h"
+#ifndef RMLUI_CORE_DECORATIONTYPES_H
+#define RMLUI_CORE_DECORATIONTYPES_H
+
+#include "NumericValue.h"
+#include "Types.h"
 
 namespace Rml {
 
-PropertyParserKeyword::PropertyParserKeyword()
+enum class DecoratorClass : byte {
+	Invalid = 0,
+	Background = 1 << 0,
+	Filter = 1 << 1,
+	BackdropFilter = 1 << 2,
+	MaskImage = 1 << 3,
+};
+inline DecoratorClass operator|(DecoratorClass a, DecoratorClass b)
 {
+	return DecoratorClass(byte(a) | byte(b));
+}
+inline DecoratorClass operator&(DecoratorClass a, DecoratorClass b)
+{
+	return DecoratorClass(byte(a) & byte(b));
 }
 
-PropertyParserKeyword::~PropertyParserKeyword()
+struct ColorStop {
+	Colourb color;
+	NumericValue position;
+};
+inline bool operator==(const ColorStop& a, const ColorStop& b)
 {
+	return a.color == b.color && a.position == b.position;
+}
+inline bool operator!=(const ColorStop& a, const ColorStop& b)
+{
+	return !(a == b);
 }
 
-// Called to parse a RCSS keyword declaration.
-bool PropertyParserKeyword::ParseValue(Property& property, const String& value, const ParameterMap& parameters) const
+struct Shadow {
+	Colourb color;
+	NumericValue offset_x, offset_y;
+	NumericValue blur_radius;
+	NumericValue spread_distance;
+	bool inset = false;
+};
+inline bool operator==(const Shadow& a, const Shadow& b)
 {
-	ParameterMap::const_iterator iterator = parameters.find(StringUtilities::ToLower(value));
-	if (iterator == parameters.end())
-		return false;
-
-	property.value = Variant((*iterator).second);
-	property.unit = Unit::KEYWORD;
-
-	return true;
+	return a.color == b.color && a.offset_x == b.offset_x && a.offset_y == b.offset_y && a.blur_radius == b.blur_radius &&
+		a.spread_distance == b.spread_distance && a.inset == b.inset;
+}
+inline bool operator!=(const Shadow& a, const Shadow& b)
+{
+	return !(a == b);
 }
 
 } // namespace Rml
+#endif

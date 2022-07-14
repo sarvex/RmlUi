@@ -76,7 +76,7 @@ void ElementDecoration::ReloadDecorators()
 	for (const PropertyId id : {PropertyId::Decorator, PropertyId::BackdropFilter, PropertyId::Filter, PropertyId::MaskImage})
 	{
 		const Property* property = element->GetLocalProperty(id);
-		if (!property || property->unit != Property::DECORATOR)
+		if (!property || property->unit != Unit::DECORATOR)
 			continue;
 
 		DecoratorsPtr decorators_ptr = property->Get<DecoratorsPtr>();
@@ -104,23 +104,23 @@ void ElementDecoration::ReloadDecorators()
 
 		const int list_size = (int)decorator_list.size();
 
-		DecoratorClasses decorator_class = DecoratorClasses::Invalid;
+		DecoratorClass decorator_class = DecoratorClass::Invalid;
 		switch (id)
 		{
 		case PropertyId::Decorator:
-			decorator_class = DecoratorClasses::Background;
+			decorator_class = DecoratorClass::Background;
 			num_backgrounds = list_size;
 			break;
 		case PropertyId::Filter:
-			decorator_class = DecoratorClasses::Filter;
+			decorator_class = DecoratorClass::Filter;
 			num_filters = list_size;
 			break;
 		case PropertyId::BackdropFilter:
-			decorator_class = DecoratorClasses::BackdropFilter;
+			decorator_class = DecoratorClass::BackdropFilter;
 			num_backdrop_filters = list_size;
 			break;
 		case PropertyId::MaskImage:
-			decorator_class = DecoratorClasses::MaskImage;
+			decorator_class = DecoratorClass::MaskImage;
 			num_mask_images = list_size;
 			break;
 		default:
@@ -132,6 +132,11 @@ void ElementDecoration::ReloadDecorators()
 		{
 			const SharedPtr<const Decorator>& decorator = decorator_list[i];
 			const DecoratorDeclaration& declaration = decorators_ptr->list[i];
+
+#ifdef RMLUI_DEBUG
+			const bool is_filter = (decorator_class == DecoratorClass::Filter);
+			RMLUI_ASSERT((is_filter && declaration.paint_area == BoxArea::Auto) || (!is_filter && declaration.paint_area != BoxArea::Auto));
+#endif
 
 			if (decorator)
 			{
@@ -213,7 +218,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			ElementUtilities::SetClippingRegion(element, true);
 
 			Rectanglef filter_rectangle = Rectanglef::CreateInvalid();
-			ElementUtilities::GetBoundingBox(filter_rectangle, element, PaintArea::Border);
+			ElementUtilities::GetBoundingBox(filter_rectangle, element, BoxArea::Border);
 			Math::ExpandToPixelGrid(filter_rectangle);
 
 			Rectanglei scissor_region = render_state.GetScissorState();
@@ -243,7 +248,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 
 			// Find the region being affected by the active filters and apply it as a scissor.
 			Rectanglef filter_region = Rectanglef::CreateInvalid();
-			ElementUtilities::GetBoundingBox(filter_region, element, PaintArea::Auto);
+			ElementUtilities::GetBoundingBox(filter_region, element, BoxArea::Auto);
 
 			const int i0 = num_backgrounds + num_backdrop_filters;
 			for (int i = i0; i < i0 + num_filters; i++)

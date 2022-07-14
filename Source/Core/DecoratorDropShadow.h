@@ -31,7 +31,7 @@
 
 #include "../../Include/RmlUi/Core/Decorator.h"
 #include "../../Include/RmlUi/Core/DecoratorInstancer.h"
-#include "../../Include/RmlUi/Core/Property.h"
+#include "../../Include/RmlUi/Core/ID.h"
 
 namespace Rml {
 
@@ -40,7 +40,7 @@ public:
 	DecoratorDropShadow();
 	virtual ~DecoratorDropShadow();
 
-	bool Initialise(Colourb color, Vector2f offset, float sigma);
+	bool Initialise(Colourb color, NumericValue offset_x, NumericValue offset_y, NumericValue sigma);
 
 	DecoratorDataHandle GenerateElementData(Element* element) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
@@ -51,8 +51,7 @@ public:
 
 private:
 	Colourb color;
-	Vector2f offset, extend_top_left, extend_bottom_right;
-	float sigma = 0;
+	NumericValue value_offset_x, value_offset_y, value_sigma;
 };
 
 class DecoratorDropShadowInstancer : public DecoratorInstancer {

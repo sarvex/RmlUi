@@ -40,10 +40,10 @@ DecoratorBlur::DecoratorBlur() {}
 
 DecoratorBlur::~DecoratorBlur() {}
 
-bool DecoratorBlur::Initialise(float in_radius)
+bool DecoratorBlur::Initialise(NumericValue in_radius)
 {
-	radius = in_radius;
-	return true;
+	radius_value = in_radius;
+	return Any(in_radius.unit & Unit::LENGTH);
 }
 
 DecoratorDataHandle DecoratorBlur::GenerateElementData(Element* element) const
@@ -52,6 +52,7 @@ DecoratorDataHandle DecoratorBlur::GenerateElementData(Element* element) const
 	if (!render_interface)
 		return INVALID_DECORATORDATAHANDLE;
 
+	const float radius = element->ResolveLength(radius_value);
 	CompiledFilterHandle handle = render_interface->CompileFilter("blur", Dictionary{{"radius", Variant(radius)}});
 
 	BasicFilterElementData* element_data = GetBasicFilterElementDataPool().AllocateAndConstruct(render_interface, handle);
@@ -73,15 +74,15 @@ void DecoratorBlur::RenderElement(Element* /*element*/, DecoratorDataHandle hand
 	element_data->render_interface->AttachFilter(element_data->filter);
 }
 
-void DecoratorBlur::ModifyScissorRegion(Element* /*element*/, Rectanglef& scissor_region) const
+void DecoratorBlur::ModifyScissorRegion(Element* element, Rectanglef& scissor_region) const
 {
-	const float blur_radius = Math::Max(2.f * radius, 3.f);
-	scissor_region.Extend(blur_radius);
+	const float radius = element->ResolveLength(radius_value);
+	const float blur_extent = 1.5f * Math::Max(radius, 1.f);
+	scissor_region.Extend(blur_extent);
 }
 
-DecoratorBlurInstancer::DecoratorBlurInstancer() : DecoratorInstancer(DecoratorClasses::Filter | DecoratorClasses::BackdropFilter)
+DecoratorBlurInstancer::DecoratorBlurInstancer() : DecoratorInstancer(DecoratorClass::Filter | DecoratorClass::BackdropFilter)
 {
-	// register properties for the decorator
 	ids.radius = RegisterProperty("radius", "0px").AddParser("length").GetId();
 	RegisterShorthand("decorator", "radius", ShorthandType::FallThrough);
 }
@@ -95,11 +96,8 @@ SharedPtr<Decorator> DecoratorBlurInstancer::InstanceDecorator(const String& /*n
 	if (!p_radius)
 		return nullptr;
 
-	// TODO dp/vp
-	const float radius = ComputeAbsoluteLength(*p_radius, 1.f, Vector2f(0.f));
-
 	auto decorator = MakeShared<DecoratorBlur>();
-	if (decorator->Initialise(radius))
+	if (decorator->Initialise(p_radius->GetNumericValue()))
 		return decorator;
 
 	return nullptr;

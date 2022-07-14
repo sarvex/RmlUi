@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -34,16 +34,14 @@
 
 namespace Rml {
 
-namespace Transforms { struct NumericValue; }
-
+struct NumericValue;
 
 /**
-	A property parser that parses a RCSS transform property specification.
+    A property parser that parses a RCSS transform property specification.
 
-	@author Markus Schöngart
+    @author Markus Schöngart
  */
-class PropertyParserTransform : public PropertyParser
-{
+class PropertyParserTransform : public PropertyParser {
 public:
 	PropertyParserTransform();
 	virtual ~PropertyParserTransform();
@@ -64,7 +62,7 @@ private:
 	/// @param[out] args The numeric arguments encountered
 	/// @param[in] nargs The number of numeric arguments expected
 	/// @return True if parsed successfully, false otherwise.
-	bool Scan(int& out_bytes_read, const char* str, const char* keyword, const PropertyParser** parsers, Transforms::NumericValue* args, int nargs) const;
+	bool Scan(int& out_bytes_read, const char* str, const char* keyword, const PropertyParser** parsers, NumericValue* args, int nargs) const;
 
 	PropertyParserNumber number, length, angle;
 };

@@ -31,7 +31,7 @@
 
 #include "../../Include/RmlUi/Core/Decorator.h"
 #include "../../Include/RmlUi/Core/DecoratorInstancer.h"
-#include "../../Include/RmlUi/Core/Property.h"
+#include "../../Include/RmlUi/Core/ID.h"
 
 namespace Rml {
 
@@ -40,7 +40,7 @@ public:
 	DecoratorBlur();
 	virtual ~DecoratorBlur();
 
-	bool Initialise(float radius);
+	bool Initialise(NumericValue radius);
 
 	DecoratorDataHandle GenerateElementData(Element* element) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
@@ -50,7 +50,7 @@ public:
 	void ModifyScissorRegion(Element* element, Rectanglef& scissor_region) const override;
 
 private:
-	float radius = 0.f;
+	NumericValue radius_value;
 };
 
 class DecoratorBlurInstancer : public DecoratorInstancer {

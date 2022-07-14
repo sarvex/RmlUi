@@ -28,6 +28,7 @@
 
 #include "RmlUi_Renderer_GL3.h"
 #include <RmlUi/Core/Core.h>
+#include <RmlUi/Core/DecorationTypes.h>
 #include <RmlUi/Core/FileInterface.h>
 #include <RmlUi/Core/GeometryUtilities.h>
 #include <RmlUi/Core/Log.h>
@@ -1446,8 +1447,8 @@ void RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle effect_handle, 
 		for (int i = 0; i < num_stops; i++)
 		{
 			const Rml::ColorStop& stop = effect.color_stop_list[i];
-			RMLUI_ASSERT(stop.position == Rml::ColorStop::Position::Number);
-			stop_positions[i] = stop.position_value;
+			RMLUI_ASSERT(stop.position.unit == Rml::Unit::NUMBER);
+			stop_positions[i] = stop.position.number;
 			for (int j = 0; j < 4; j++)
 				stop_colors[i][j] = float(stop.color[j]) * (1.f / 255.f);
 			for (int j = 0; j < 3; j++)

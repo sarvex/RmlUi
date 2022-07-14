@@ -34,7 +34,6 @@
 #include "../../Include/RmlUi/Core/FontEngineInterface.h"
 #include "../../Include/RmlUi/Core/Log.h"
 #include "../../Include/RmlUi/Core/Profiling.h"
-#include "../../Include/RmlUi/Core/Property.h"
 #include "ComputeProperty.h"
 #include "LayoutEngine.h"
 #include "LayoutLineBox.h"
@@ -138,7 +137,7 @@ void LayoutInlineBoxText::PositionElement()
 	}
 	else
 	{
-		GetTextElement()->AddLine(line->GetRelativePosition() + position - element->GetRelativeOffset(Box::BORDER), line_contents);
+		GetTextElement()->AddLine(line->GetRelativePosition() + position - element->GetRelativeOffset(BoxArea::Border), line_contents);
 	}
 }
 

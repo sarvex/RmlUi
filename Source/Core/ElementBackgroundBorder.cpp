@@ -30,6 +30,7 @@
 #include "../../Include/RmlUi/Core/Box.h"
 #include "../../Include/RmlUi/Core/ComputedValues.h"
 #include "../../Include/RmlUi/Core/Context.h"
+#include "../../Include/RmlUi/Core/DecorationTypes.h"
 #include "../../Include/RmlUi/Core/Element.h"
 #include "../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../Include/RmlUi/Core/GeometryUtilities.h"
@@ -59,9 +60,9 @@ void ElementBackgroundBorder::Render(Element* element)
 
 	Geometry* shadow_geometry = GetGeometry(BackgroundType::BoxShadow);
 	if (shadow_geometry && *shadow_geometry)
-		shadow_geometry->Render(element->GetAbsoluteOffset(Box::BORDER));
+		shadow_geometry->Render(element->GetAbsoluteOffset(BoxArea::Border));
 	else if (Geometry* main_geometry = GetGeometry(BackgroundType::Main))
-		main_geometry->Render(element->GetAbsoluteOffset(Box::BORDER));
+		main_geometry->Render(element->GetAbsoluteOffset(BoxArea::Border));
 }
 
 void ElementBackgroundBorder::DirtyBackground()
@@ -74,18 +75,18 @@ void ElementBackgroundBorder::DirtyBorder()
 	border_dirty = true;
 }
 
-Geometry* ElementBackgroundBorder::GetClipGeometry(Element* element, Box::Area clip_area)
+Geometry* ElementBackgroundBorder::GetClipGeometry(Element* element, BoxArea clip_area)
 {
 	BackgroundType type = {};
 	switch (clip_area)
 	{
-	case Rml::Box::BORDER:
+	case Rml::BoxArea::Border:
 		type = BackgroundType::ClipBorder;
 		break;
-	case Rml::Box::PADDING:
+	case Rml::BoxArea::Padding:
 		type = BackgroundType::ClipPadding;
 		break;
-	case Rml::Box::CONTENT:
+	case Rml::BoxArea::Content:
 		type = BackgroundType::ClipContent;
 		break;
 	default:
@@ -144,17 +145,26 @@ void ElementBackgroundBorder::GenerateGeometry(Element* element)
 	if (p_box_shadow)
 	{
 		RMLUI_ASSERT(p_box_shadow->value.GetType() == Variant::SHADOWLIST);
-		const ShadowList& shadow_list = p_box_shadow->value.GetReference<ShadowList>();
+		ShadowList shadow_list = p_box_shadow->value.Get<ShadowList>();
 
-		GenerateBoxShadow(element, shadow_list, border_radius, computed.opacity());
+		GenerateBoxShadow(element, std::move(shadow_list), border_radius, computed.opacity());
 	}
 }
 
-void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowList& shadow_list, const Vector4f border_radius, const float opacity)
+void ElementBackgroundBorder::GenerateBoxShadow(Element* element, ShadowList shadow_list, const Vector4f border_radius, const float opacity)
 {
 	// Find the box-shadow texture dimension and offset required to cover all box-shadows and element boxes combined.
 	Vector2f element_offset_in_texture;
 	Vector2i texture_dimensions;
+
+	// Resolve all lengths to px units.
+	for (Shadow& shadow : shadow_list)
+	{
+		shadow.blur_radius = NumericValue(element->ResolveLength(shadow.blur_radius), Unit::PX);
+		shadow.spread_distance = NumericValue(element->ResolveLength(shadow.spread_distance), Unit::PX);
+		shadow.offset_x = NumericValue(element->ResolveLength(shadow.offset_x), Unit::PX);
+		shadow.offset_y = NumericValue(element->ResolveLength(shadow.offset_y), Unit::PX);
+	}
 
 	{
 		Vector2f extend_min;
@@ -165,9 +175,10 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 		{
 			if (!shadow.inset)
 			{
-				const float extend = shadow.blur_radius + shadow.spread_distance;
-				extend_min = Math::Min(extend_min, shadow.offset - Vector2f(extend));
-				extend_max = Math::Max(extend_max, shadow.offset + Vector2f(extend));
+				const float extend = 1.5f * shadow.blur_radius.number + shadow.spread_distance.number;
+				const Vector2f offset = {shadow.offset_x.number, shadow.offset_y.number};
+				extend_min = Math::Min(extend_min, offset - Vector2f(extend));
+				extend_max = Math::Max(extend_max, offset + Vector2f(extend));
 			}
 		}
 
@@ -178,7 +189,7 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 		{
 			Vector2f offset;
 			const Box& box = element->GetBox(i, offset);
-			texture_region.Join(Rectanglef::FromPositionSize(offset, box.GetSize(Box::BORDER)));
+			texture_region.Join(Rectanglef::FromPositionSize(offset, box.GetSize(BoxArea::Border)));
 		}
 
 		texture_region.ExtendTopLeft(-extend_min);
@@ -223,9 +234,9 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 			const Box& box = element->GetBox(i, offset);
 
 			if (has_inner_shadow)
-				GeometryUtilities::GenerateBackground(&geometry_padding, box, offset, border_radius, Colourb(255), Box::PADDING);
+				GeometryUtilities::GenerateBackground(&geometry_padding, box, offset, border_radius, Colourb(255), BoxArea::Padding);
 			if (has_outer_shadow)
-				GeometryUtilities::GenerateBackground(&geometry_padding_border, box, offset, border_radius, Colourb(255), Box::BORDER);
+				GeometryUtilities::GenerateBackground(&geometry_padding_border, box, offset, border_radius, Colourb(255), BoxArea::Border);
 		}
 
 		RenderState& render_state = context->GetRenderState();
@@ -240,19 +251,22 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 		for (int shadow_index = (int)shadow_list.size() - 1; shadow_index >= 0; shadow_index--)
 		{
 			const Shadow& shadow = shadow_list[shadow_index];
+			const Vector2f shadow_offset = {shadow.offset_x.number, shadow.offset_y.number};
 			const bool inset = shadow.inset;
+			const float spread_distance = shadow.spread_distance.number;
+			const float blur_radius = shadow.blur_radius.number;
 
 			Vector4f spread_radii = border_radius;
 			for (int i = 0; i < 4; i++)
 			{
 				float& radius = spread_radii[i];
 				float spread_factor = (inset ? -1.f : 1.f);
-				if (radius < shadow.spread_distance)
+				if (radius < spread_distance)
 				{
-					const float ratio_minus_one = (radius / shadow.spread_distance) - 1.f;
+					const float ratio_minus_one = (radius / spread_distance) - 1.f;
 					spread_factor *= 1.f + ratio_minus_one * ratio_minus_one * ratio_minus_one;
 				}
-				radius = Math::Max(radius + spread_factor * shadow.spread_distance, 0.f);
+				radius = Math::Max(radius + spread_factor * spread_distance, 0.f);
 			}
 
 			Geometry shadow_geometry;
@@ -262,23 +276,24 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 			{
 				Vector2f offset;
 				Box box = element->GetBox(i, offset);
-				const float signed_spread_distance = (inset ? -shadow.spread_distance : shadow.spread_distance);
+				const float signed_spread_distance = (inset ? -spread_distance : spread_distance);
 				offset -= Vector2f(signed_spread_distance);
 
-				for (int j = 0; j < (int)Box::NUM_EDGES; j++)
+				for (int j = 0; j < Box::num_edges; j++)
 				{
-					Box::Edge edge = (Box::Edge)j;
-					const float new_size = box.GetEdge(Box::PADDING, edge) + signed_spread_distance;
-					box.SetEdge(Box::PADDING, edge, new_size);
+					BoxEdge edge = (BoxEdge)j;
+					const float new_size = box.GetEdge(BoxArea::Padding, edge) + signed_spread_distance;
+					box.SetEdge(BoxArea::Padding, edge, new_size);
 				}
 
-				GeometryUtilities::GenerateBackground(&shadow_geometry, box, offset, spread_radii, shadow.color, inset ? Box::PADDING : Box::BORDER);
+				GeometryUtilities::GenerateBackground(&shadow_geometry, box, offset, spread_radii, shadow.color,
+					inset ? BoxArea::Padding : BoxArea::Border);
 			}
 
 			CompiledFilterHandle blur = {};
-			if (shadow.blur_radius > 0.5f)
+			if (blur_radius > 0.5f)
 			{
-				blur = render_interface->CompileFilter("blur", Dictionary{{"radius", Variant(shadow.blur_radius)}});
+				blur = render_interface->CompileFilter("blur", Dictionary{{"radius", Variant(blur_radius)}});
 				if (blur)
 				{
 					render_interface->StackPush();
@@ -288,7 +303,7 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 
 			if (inset)
 			{
-				render_state.SetClipMask(ClipMask::ClipOut, &shadow_geometry, shadow.offset + element_offset_in_texture);
+				render_state.SetClipMask(ClipMask::ClipOut, &shadow_geometry, shadow_offset + element_offset_in_texture);
 
 				for (Rml::Vertex& vertex : geometry_padding.GetVertices())
 					vertex.colour = shadow.color;
@@ -301,7 +316,7 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, const ShadowLi
 			else
 			{
 				render_state.SetClipMask(ClipMask::ClipOut, &geometry_padding_border, element_offset_in_texture);
-				shadow_geometry.Render(shadow.offset + element_offset_in_texture);
+				shadow_geometry.Render(shadow_offset + element_offset_in_texture);
 			}
 
 			if (blur)

@@ -29,6 +29,7 @@
 #include "../../Include/RmlUi/Core/ElementUtilities.h"
 #include "../../Include/RmlUi/Core/Context.h"
 #include "../../Include/RmlUi/Core/Core.h"
+#include "../../Include/RmlUi/Core/DecorationTypes.h"
 #include "../../Include/RmlUi/Core/Element.h"
 #include "../../Include/RmlUi/Core/ElementScroll.h"
 #include "../../Include/RmlUi/Core/Factory.h"
@@ -69,10 +70,10 @@ static void SetBox(Element* element)
 // Positions an element relative to an offset parent.
 static void SetElementOffset(Element* element, Vector2f offset)
 {
-	Vector2f relative_offset = element->GetParentNode()->GetBox().GetPosition(Box::CONTENT);
+	Vector2f relative_offset = element->GetParentNode()->GetBox().GetPosition(BoxArea::Content);
 	relative_offset += offset;
-	relative_offset.x += element->GetBox().GetEdge(Box::MARGIN, Box::LEFT);
-	relative_offset.y += element->GetBox().GetEdge(Box::MARGIN, Box::TOP);
+	relative_offset.x += element->GetBox().GetEdge(BoxArea::Margin, BoxEdge::Left);
+	relative_offset.y += element->GetBox().GetEdge(BoxArea::Margin, BoxEdge::Top);
 
 	element->SetOffset(relative_offset, element->GetParentNode());
 }
@@ -195,7 +196,7 @@ bool ElementUtilities::GetClippingRegion(Rectanglei& clip_region, Element* eleme
 		// Merge the existing clip region with the current clip region, unless we are ignoring clip regions.
 		if (((clip_always || clip_enabled) && num_ignored_clips == 0) || force_clip_current_element)
 		{
-			const Box::Area client_area = (force_clip_current_element ? Box::BORDER : clipping_element->GetClientArea());
+			const BoxArea client_area = (force_clip_current_element ? BoxArea::Border : clipping_element->GetClientArea());
 			const bool has_clipping_content =
 				(clip_always || force_clip_current_element || clipping_element->GetClientWidth() < clipping_element->GetScrollWidth() - 0.5f ||
 					clipping_element->GetClientHeight() < clipping_element->GetScrollHeight() - 0.5f);
@@ -213,7 +214,7 @@ bool ElementUtilities::GetClippingRegion(Rectanglei& clip_region, Element* eleme
 				if (has_border_radius || (transform && has_clipping_content))
 				{
 					Geometry* clip_geometry = clipping_element->GetElementBackgroundBorder()->GetClipGeometry(clipping_element, client_area);
-					const Vector2f absolute_offset = clipping_element->GetAbsoluteOffset(Box::BORDER);
+					const Vector2f absolute_offset = clipping_element->GetAbsoluteOffset(BoxArea::Border);
 					const ClipMask clip_mask = (clip_mask_list->empty() ? ClipMask::Clip : ClipMask::ClipIntersect);
 					clip_mask_list->push_back(ElementClip{clip_mask, clip_geometry, absolute_offset, transform});
 				}
@@ -300,14 +301,16 @@ bool ElementUtilities::SetClippingRegion(Element* element, bool force_clip_self)
 	return true;
 }
 
-bool ElementUtilities::GetBoundingBox(Rectanglef& out_rectangle, Element* element, PaintArea area)
+bool ElementUtilities::GetBoundingBox(Rectanglef& out_rectangle, Element* element, BoxArea box_area)
 {
 	RMLUI_ASSERT(element);
 
 	Vector2f shadow_extent_neg, shadow_extent_pos;
-	if (area == PaintArea::Auto)
+	if (box_area == BoxArea::Auto)
 	{
-		// Extend the bounding box to include the element's box-shadow.
+		// Auto acts like border box but extends the bounding box to include the element's box-shadow.
+		box_area = BoxArea::Border;
+
 		if (const Property* p_box_shadow = element->GetLocalProperty(PropertyId::BoxShadow))
 		{
 			RMLUI_ASSERT(p_box_shadow->value.GetType() == Variant::SHADOWLIST);
@@ -317,15 +320,16 @@ bool ElementUtilities::GetBoundingBox(Rectanglef& out_rectangle, Element* elemen
 			{
 				if (!shadow.inset)
 				{
-					const float extend = shadow.blur_radius + shadow.spread_distance;
-					shadow_extent_neg = Math::Min(shadow_extent_neg, shadow.offset - Vector2f(extend));
-					shadow_extent_pos = Math::Max(shadow_extent_pos, shadow.offset + Vector2f(extend));
+					const float extent = 1.5f * element->ResolveLength(shadow.blur_radius) + element->ResolveLength(shadow.spread_distance);
+					const Vector2f offset = {element->ResolveLength(shadow.offset_x), element->ResolveLength(shadow.offset_y)};
+					
+					shadow_extent_neg = Math::Min(shadow_extent_neg, offset - Vector2f(extent));
+					shadow_extent_pos = Math::Max(shadow_extent_pos, offset + Vector2f(extent));
 				}
 			}
 		}
 	}
 
-	const Box::Area box_area = ToBoxArea(area);
 	const Vector2f element_origin = element->GetAbsoluteOffset(box_area);
 	const Vector2f element_size = element->GetBox().GetSize(box_area);
 
@@ -405,8 +409,8 @@ bool ElementUtilities::PositionElement(Element* element, Vector2f offset, Positi
 
 	SetBox(element);
 
-	Vector2f containing_block = element->GetParentNode()->GetBox().GetSize(Box::CONTENT);
-	Vector2f element_block = element->GetBox().GetSize(Box::MARGIN);
+	Vector2f containing_block = element->GetParentNode()->GetBox().GetSize(BoxArea::Content);
+	Vector2f element_block = element->GetBox().GetSize(BoxArea::Margin);
 
 	Vector2f resolved_offset = offset;
 

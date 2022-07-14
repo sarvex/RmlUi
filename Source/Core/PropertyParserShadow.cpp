@@ -27,6 +27,7 @@
  */
 
 #include "PropertyParserShadow.h"
+#include "../../Include/RmlUi/Core/DecorationTypes.h"
 #include "../../Include/RmlUi/Core/StringUtilities.h"
 
 namespace Rml {
@@ -42,7 +43,7 @@ bool PropertyParserShadow::ParseValue(Property& property, const String& value, c
 	if (value.empty() || value == "none")
 	{
 		property.value = Variant();
-		property.unit = Property::UNKNOWN;
+		property.unit = Unit::UNKNOWN;
 		return true;
 	}
 
@@ -80,20 +81,19 @@ bool PropertyParserShadow::ParseValue(Property& property, const String& value, c
 			Property prop;
 			if (parser_length->ParseValue(prop, argument, empty_parameter_map))
 			{
-				// TODO: Non-px units
 				switch (length_argument_index)
 				{
 				case 0:
-					shadow.offset.x = prop.Get<float>();
+					shadow.offset_x = prop.GetNumericValue();
 					break;
 				case 1:
-					shadow.offset.y = prop.Get<float>();
+					shadow.offset_y = prop.GetNumericValue();
 					break;
 				case 2:
-					shadow.blur_radius = prop.Get<float>();
+					shadow.blur_radius = prop.GetNumericValue();
 					break;
 				case 3:
-					shadow.spread_distance = prop.Get<float>();
+					shadow.spread_distance = prop.GetNumericValue();
 					break;
 				default:
 					return false;
@@ -118,7 +118,7 @@ bool PropertyParserShadow::ParseValue(Property& property, const String& value, c
 			return false;
 	}
 
-	property.unit = Property::SHADOWLIST;
+	property.unit = Unit::SHADOWLIST;
 	property.value = Variant(std::move(shadow_list));
 
 	return true;

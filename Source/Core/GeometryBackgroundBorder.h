@@ -81,6 +81,7 @@ public:
 	void DrawBorder(const BorderMetrics& metrics, EdgeSizes edge_sizes, const Colourb border_colors[4]);
 
 private:
+	enum Edge { TOP, RIGHT, BOTTOM, LEFT };
 	enum Corner { TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT };
 
 	// -- Background --

@@ -27,6 +27,8 @@
  */
 
 #include "../../Include/RmlUi/Core/Variant.h"
+#include "../../Include/RmlUi/Core/DecorationTypes.h"
+#include "../../Include/RmlUi/Core/StyleSheetTypes.h"
 #include <string.h>
 
 namespace Rml {

@@ -53,7 +53,7 @@ bool PropertyParserFontEffect::ParseValue(Property& property, const String& font
 	if (font_effect_string_value.empty() || font_effect_string_value == "none")
 	{
 		property.value = Variant();
-		property.unit = Property::UNKNOWN;
+		property.unit = Unit::UNKNOWN;
 		return true;
 	}
 
@@ -138,7 +138,7 @@ bool PropertyParserFontEffect::ParseValue(Property& property, const String& font
 	);
 
 	property.value = Variant(MakeShared<FontEffects>(std::move(font_effects)));
-	property.unit = Property::FONTEFFECT;
+	property.unit = Unit::FONTEFFECT;
 
 	return true;
 }

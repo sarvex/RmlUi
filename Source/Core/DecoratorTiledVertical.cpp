@@ -100,7 +100,7 @@ DecoratorDataHandle DecoratorTiledVertical::GenerateElementData(Element* element
 	const int num_textures = GetNumTextures();
 	DecoratorTiledVerticalData* data = new DecoratorTiledVerticalData(element, num_textures);
 
-	Vector2f padded_size = element->GetBox().GetSize(Box::PADDING);
+	Vector2f padded_size = element->GetBox().GetSize(BoxArea::Padding);
 
 	Vector2f top_dimensions = tiles[TOP].GetNaturalDimensions(element);
 	Vector2f bottom_dimensions = tiles[BOTTOM].GetNaturalDimensions(element);
@@ -148,7 +148,7 @@ void DecoratorTiledVertical::ReleaseElementData(DecoratorDataHandle element_data
 // Called to render the decorator on an element.
 void DecoratorTiledVertical::RenderElement(Element* element, DecoratorDataHandle element_data) const
 {
-	Vector2f translation = element->GetAbsoluteOffset(Box::PADDING).Round();
+	Vector2f translation = element->GetAbsoluteOffset(BoxArea::Padding).Round();
 	DecoratorTiledVerticalData* data = reinterpret_cast< DecoratorTiledVerticalData* >(element_data);
 
 	for (int i = 0; i < data->num_textures; i++)

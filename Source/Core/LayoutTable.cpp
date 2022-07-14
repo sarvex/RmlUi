@@ -188,7 +188,7 @@ void LayoutTable::InitializeCellBoxes()
 
 		// Determine the cell's content width. Include any spanning columns in the cell width.
 		const float cell_border_width = GetSpanningCellBorderSize(columns, grid.cells[i].column_begin, grid.cells[i].column_last);
-		const float content_width = Math::Max(0.0f, cell_border_width - box.GetSizeAcross(Box::HORIZONTAL, Box::BORDER, Box::PADDING));
+		const float content_width = Math::Max(0.0f, cell_border_width - box.GetSizeAcross(BoxDirection::Horizontal, BoxArea::Border, BoxArea::Padding));
 		box.SetContent(Vector2f(content_width, box.GetSize().y));
 	}
 }
@@ -292,7 +292,7 @@ void LayoutTable::DetermineRowHeights()
 						+ metric.group_padding_border_a + metric.group_padding_border_b + metric.sum_margin_a + metric.sum_margin_b;
 				});
 
-				const float cell_inrow_height = box.GetSizeAcross(Box::VERTICAL, Box::BORDER) - height_from_spanning_rows;
+				const float cell_inrow_height = box.GetSizeAcross(BoxDirection::Vertical, BoxArea::Border) - height_from_spanning_rows;
 
 				// Now we have the height of the cell, increase the row height to accompany the cell.
 				row_metric.fixed_size = Math::Max(row_metric.fixed_size, cell_inrow_height);
@@ -324,13 +324,13 @@ void LayoutTable::FormatRows()
 		// We use inline context here because we only care about padding, border, and (non-auto) margin.
 		LayoutDetails::BuildBox(box, table_initial_content_size, element, BoxContext::Inline, 0.0f);
 		const Vector2f content_size(
-			table_resulting_content_size.x - box.GetSizeAcross(Box::HORIZONTAL, Box::MARGIN, Box::PADDING),
+			table_resulting_content_size.x - box.GetSizeAcross(BoxDirection::Horizontal, BoxArea::Margin, BoxArea::Padding),
 			content_height
 		);
 		box.SetContent(content_size);
 		element->SetBox(box);
 
-		element->SetOffset(table_content_offset + Vector2f(box.GetEdge(Box::MARGIN, Box::LEFT), offset_y), element_table);
+		element->SetOffset(table_content_offset + Vector2f(box.GetEdge(BoxArea::Margin, BoxEdge::Left), offset_y), element_table);
 	};
 
 	for (int i = 0; i < (int)rows.size(); i++)
@@ -357,12 +357,12 @@ void LayoutTable::FormatColumns()
 		LayoutDetails::BuildBox(box, table_initial_content_size, element, BoxContext::Inline, 0.0f);
 		const Vector2f content_size(
 			content_width,
-			table_resulting_content_size.y - box.GetSizeAcross(Box::VERTICAL, Box::MARGIN, Box::PADDING)
+			table_resulting_content_size.y - box.GetSizeAcross(BoxDirection::Vertical, BoxArea::Margin, BoxArea::Padding)
 		);
 		box.SetContent(content_size);
 		element->SetBox(box);
 
-		element->SetOffset(table_content_offset + Vector2f(offset_x, box.GetEdge(Box::MARGIN, Box::TOP)), element_table);
+		element->SetOffset(table_content_offset + Vector2f(offset_x, box.GetEdge(BoxArea::Margin, BoxEdge::Top)), element_table);
 	};
 
 	for (int i = 0; i < (int)columns.size(); i++)
@@ -409,11 +409,11 @@ void LayoutTable::FormatCells()
 			else
 			{
 				// We don't need to add any padding and can thus avoid formatting, just set the height to the row height.
-				box.SetContent(Vector2f(box.GetSize().x, Math::Max(0.0f, cell_border_height - box.GetSizeAcross(Box::VERTICAL, Box::BORDER, Box::PADDING))));
+				box.SetContent(Vector2f(box.GetSize().x, Math::Max(0.0f, cell_border_height - box.GetSizeAcross(BoxDirection::Vertical, BoxArea::Border, BoxArea::Padding))));
 			}
 		}
 
-		const float available_height = cell_border_height - box.GetSizeAcross(Box::VERTICAL, Box::BORDER);
+		const float available_height = cell_border_height - box.GetSizeAcross(BoxDirection::Vertical, BoxArea::Border);
 
 		if (available_height > 0)
 		{
@@ -437,8 +437,8 @@ void LayoutTable::FormatCells()
 				add_padding_bottom = available_height;
 			}
 
-			box.SetEdge(Box::PADDING, Box::TOP, box.GetEdge(Box::PADDING, Box::TOP) + add_padding_top);
-			box.SetEdge(Box::PADDING, Box::BOTTOM, box.GetEdge(Box::PADDING, Box::BOTTOM) + add_padding_bottom);
+			box.SetEdge(BoxArea::Padding, BoxEdge::Top, box.GetEdge(BoxArea::Padding, BoxEdge::Top) + add_padding_top);
+			box.SetEdge(BoxArea::Padding, BoxEdge::Bottom, box.GetEdge(BoxArea::Padding, BoxEdge::Bottom) + add_padding_bottom);
 		}
 
 		// Format the cell in a new block formatting context.
