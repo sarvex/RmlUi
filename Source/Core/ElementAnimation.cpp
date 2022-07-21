@@ -27,13 +27,16 @@
  */
 
 #include "ElementAnimation.h"
-#include "ElementStyle.h"
-#include "TransformUtilities.h"
+#include "../../Include/RmlUi/Core/DecoratorInstancer.h"
 #include "../../Include/RmlUi/Core/Element.h"
 #include "../../Include/RmlUi/Core/PropertyDefinition.h"
+#include "../../Include/RmlUi/Core/PropertySpecification.h"
 #include "../../Include/RmlUi/Core/StyleSheetSpecification.h"
+#include "../../Include/RmlUi/Core/StyleSheetTypes.h"
 #include "../../Include/RmlUi/Core/Transform.h"
 #include "../../Include/RmlUi/Core/TransformPrimitive.h"
+#include "ElementStyle.h"
+#include "TransformUtilities.h"
 
 namespace Rml {
 
@@ -165,6 +168,97 @@ static Property InterpolateProperties(const Property& p0, const Property& p1, fl
 		return Property{ TransformPtr(std::move(t)), Unit::TRANSFORM };
 	}
 
+	if (p0.unit == Unit::DECORATOR && p1.unit == Unit::DECORATOR)
+	{
+		auto DiscreteInterpolation = [&]() { return alpha < 0.5f ? p0 : p1; };
+
+		auto& ptr0 = p0.value.GetReference<DecoratorsPtr>();
+		auto& ptr1 = p1.value.GetReference<DecoratorsPtr>();
+		if (!ptr0 || !ptr1)
+		{
+			RMLUI_ERRORMSG("Invalid decorator pointer, were the decorator keys properly prepared?");
+			return DiscreteInterpolation();
+		}
+
+		const bool p0_smaller = (ptr0->list.size() < ptr1->list.size());
+		auto& small = (p0_smaller ? ptr0->list : ptr1->list);
+		auto& big = (p0_smaller ? ptr1->list : ptr0->list);
+
+		// Build the new, interpolated decorator.
+		UniquePtr<DecoratorDeclarationList> decorator(new DecoratorDeclarationList);
+		decorator->list.reserve(ptr0->list.size());
+
+		// Interpolate decorators that have common types.
+		for (size_t i = 0; i < small.size(); i++)
+		{
+			const DecoratorDeclaration& d0 = ptr0->list[i];
+			const DecoratorDeclaration& d1 = ptr1->list[i];
+
+			if (d0.instancer != d1.instancer || d0.paint_area != d1.paint_area || d0.type != d1.type ||
+				d0.properties.GetNumProperties() != d1.properties.GetNumProperties())
+			{
+				// Incompatible decorators, fall back to discrete interpolation.
+				return DiscreteInterpolation();
+			}
+
+			decorator->list.push_back(DecoratorDeclaration{d0.type, d0.instancer, PropertyDictionary(), d0.paint_area});
+			PropertyDictionary& props = decorator->list.back().properties;
+
+			const auto& props0 = d0.properties.GetProperties();
+			const auto& props1 = d1.properties.GetProperties();
+
+			for (const auto& pair0 : props0)
+			{
+				const PropertyId id = pair0.first;
+				const Property& prop0 = pair0.second;
+
+				auto it = props1.find(id);
+				if (it == props1.end())
+				{
+					RMLUI_ERRORMSG("Incompatible decorator properties.");
+					return DiscreteInterpolation();
+				}
+				const Property& prop1 = it->second;
+
+				Property p = InterpolateProperties(prop0, prop1, alpha, element, prop0.definition);
+				p.definition = prop0.definition;
+				props.SetProperty(id, p);
+			}
+		}
+
+		// Append any trailing decorators from the largest list and interpolate against the default values of its type.
+		for (size_t i = small.size(); i < big.size(); i++)
+		{
+			const DecoratorDeclaration& d_big = big[i];
+			RMLUI_ASSERT(d_big.instancer);
+
+			decorator->list.push_back(DecoratorDeclaration{d_big.type, d_big.instancer, PropertyDictionary(), d_big.paint_area});
+			DecoratorDeclaration& d_new = decorator->list.back();
+
+			const PropertySpecification& specification = d_new.instancer->GetPropertySpecification();
+
+			const PropertyMap& props_big = d_big.properties.GetProperties();
+			for (const auto& pair_big : props_big)
+			{
+				const PropertyId id = pair_big.first;
+				const PropertyDefinition* underlying_definition = specification.GetProperty(id);
+				if (!underlying_definition)
+					return DiscreteInterpolation();
+
+				const Property& p_big = pair_big.second;
+				const Property& p_small = *underlying_definition->GetDefaultValue();
+				const Property& p_interp0 = (p0_smaller ? p_small : p_big);
+				const Property& p_interp1 = (p0_smaller ? p_big : p_small);
+
+				Property p = InterpolateProperties(p_interp0, p_interp1, alpha, element, p_big.definition);
+				p.definition = p_big.definition;
+				d_new.properties.SetProperty(id, p);
+			}
+		}
+
+		return Property{DecoratorsPtr(std::move(decorator)), Unit::DECORATOR};
+	}
+
 	// Fall back to discrete interpolation for incompatible units.
 	return alpha < 0.5f ? p0 : p1;
 }
@@ -247,13 +341,9 @@ static PrepareTransformResult PrepareTransformPair(Transform& t0, Transform& t1,
 				if (TransformUtilities::TryConvertToMatchingGenericType(small[i_small], big[i_big]))
 				{
 					// They matched exactly or in their more generic form. One or both primitives may have been converted.
-					match_success = true;
 					if (big[i_big].type != big_type)
 						changed_big = true;
-				}
 
-				if (match_success)
-				{
 					matching_indices.push_back(i_big);
 					match_success = true;
 					i_big += 1;
@@ -392,6 +482,27 @@ static bool PrepareTransforms(Vector<AnimationKey>& keys, Element& element, int 
 	return (count_iterations < max_iterations);
 }
 
+static bool PrepareDecorator(AnimationKey& key)
+{
+	Property& property = key.property;
+	RMLUI_ASSERT(property.value.GetType() == Variant::DECORATORSPTR);
+
+	if (!property.value.GetReference<DecoratorsPtr>())
+		property.value = MakeShared<DecoratorDeclarationList>();
+
+	const DecoratorDeclarationList& declaration_list = *property.value.GetReference<DecoratorsPtr>();
+
+	for (const DecoratorDeclaration& declaration : declaration_list.list)
+	{
+		if (!declaration.instancer)
+		{
+			Log::Message(Log::LT_WARNING, "Animation keys cannot include decorator values containing @decorator names.");
+			return false;
+		}
+	}
+
+	return true;
+}
 
 ElementAnimation::ElementAnimation(PropertyId property_id, ElementAnimationOrigin origin, const Property& current_value, Element& element, double start_world_time, float duration, int num_iterations, bool alternate_direction)
 	: property_id(property_id), duration(duration), num_iterations(num_iterations), alternate_direction(alternate_direction), last_update_world_time(start_world_time),
@@ -407,7 +518,7 @@ ElementAnimation::ElementAnimation(PropertyId property_id, ElementAnimationOrigi
 
 bool ElementAnimation::InternalAddKey(float time, const Property& in_property, Element& element, Tween tween)
 {
-	const Units valid_units = (Unit::NUMBER_LENGTH_PERCENT | Unit::ANGLE | Unit::COLOUR | Unit::TRANSFORM | Unit::KEYWORD);
+	const Units valid_units = (Unit::NUMBER_LENGTH_PERCENT | Unit::ANGLE | Unit::COLOUR | Unit::TRANSFORM | Unit::KEYWORD | Unit::DECORATOR);
 
 	if (!Any(in_property.unit & valid_units))
 	{
@@ -421,6 +532,10 @@ bool ElementAnimation::InternalAddKey(float time, const Property& in_property, E
 	if (keys.back().property.unit == Unit::TRANSFORM)
 	{
 		result = PrepareTransforms(keys, element, (int)keys.size() - 1);
+	}
+	else if (keys.back().property.unit == Unit::DECORATOR)
+	{
+		result = PrepareDecorator(keys.back());
 	}
 
 	if (!result)

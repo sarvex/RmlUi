@@ -115,20 +115,34 @@ const Keyframes * StyleSheet::GetKeyframes(const String & name) const
 
 const DecoratorPtrList& StyleSheet::InstanceDecorators(const DecoratorDeclarationList& declaration_list, const PropertySource* source) const
 {
+	RMLUI_ASSERT_NONRECURSIVE; // Since we may return a reference to the below static variable.
+	static DecoratorPtrList non_cached_decorator_list;
+
+	// Empty declaration values are used for interpolated values which we don't want to cache.
+	const bool enable_cache = !declaration_list.value.empty();
+
 	// Generate the cache key. Relative paths of textures may be affected by the source path, and ultimately
 	// which texture should be displayed. Thus, we need to include this path in the cache key.
 	String key;
-	key.reserve(declaration_list.value.size() + 1 + (source ? source->path.size() : 0));
-	key = declaration_list.value;
-	key += ';';
-	if (source)
-		key += source->path;
 
-	auto it_cache = decorator_cache.find(key);
-	if (it_cache != decorator_cache.end())
-		return it_cache->second;
+	if (enable_cache)
+	{
+		key.reserve(declaration_list.value.size() + 1 + (source ? source->path.size() : 0));
+		key = declaration_list.value;
+		key += ';';
+		if (source)
+			key += source->path;
 
-	DecoratorPtrList& decorators = decorator_cache[key];
+		auto it_cache = decorator_cache.find(key);
+		if (it_cache != decorator_cache.end())
+			return it_cache->second;
+	}
+	else
+	{
+		non_cached_decorator_list.clear();
+	}
+
+	DecoratorPtrList& decorators = enable_cache ? decorator_cache[key] : non_cached_decorator_list;
 	decorators.reserve(declaration_list.list.size());
 
 	for (const DecoratorDeclaration& declaration : declaration_list.list)
