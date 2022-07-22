@@ -30,7 +30,7 @@
 #define RMLUI_TESTS_COMMON_TESTSSHELL_H
 
 #include <RmlUi/Core/Types.h>
-namespace Rml { class RenderInterface; }
+class TestsSystemInterface;
 
 namespace TestsShell {
 
@@ -53,6 +53,8 @@ namespace TestsShell {
 
 	// Stats only available for the dummy renderer.
 	Rml::String GetRenderStats();
+
+	TestsSystemInterface* GetTestsSystemInterface();
 }
 
 #endif
