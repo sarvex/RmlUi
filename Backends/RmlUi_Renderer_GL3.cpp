@@ -1183,6 +1183,16 @@ private:
 
 static RenderState render_state;
 
+static inline Rml::Colourf ToPremultipliedAlpha(Rml::Colourb c0)
+{
+	Rml::Colourf result;
+	result.alpha = (1.f / 255.f) * float(c0.alpha);
+	result.red = (1.f / 255.f) * float(c0.red) * result.alpha;
+	result.green = (1.f / 255.f) * float(c0.green) * result.alpha;
+	result.blue = (1.f / 255.f) * float(c0.blue) * result.alpha;
+	return result;
+}
+
 struct Rectangle2i {
 	Rectangle2i() = default;
 	Rectangle2i(Rml::Vector2i pos, Rml::Vector2i size) : pos(pos), size(size) {}
@@ -1449,10 +1459,7 @@ void RenderInterface_GL3::RenderEffect(Rml::CompiledEffectHandle effect_handle, 
 			const Rml::ColorStop& stop = effect.color_stop_list[i];
 			RMLUI_ASSERT(stop.position.unit == Rml::Unit::NUMBER);
 			stop_positions[i] = stop.position.number;
-			for (int j = 0; j < 4; j++)
-				stop_colors[i][j] = float(stop.color[j]) * (1.f / 255.f);
-			for (int j = 0; j < 3; j++)
-				stop_colors[i][j] *= stop_colors[i].alpha; // Pre-multiply alpha.
+			stop_colors[i] = ToPremultipliedAlpha(stop.color);
 		}
 
 		const auto& locations = Gfx::programs.main_linear_gradient.uniform_locations;
@@ -1678,11 +1685,7 @@ void RenderInterface_GL3::RenderFilters()
 			glUseProgram(Gfx::programs.dropshadow.id);
 			glDisable(GL_BLEND);
 
-			Rml::Colourf color;
-			color.red = (1.f / 255.f) * (float)filter.color.red;
-			color.green = (1.f / 255.f) * (float)filter.color.green;
-			color.blue = (1.f / 255.f) * (float)filter.color.blue;
-			color.alpha = (1.f / 255.f) * (float)filter.color.alpha;
+			Rml::Colourf color = ToPremultipliedAlpha(filter.color);
 			glUniform4fv(Gfx::programs.dropshadow.uniform_locations[(int)Gfx::ProgramUniform::Color], 1, &color[0]);
 
 			const Gfx::FramebufferData& primary = render_state.GetPostprocessPrimary();
