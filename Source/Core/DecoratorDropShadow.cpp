@@ -101,7 +101,7 @@ void DecoratorDropShadow::ModifyScissorRegion(Element* element, Rectanglef& scis
 
 DecoratorDropShadowInstancer::DecoratorDropShadowInstancer() : DecoratorInstancer(DecoratorClass::Filter | DecoratorClass::BackdropFilter)
 {
-	ids.color = RegisterProperty("color", "black").AddParser("color").GetId();
+	ids.color = RegisterProperty("color", "transparent").AddParser("color").GetId();
 	ids.offset_x = RegisterProperty("offset-x", "0px").AddParser("length").GetId();
 	ids.offset_y = RegisterProperty("offset-y", "0px").AddParser("length").GetId();
 	ids.sigma = RegisterProperty("sigma", "0px").AddParser("length").GetId();

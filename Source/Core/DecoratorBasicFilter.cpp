@@ -74,16 +74,16 @@ void DecoratorBasicFilter::RenderElement(Element* /*element*/, DecoratorDataHand
 	element_data->render_interface->AttachFilter(element_data->filter);
 }
 
-DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer(ValueType value_type) :
+DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer(ValueType value_type, const char* default_value) :
 	DecoratorInstancer(DecoratorClass::Filter | DecoratorClass::BackdropFilter), ids{}
 {
 	switch (value_type)
 	{
 	case ValueType::NumberPercent:
-		ids.value = RegisterProperty("value", "1").AddParser("number_percent").GetId();
+		ids.value = RegisterProperty("value", default_value).AddParser("number_percent").GetId();
 		break;
 	case ValueType::Angle:
-		ids.value = RegisterProperty("value", "0rad").AddParser("angle").GetId();
+		ids.value = RegisterProperty("value", default_value).AddParser("angle").GetId();
 		break;
 	}
 

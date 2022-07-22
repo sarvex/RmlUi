@@ -56,7 +56,7 @@ class DecoratorBasicFilterInstancer : public DecoratorInstancer {
 public:
 	enum class ValueType { NumberPercent, Angle };
 
-	DecoratorBasicFilterInstancer(ValueType value_type = ValueType::NumberPercent);
+	DecoratorBasicFilterInstancer(ValueType value_type, const char* default_value);
 	~DecoratorBasicFilterInstancer();
 
 	SharedPtr<Decorator> InstanceDecorator(const String& name, const PropertyDictionary& properties,

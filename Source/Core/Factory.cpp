@@ -171,8 +171,9 @@ struct DefaultInstancers {
 	DecoratorBlurInstancer decorator_blur;
 	DecoratorDropShadowInstancer decorator_drop_shadow;
 	DecoratorLinearGradientInstancer decorator_linear_gradient;
-	DecoratorBasicFilterInstancer decorator_hue_rotate = {DecoratorBasicFilterInstancer::ValueType::Angle};
-	DecoratorBasicFilterInstancer decorator_basic_filter;
+	DecoratorBasicFilterInstancer decorator_hue_rotate = {DecoratorBasicFilterInstancer::ValueType::Angle, "0rad"};
+	DecoratorBasicFilterInstancer decorator_basic_filter_d0 = {DecoratorBasicFilterInstancer::ValueType::NumberPercent, "0"};
+	DecoratorBasicFilterInstancer decorator_basic_filter_d1 = {DecoratorBasicFilterInstancer::ValueType::NumberPercent, "1"};
 	DecoratorShaderInstancer decorator_shader;
 
 	// Font effects
@@ -274,13 +275,13 @@ bool Factory::Initialise()
 	RegisterDecoratorInstancer("shader", &default_instancers->decorator_shader);
 	
 	// Basic filters
-	RegisterDecoratorInstancer("brightness", &default_instancers->decorator_basic_filter);
-	RegisterDecoratorInstancer("contrast", &default_instancers->decorator_basic_filter);
-	RegisterDecoratorInstancer("grayscale", &default_instancers->decorator_basic_filter);
-	RegisterDecoratorInstancer("invert", &default_instancers->decorator_basic_filter);
-	RegisterDecoratorInstancer("opacity", &default_instancers->decorator_basic_filter);
-	RegisterDecoratorInstancer("saturate", &default_instancers->decorator_basic_filter);
-	RegisterDecoratorInstancer("sepia", &default_instancers->decorator_basic_filter);
+	RegisterDecoratorInstancer("brightness", &default_instancers->decorator_basic_filter_d1);
+	RegisterDecoratorInstancer("contrast", &default_instancers->decorator_basic_filter_d1);
+	RegisterDecoratorInstancer("grayscale", &default_instancers->decorator_basic_filter_d0);
+	RegisterDecoratorInstancer("invert", &default_instancers->decorator_basic_filter_d0);
+	RegisterDecoratorInstancer("opacity", &default_instancers->decorator_basic_filter_d1);
+	RegisterDecoratorInstancer("saturate", &default_instancers->decorator_basic_filter_d1);
+	RegisterDecoratorInstancer("sepia", &default_instancers->decorator_basic_filter_d0);
 
 	// Font effect instancers
 	RegisterFontEffectInstancer("blur", &default_instancers->font_effect_blur);
