@@ -199,3 +199,8 @@ Rml::String TestsShell::GetRenderStats()
 
 	return result;
 }
+
+TestsSystemInterface* TestsShell::GetTestsSystemInterface()
+{
+	return &tests_system_interface;
+}
