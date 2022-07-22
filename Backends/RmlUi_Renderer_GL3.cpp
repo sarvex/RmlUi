@@ -1193,25 +1193,6 @@ static inline Rml::Colourf ToPremultipliedAlpha(Rml::Colourb c0)
 	return result;
 }
 
-struct Rectangle2i {
-	Rectangle2i() = default;
-	Rectangle2i(Rml::Vector2i pos, Rml::Vector2i size) : pos(pos), size(size) {}
-	Rectangle2i(int x, int y, int w, int h) : pos(x, y), size(w, h) {}
-	Rml::Vector2i pos, size;
-};
-
-static Rectangle2i RectangleIntersection(Rectangle2i a, Rectangle2i b)
-{
-	const Rml::Vector2i a_max = a.pos + a.size;
-	const Rml::Vector2i b_max = b.pos + b.size;
-
-	Rectangle2i result;
-	result.pos = Rml::Math::Max(a.pos, b.pos);
-	result.size = Rml::Math::Max(Rml::Math::Min(a_max, b_max) - result.pos, Rml::Vector2i(0));
-
-	return result;
-}
-
 enum class EffectType { Invalid = 0, LinearGradient, Creation };
 struct CompiledEffect {
 	EffectType type;
@@ -1341,14 +1322,6 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	glClear(GL_COLOR_BUFFER_BIT);
 	glClearColor(0, 0, 0, 0);
 #endif
-
-	// Intersect the blur area with the framebuffer dimensions.
-	{
-		const Rml::Vector2i framebuffer_size = {source_destination.width, source_destination.height};
-		const Rectangle2i rect = RectangleIntersection({position, size}, {Rml::Vector2i(0), framebuffer_size});
-		position = rect.pos;
-		size = rect.size;
-	}
 
 	// Begin by downscale so that the blur pass can be done at a reduced resolution for large sigma.
 	Rml::Vector2i scissor_min = position;
