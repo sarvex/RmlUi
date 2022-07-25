@@ -215,7 +215,7 @@ bool ElementUtilities::GetClippingRegion(Rectanglei& clip_region, Element* eleme
 				{
 					Geometry* clip_geometry = clipping_element->GetElementBackgroundBorder()->GetClipGeometry(clipping_element, client_area);
 					const Vector2f absolute_offset = clipping_element->GetAbsoluteOffset(BoxArea::Border);
-					const ClipMask clip_mask = (clip_mask_list->empty() ? ClipMask::Clip : ClipMask::ClipIntersect);
+					const ClipMaskOperation clip_mask = (clip_mask_list->empty() ? ClipMaskOperation::Clip : ClipMaskOperation::ClipIntersect);
 					clip_mask_list->push_back(ElementClip{clip_mask, clip_geometry, absolute_offset, transform});
 				}
 

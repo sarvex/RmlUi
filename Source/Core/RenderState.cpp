@@ -90,7 +90,7 @@ void RenderState::DisableClipMask()
 	}
 }
 
-void RenderState::SetClipMask(ClipMask clip_mask, Geometry* geometry, Vector2f translation)
+void RenderState::SetClipMask(ClipMaskOperation clip_mask, Geometry* geometry, Vector2f translation)
 {
 	RMLUI_ASSERT(geometry);
 	State& state = stack.back();
@@ -148,7 +148,7 @@ void RenderState::ApplyClipMask(const ElementClipList& clip_elements)
 		for (const ElementClip& element_clip : clip_elements)
 		{
 			SetTransform(element_clip.transform);
-			element_clip.clip_geometry->SetClipMask(element_clip.clip_mask, element_clip.absolute_offset);
+			element_clip.clip_geometry->RenderToClipMask(element_clip.clip_mask, element_clip.absolute_offset);
 		}
 
 		// Apply the initially set transform in case it was changed.

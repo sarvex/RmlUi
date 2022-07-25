@@ -65,7 +65,7 @@ bool RenderInterface::EnableClipMask(bool /*enable*/)
 	return false;
 }
 
-void RenderInterface::SetClipMask(ClipMask /*mask*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/) {}
+void RenderInterface::RenderToClipMask(ClipMaskOperation /*mask_operation*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/) {}
 
 // Called by RmlUi when a texture is required by the library.
 bool RenderInterface::LoadTexture(TextureHandle& /*texture_handle*/, Vector2i& /*texture_dimensions*/, const String& /*source*/)
@@ -89,14 +89,14 @@ void RenderInterface::SetTransform(const Matrix4f* /*transform*/)
 {
 }
 
-CompiledEffectHandle RenderInterface::CompileEffect(const String& /*name*/, const Dictionary& /*parameters*/)
+CompiledShaderHandle RenderInterface::CompileShader(const String& /*name*/, const Dictionary& /*parameters*/)
 {
-	return CompiledEffectHandle{};
+	return CompiledShaderHandle{};
 }
 
-void RenderInterface::RenderEffect(CompiledEffectHandle /*effect*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/) {}
+void RenderInterface::AttachShader(CompiledShaderHandle /*shader*/) {}
 
-void RenderInterface::ReleaseCompiledEffect(CompiledEffectHandle /*effect*/) {}
+void RenderInterface::ReleaseCompiledShader(CompiledShaderHandle /*shader*/) {}
 
 CompiledFilterHandle RenderInterface::CompileFilter(const String& /*name*/, const Dictionary& /*parameters*/)
 {
@@ -107,15 +107,13 @@ void RenderInterface::AttachFilter(CompiledFilterHandle /*filter*/) {}
 
 void RenderInterface::ReleaseCompiledFilter(CompiledFilterHandle /*filter*/) {}
 
-void RenderInterface::StackPush() {}
+void RenderInterface::PushLayer() {}
 
-void RenderInterface::StackPop() {}
+void RenderInterface::PopLayer() {}
 
-void RenderInterface::StackApply(BlitDestination /*destination*/) {}
+void RenderInterface::CompositeLayer(CompositeDestination /*destination*/, BlendMode /*blend_mode*/) {}
 
-void RenderInterface::AttachMask() {}
-
-TextureHandle RenderInterface::RenderToTexture(Vector2i /*offset*/, Vector2i /*dimensions*/)
+TextureHandle RenderInterface::RenderToTexture(Rectanglei /*bounds*/)
 {
 	return {};
 }

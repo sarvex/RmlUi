@@ -73,14 +73,14 @@ public:
 	void Render(Vector2f translation);
 
 	/// Render the geometry with an applied effect. Requires that the geometry can be compiled.
-	/// @param[in] effect The render effect to apply.
+	/// @param[in] shader The shader to use for rendering the geometry.
 	/// @param[in] translation The translation of the geometry.
-	void Render(CompiledEffectHandle effect, Vector2f translation);
+	void Render(CompiledShaderHandle shader, Vector2f translation);
 
 	/// Use the geometry to set the clip mask through the render interface. Requires that the geometry can be compiled.
 	/// @param[in] clip_mask The clip mask to apply.
 	/// @param[in] translation The translation of the geometry.
-	void SetClipMask(ClipMask clip_mask, Vector2f translation);
+	void RenderToClipMask(ClipMaskOperation clip_mask, Vector2f translation);
 
 	/// Returns the geometry's vertices. If these are written to, Release() should be called to force a recompile.
 	/// @return The geometry's vertex array.

@@ -40,7 +40,7 @@ class RenderInterface;
 class RenderStateSession;
 
 struct ElementClip {
-	ClipMask clip_mask;
+	ClipMaskOperation clip_mask;
 	Geometry* clip_geometry;
 	Vector2f absolute_offset;
 	const Matrix4f* transform;
@@ -76,7 +76,7 @@ public:
 
 	void DisableClipMask();
 	void SetClipMask(ElementClipList clip_elements);
-	void SetClipMask(ClipMask clip_mask, Geometry* geometry, Vector2f translation);
+	void SetClipMask(ClipMaskOperation clip_mask, Geometry* geometry, Vector2f translation);
 
 	void SetTransform(const Matrix4f* new_transform);
 

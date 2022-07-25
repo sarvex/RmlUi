@@ -266,7 +266,7 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 
 	RMLUI_ASSERT(std::all_of(stops.begin(), stops.end(), [](auto&& stop) { return stop.position.unit == Unit::NUMBER; }));
 
-	CompiledEffectHandle effect_handle = render_interface->CompileEffect("linear-gradient",
+	CompiledShaderHandle effect_handle = render_interface->CompileShader("linear-gradient",
 		Dictionary{
 			{"angle", Variant(angle)},
 			{"p0", Variant(gradient_points.p0)},
@@ -293,7 +293,7 @@ void DecoratorLinearGradient::ReleaseElementData(DecoratorDataHandle handle) con
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
 	RenderInterface* render_interface = element_data->geometry.GetRenderInterface();
-	render_interface->ReleaseCompiledEffect(element_data->effect);
+	render_interface->ReleaseCompiledShader(element_data->effect);
 
 	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
 }

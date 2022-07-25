@@ -142,32 +142,17 @@ void Geometry::Render(Vector2f translation)
 	}
 }
 
-void Geometry::Render(CompiledEffectHandle effect_handle, Vector2f translation)
+void Geometry::Render(CompiledShaderHandle shader_handle, Vector2f translation)
 {
 	RenderInterface* render_interface = GetRenderInterface();
 	if (!render_interface)
 		return;
 
-	if (!compile_attempted)
-	{
-		if (vertices.empty() || indices.empty())
-			return;
-
-		RMLUI_ZoneScoped;
-
-		compile_attempted = true;
-		compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
-			texture ? texture->GetHandle(render_interface) : 0);
-	}
-
-	if (compiled_geometry)
-	{
-		translation = translation.Round();
-		render_interface->RenderEffect(effect_handle, compiled_geometry, translation);
-	}
+	render_interface->AttachShader(shader_handle);
+	Render(translation);
 }
 
-void Geometry::SetClipMask(ClipMask clip_mask, Vector2f translation)
+void Geometry::RenderToClipMask(ClipMaskOperation clip_mask, Vector2f translation)
 {
 	RenderInterface* render_interface = GetRenderInterface();
 	if (!render_interface)
@@ -188,7 +173,7 @@ void Geometry::SetClipMask(ClipMask clip_mask, Vector2f translation)
 	if (compiled_geometry)
 	{
 		translation = translation.Round();
-		render_interface->SetClipMask(clip_mask, compiled_geometry, translation);
+		render_interface->RenderToClipMask(clip_mask, compiled_geometry, translation);
 	}
 }
 

@@ -244,7 +244,7 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, ShadowList sha
 		render_state.Reset();
 		render_state.SetScissorRegion(Rectanglei::FromSize(texture_dimensions));
 
-		render_interface->StackPush();
+		render_interface->PushLayer();
 
 		main_geometry.Render(element_offset_in_texture);
 
@@ -296,14 +296,14 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, ShadowList sha
 				blur = render_interface->CompileFilter("blur", Dictionary{{"radius", Variant(blur_radius)}});
 				if (blur)
 				{
-					render_interface->StackPush();
+					render_interface->PushLayer();
 					render_interface->AttachFilter(blur);
 				}
 			}
 
 			if (inset)
 			{
-				render_state.SetClipMask(ClipMask::ClipOut, &shadow_geometry, shadow_offset + element_offset_in_texture);
+				render_state.SetClipMask(ClipMaskOperation::ClipOut, &shadow_geometry, shadow_offset + element_offset_in_texture);
 
 				for (Rml::Vertex& vertex : geometry_padding.GetVertices())
 					vertex.colour = shadow.color;
@@ -311,18 +311,18 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, ShadowList sha
 				geometry_padding.Release();
 				geometry_padding.Render(element_offset_in_texture);
 
-				render_state.SetClipMask(ClipMask::Clip, &geometry_padding, element_offset_in_texture);
+				render_state.SetClipMask(ClipMaskOperation::Clip, &geometry_padding, element_offset_in_texture);
 			}
 			else
 			{
-				render_state.SetClipMask(ClipMask::ClipOut, &geometry_padding_border, element_offset_in_texture);
+				render_state.SetClipMask(ClipMaskOperation::ClipOut, &geometry_padding_border, element_offset_in_texture);
 				shadow_geometry.Render(shadow_offset + element_offset_in_texture);
 			}
 
 			if (blur)
 			{
-				render_interface->StackApply(BlitDestination::BlendStackBelow);
-				render_interface->StackPop();
+				render_interface->CompositeLayer(CompositeDestination::BelowLayer, BlendMode::Blend);
+				render_interface->PopLayer();
 				render_interface->ReleaseCompiledFilter(blur);
 			}
 		}
@@ -330,8 +330,8 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, ShadowList sha
 		render_state.DisableScissorRegion();
 		render_state.DisableClipMask();
 
-		TextureHandle shadow_texture = render_interface->RenderToTexture({}, texture_dimensions);
-		render_interface->StackPop();
+		TextureHandle shadow_texture = render_interface->RenderToTexture(Rectanglei::FromSize(texture_dimensions));
+		render_interface->PopLayer();
 
 		out_dimensions = texture_dimensions;
 		out_handle = shadow_texture;

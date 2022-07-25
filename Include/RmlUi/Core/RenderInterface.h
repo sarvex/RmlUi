@@ -39,11 +39,9 @@ namespace Rml {
 
 class Context;
 
-enum class StencilCommand { None, Clear, WriteValue, WriteIncrement, WriteDisable, TestEqual, TestDisable };
-enum class RenderCommand { None, StackPush, StackPop, StackToTexture, StackToFilter, FilterToStack, StackToMask };
-
-enum class ClipMask { Clip, ClipIntersect, ClipOut };
-enum class BlitDestination { Stack, BlendStackBelow };
+enum class ClipMaskOperation { Clip, ClipIntersect, ClipOut };
+enum class CompositeDestination { CurrentLayer, BelowLayer, MaskImage };
+enum class BlendMode { Replace, Blend };
 
 /**
 	The abstract base class for application-specific rendering implementation. Your application must provide a concrete
@@ -100,8 +98,8 @@ public:
 	virtual void SetScissorRegion(int x, int y, int width, int height) = 0;
 
 	virtual bool EnableClipMask(bool enable);
-	/// @note Affected by transform: Yes. Affected by scissor: Yes. Affected by clip mask: No.
-	virtual void SetClipMask(ClipMask mask, CompiledGeometryHandle geometry, Vector2f translation);
+	/// @note Affected by transform: Yes. Affected by scissor: Yes. Affected by clip mask: See arguments.
+	virtual void RenderToClipMask(ClipMaskOperation mask_operation, CompiledGeometryHandle geometry, Vector2f translation);
 
 	/// Called by RmlUi when a texture is required by the library.
 	/// @param[out] texture_handle The handle to write the texture handle for the loaded texture to.
@@ -126,33 +124,29 @@ public:
 	virtual void SetTransform(const Matrix4f* transform);
 
 	/// Called by RmlUi when...
-	virtual CompiledEffectHandle CompileEffect(const String& name, const Dictionary& parameters);
+	virtual void PushLayer();
 	/// Called by RmlUi when...
-	/// @note Affected by transform: Yes. Affected by scissor: Yes. Affected by clip mask: Yes.
-	virtual void RenderEffect(CompiledEffectHandle effect, CompiledGeometryHandle geometry, Vector2f translation);
+	virtual void PopLayer();
+	// Apply effects and mask image to the current layer, and render back to the same or another layer.
+	/// @note Affected by transform: No. Affected by scissor: Yes. Affected by clip mask: Yes.
+	virtual void CompositeLayer(CompositeDestination destination, BlendMode blend_mode);
+
 	/// Called by RmlUi when...
-	virtual void ReleaseCompiledEffect(CompiledEffectHandle effect);
+	virtual CompiledShaderHandle CompileShader(const String& name, const Dictionary& parameters);
+	/// Use the provided shader on the next render command.
+	virtual void AttachShader(CompiledShaderHandle shader);
+	/// Called by RmlUi when...
+	virtual void ReleaseCompiledShader(CompiledShaderHandle shader);
 
 	/// Called by RmlUi when...
 	virtual CompiledFilterHandle CompileFilter(const String& name, const Dictionary& parameters);
-	// Apply filter to the next blit command.
+	// Apply filter to the next CompositeLayer command.
 	virtual void AttachFilter(CompiledFilterHandle filter);
 	/// Called by RmlUi when...
 	virtual void ReleaseCompiledFilter(CompiledFilterHandle filter);
 
-	/// Called by RmlUi when...
-	virtual void StackPush();
-	/// Called by RmlUi when...
-	virtual void StackPop();
-	// Apply filters, clipping, and mask to the current stack top, and render back to the stack top or below. 
-	/// @note Affected by transform: No. Affected by scissor: Yes. Affected by clip mask: Yes.
-	virtual void StackApply(BlitDestination destination);
-
-	// Attach mask from the current stack top.
-	virtual void AttachMask();
-
-	// Render to texture from the current stack top.
-	virtual TextureHandle RenderToTexture(Vector2i offset, Vector2i dimensions);
+	// Render to texture from the current layer.
+	virtual TextureHandle RenderToTexture(Rectanglei bounds);
 
 	/// Get the context currently being rendered. This is only valid during RenderGeometry,
 	/// CompileGeometry, RenderCompiledGeometry, EnableScissorRegion and SetScissorRegion.

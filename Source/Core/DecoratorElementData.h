@@ -46,9 +46,9 @@ struct BasicFilterElementData {
 Pool<BasicFilterElementData>& GetBasicFilterElementDataPool();
 
 struct BasicEffectElementData {
-	BasicEffectElementData(Geometry&& geometry, CompiledEffectHandle effect) : geometry(std::move(geometry)), effect(effect) {}
+	BasicEffectElementData(Geometry&& geometry, CompiledShaderHandle effect) : geometry(std::move(geometry)), effect(effect) {}
 	Geometry geometry;
-	CompiledEffectHandle effect;
+	CompiledShaderHandle effect;
 };
 
 Pool<BasicEffectElementData>& GetBasicEffectElementDataPool();

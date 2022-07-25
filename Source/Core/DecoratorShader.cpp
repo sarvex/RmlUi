@@ -56,8 +56,8 @@ DecoratorDataHandle DecoratorShader::GenerateElementData(Element* element, BoxAr
 
 	const Box& box = element->GetBox();
 	const Vector2f dimensions = box.GetSize(render_area);
-	CompiledEffectHandle effect_handle =
-		render_interface->CompileEffect("shader", Dictionary{{"value", Variant(value)}, {"dimensions", Variant(dimensions)}});
+	CompiledShaderHandle effect_handle =
+		render_interface->CompileShader("shader", Dictionary{{"value", Variant(value)}, {"dimensions", Variant(dimensions)}});
 
 	Geometry geometry(render_interface);
 
@@ -79,7 +79,7 @@ void DecoratorShader::ReleaseElementData(DecoratorDataHandle handle) const
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
 	RenderInterface* render_interface = element_data->geometry.GetRenderInterface();
 
-	render_interface->ReleaseCompiledEffect(element_data->effect);
+	render_interface->ReleaseCompiledShader(element_data->effect);
 
 	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
 }

@@ -232,7 +232,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				decorator.decorator->RenderElement(element, decorator.decorator_data);
 			}
 
-			render_interface->StackApply(BlitDestination::Stack);
+			render_interface->CompositeLayer(CompositeDestination::CurrentLayer, BlendMode::Replace);
 		}
 	}
 
@@ -240,12 +240,27 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 	{
 		if (render_stage == RenderStage::Enter)
 		{
-			render_interface->StackPush();
+			render_interface->PushLayer();
 		}
 		else if (render_stage == RenderStage::Exit)
 		{
 			ElementUtilities::SetClippingRegion(element);
 
+			if (num_mask_images > 0)
+			{
+				render_interface->PushLayer();
+
+				const int i0_mask = num_backgrounds + num_backdrop_filters + num_filters;
+				for (int i = i0_mask; i < i0_mask + num_mask_images; i++)
+				{
+					DecoratorHandle& decorator = decorators[i];
+					decorator.decorator->RenderElement(element, decorator.decorator_data);
+				}
+
+				render_interface->CompositeLayer(CompositeDestination::MaskImage, BlendMode::Replace);
+				render_interface->PopLayer();
+			}
+			
 			// Find the region being affected by the active filters and apply it as a scissor.
 			Rectanglef filter_region = Rectanglef::CreateInvalid();
 			ElementUtilities::GetBoundingBox(filter_region, element, BoxArea::Auto);
@@ -266,23 +281,8 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				decorator.decorator->RenderElement(element, decorator.decorator_data);
 			}
 
-			if (num_mask_images > 0)
-			{
-				render_interface->StackPush();
-
-				const int i0_mask = num_backgrounds + num_backdrop_filters + num_filters;
-				for (int i = i0_mask; i < i0_mask + num_mask_images; i++)
-				{
-					DecoratorHandle& decorator = decorators[i];
-					decorator.decorator->RenderElement(element, decorator.decorator_data);
-				}
-
-				render_interface->AttachMask();
-				render_interface->StackPop();
-			}
-
-			render_interface->StackApply(BlitDestination::BlendStackBelow);
-			render_interface->StackPop();
+			render_interface->CompositeLayer(CompositeDestination::BelowLayer, BlendMode::Blend);
+			render_interface->PopLayer();
 		}
 	}
 }
