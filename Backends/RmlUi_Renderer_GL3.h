@@ -38,6 +38,8 @@ public:
 	RenderInterface_GL3();
 	~RenderInterface_GL3();
 
+	void BeginFrame();
+
 	void RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices, Rml::TextureHandle texture,
 		const Rml::Vector2f& translation) override;
 
@@ -50,7 +52,7 @@ public:
 	void SetScissorRegion(int x, int y, int width, int height) override;
 
 	bool EnableClipMask(bool enable) override;
-	void SetClipMask(Rml::ClipMask mask, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation) override;
+	void RenderToClipMask(Rml::ClipMaskOperation mask_operation, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation) override;
 
 	bool LoadTexture(Rml::TextureHandle& texture_handle, Rml::Vector2i& texture_dimensions, const Rml::String& source) override;
 	bool GenerateTexture(Rml::TextureHandle& texture_handle, const Rml::byte* source, const Rml::Vector2i& source_dimensions) override;
@@ -58,28 +60,26 @@ public:
 
 	void SetTransform(const Rml::Matrix4f* transform) override;
 
-	Rml::CompiledEffectHandle CompileEffect(const Rml::String& name, const Rml::Dictionary& parameters) override;
-	void RenderEffect(Rml::CompiledEffectHandle effect, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation) override;
-	void ReleaseCompiledEffect(Rml::CompiledEffectHandle effect) override;
+	Rml::CompiledShaderHandle CompileShader(const Rml::String& name, const Rml::Dictionary& parameters) override;
+	void AttachShader(Rml::CompiledShaderHandle shader) override;
+	void ReleaseCompiledShader(Rml::CompiledShaderHandle shader) override;
 
 	Rml::CompiledFilterHandle CompileFilter(const Rml::String& name, const Rml::Dictionary& parameters) override;
 	void AttachFilter(Rml::CompiledFilterHandle filter) override;
 	void ReleaseCompiledFilter(Rml::CompiledFilterHandle filter) override;
 
-	void StackPush() override;
-	void StackPop() override;
-	void StackApply(Rml::BlitDestination destination) override;
+	void PushLayer() override;
+	void PopLayer() override;
+	void CompositeLayer(Rml::CompositeDestination destination, Rml::BlendMode blend_mode) override;
 
-	void AttachMask() override;
-
-	Rml::TextureHandle RenderToTexture(Rml::Vector2i offset, Rml::Vector2i dimensions) override;
+	Rml::TextureHandle RenderToTexture(Rml::Rectanglei bounds) override;
 
 	static const Rml::TextureHandle TextureIgnoreBinding = Rml::TextureHandle(-1);
 	static const Rml::TextureHandle TexturePostprocess = Rml::TextureHandle(-2);
 
 private:
 	enum class ProgramId { None, Texture = 1, Color = 2, LinearGradient = 4, Creation = 8, All = (Texture | Color | LinearGradient | Creation) };
-	void SubmitTransformUniform(ProgramId program_id, int uniform_location);
+	void SubmitTransformUniform(ProgramId program_id, Rml::Vector2f translation);
 
 	void RenderFilters();
 
@@ -94,6 +94,7 @@ private:
 
 	Rml::Vector<CompiledFilter*> attached_filters;
 
+	ProgramId active_program = ProgramId::None;
 	bool has_mask = false;
 };
 

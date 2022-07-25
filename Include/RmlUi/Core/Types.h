@@ -106,7 +106,7 @@ using CompiledGeometryHandle = uintptr_t;
 using DecoratorDataHandle = uintptr_t;
 using FontFaceHandle = uintptr_t;
 using FontEffectsHandle = uintptr_t;
-using CompiledEffectHandle = uintptr_t;
+using CompiledShaderHandle = uintptr_t;
 using CompiledFilterHandle = uintptr_t;
 
 using ElementPtr = UniqueReleaserPtr<Element>;
