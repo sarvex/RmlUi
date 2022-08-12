@@ -359,6 +359,7 @@ enum class FramebufferAttachment { None, Depth, DepthStencil };
 
 static Shaders shaders = {};
 static Programs programs = {};
+static ProgramId active_program = ProgramId::None;
 static Rml::Matrix4f projection;
 
 static RenderInterface_GL3* render_interface = nullptr;
@@ -721,6 +722,38 @@ static void DrawFullscreenQuad(Rml::Vector2f uv_offset = {}, Rml::Vector2f uv_sc
 	render_interface->RenderGeometry(vertices, 4, indices, 6, RenderInterface_GL3::TexturePostprocess, {});
 }
 
+ProgramData* GetProgramData(ProgramId program_id)
+{
+	ProgramData* program = nullptr;
+	switch (program_id)
+	{
+	case ProgramId::Texture: program = &programs.main_texture; break;
+	case ProgramId::Color: program = &programs.main_color; break;
+	case ProgramId::LinearGradient: program = &programs.main_linear_gradient; break;
+	case ProgramId::Creation: program = &programs.main_creation; break;
+	case ProgramId::Passthrough: program = &programs.passthrough; break;
+	case ProgramId::ColorMatrix: program = &programs.color_matrix; break;
+	case ProgramId::Blur: program = &programs.blur; break;
+	case ProgramId::Dropshadow: program = &programs.dropshadow; break;
+	case ProgramId::BlendMask: program = &programs.blend_mask; break;
+	case ProgramId::None:
+	case ProgramId::Count: break;
+	}
+	RMLUI_ASSERT(program);
+
+	return program;
+}
+
+void UseProgram(ProgramId program_id)
+{
+	if (active_program != program_id)
+	{
+		if (program_id != ProgramId::None)
+			glUseProgram(GetProgramData(program_id)->id);
+		active_program = program_id;
+	}
+}
+
 } // namespace Gfx
 
 RenderInterface_GL3::RenderInterface_GL3()
@@ -735,7 +768,9 @@ RenderInterface_GL3::~RenderInterface_GL3()
 
 void RenderInterface_GL3::BeginFrame()
 {
-	active_program = ProgramId::None;
+	Gfx::UseProgram(ProgramId::None);
+	has_mask = false;
+	program_transform_dirty.set();
 	SetTransform(nullptr);
 	scissor_state = {};
 }
@@ -805,38 +840,18 @@ void RenderInterface_GL3::RenderCompiledGeometry(Rml::CompiledGeometryHandle han
 	{
 		// Do nothing.
 	}
-	else if (active_program != ProgramId::None && active_program != ProgramId::Color && active_program != ProgramId::Texture)
-	{
-		SubmitTransformUniform(active_program, translation);
-		active_program = ProgramId::None;
-	}
 	else if (geometry->texture)
 	{
-		if (active_program != ProgramId::Texture)
-		{
-			glUseProgram(Gfx::programs.main_texture.id);
-			active_program = ProgramId::Texture;
-		}
-
-		Gfx::CheckGLError("RenderCompiledGeometryPrePre1");
+		Gfx::UseProgram(ProgramId::Texture);
+		SubmitTransformUniform(translation);
 		if (geometry->texture != TextureIgnoreBinding)
 			glBindTexture(GL_TEXTURE_2D, (GLuint)geometry->texture);
-
-		Gfx::CheckGLError("RenderCompiledGeometryPrePre2");
-		SubmitTransformUniform(ProgramId::Texture, translation);
 	}
 	else
 	{
-		if (active_program != ProgramId::Color)
-		{
-			glUseProgram(Gfx::programs.main_color.id);
-			active_program = ProgramId::Color;
-		}
-
-		SubmitTransformUniform(ProgramId::Color, translation);
+		Gfx::UseProgram(ProgramId::Color);
+		SubmitTransformUniform(translation);
 	}
-
-	Gfx::CheckGLError("RenderCompiledGeometryPre");
 
 	glBindVertexArray(geometry->vao);
 	glDrawElements(GL_TRIANGLES, geometry->draw_count, GL_UNSIGNED_INT, (const GLvoid*)0);
@@ -1090,7 +1105,7 @@ void RenderInterface_GL3::ReleaseTexture(Rml::TextureHandle texture_handle)
 void RenderInterface_GL3::SetTransform(const Rml::Matrix4f* new_transform)
 {
 	transform = Gfx::projection * (new_transform ? *new_transform : Rml::Matrix4f::Identity());
-	transform_dirty_state = ProgramId::All;
+	program_transform_dirty.set();
 }
 
 class RenderState {
@@ -1353,7 +1368,7 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	Rml::Vector2i scissor_max = position + size;
 	Rml::Vector2i scissor_size = size;
 
-	glUseProgram(Gfx::programs.passthrough.id);
+	Gfx::UseProgram(ProgramId::Passthrough);
 	glEnable(GL_SCISSOR_TEST);
 	glScissor(scissor_min.x, scissor_min.y, scissor_size.x, scissor_size.y);
 
@@ -1401,7 +1416,7 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 #endif
 
 	// Set up uniforms.
-	glUseProgram(Gfx::programs.blur.id);
+	Gfx::UseProgram(ProgramId::Blur);
 	SetBlurWeights(sigma);
 	SetTexCoordLimits(Gfx::programs.blur, scissor_min, scissor_size, {source_destination.width, source_destination.height});
 	const float blending_magnitude = 1.f;
@@ -1437,10 +1452,13 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	Gfx::CheckGLError("Blur");
 }
 
-void RenderInterface_GL3::AttachShader(Rml::CompiledShaderHandle shader_handle)
+void RenderInterface_GL3::RenderShader(Rml::CompiledShaderHandle shader_handle, Rml::CompiledGeometryHandle geometry_handle,
+	Rml::Vector2f translation)
 {
+	RMLUI_ASSERT(geometry_handle);
 	const CompiledShader& shader = *reinterpret_cast<CompiledShader*>(shader_handle);
 	const CompiledShaderType type = shader.type;
+	const Gfx::CompiledGeometryData& geometry = *reinterpret_cast<Gfx::CompiledGeometryData*>(geometry_handle);
 
 	switch (type)
 	{
@@ -1461,14 +1479,16 @@ void RenderInterface_GL3::AttachShader(Rml::CompiledShaderHandle shader_handle)
 
 		const auto& locations = Gfx::programs.main_linear_gradient.uniform_locations;
 
-		glUseProgram(Gfx::programs.main_linear_gradient.id);
-		active_program = ProgramId::LinearGradient;
-
+		Gfx::UseProgram(ProgramId::LinearGradient);
 		glUniform2fv(locations[(int)Gfx::ProgramUniform::P0], 1, &shader.p0.x);
 		glUniform2fv(locations[(int)Gfx::ProgramUniform::P1], 1, &shader.p1.x);
 		glUniform1i(locations[(int)Gfx::ProgramUniform::NumStops], num_stops);
 		glUniform1fv(locations[(int)Gfx::ProgramUniform::StopPositions], num_stops, stop_positions);
 		glUniform4fv(locations[(int)Gfx::ProgramUniform::StopColors], num_stops, stop_colors[0]);
+
+		SubmitTransformUniform(translation);
+		glBindVertexArray(geometry.vao);
+		glDrawElements(GL_TRIANGLES, geometry.draw_count, GL_UNSIGNED_INT, (const GLvoid*)0);
 	}
 	break;
 	case CompiledShaderType::Creation:
@@ -1476,13 +1496,13 @@ void RenderInterface_GL3::AttachShader(Rml::CompiledShaderHandle shader_handle)
 		const auto& locations = Gfx::programs.main_creation.uniform_locations;
 		const double time = Rml::GetSystemInterface()->GetElapsedTime();
 
-		glUseProgram(Gfx::programs.main_creation.id);
-		active_program = ProgramId::Creation;
-
+		Gfx::UseProgram(ProgramId::Creation);
 		glUniform1f(locations[(int)Gfx::ProgramUniform::Value], (float)time);
 		glUniform2fv(locations[(int)Gfx::ProgramUniform::Dimensions], 1, &shader.dimensions.x);
 
-		Gfx::CheckGLError("RenderEffectCreation");
+		SubmitTransformUniform(translation);
+		glBindVertexArray(geometry.vao);
+		glDrawElements(GL_TRIANGLES, geometry.draw_count, GL_UNSIGNED_INT, (const GLvoid*)0);
 	}
 	break;
 	case CompiledShaderType::Invalid:
@@ -1491,6 +1511,8 @@ void RenderInterface_GL3::AttachShader(Rml::CompiledShaderHandle shader_handle)
 	}
 	break;
 	}
+
+	Gfx::CheckGLError("AttachShader");
 }
 
 void RenderInterface_GL3::ReleaseCompiledShader(Rml::CompiledShaderHandle effect_handle)
@@ -1670,7 +1692,7 @@ void RenderInterface_GL3::RenderFilters()
 		case FilterType::DropShadow:
 		{
 			ScissorState original_scissor_state = scissor_state;
-			glUseProgram(Gfx::programs.dropshadow.id);
+			Gfx::UseProgram(ProgramId::Dropshadow);
 			glDisable(GL_BLEND);
 
 			Rml::Colourf color = ToPremultipliedAlpha(filter.color);
@@ -1698,7 +1720,7 @@ void RenderInterface_GL3::RenderFilters()
 
 			EnableScissorRegion(original_scissor_state.enabled);
 			SetScissorRegion(original_scissor_state.x, original_scissor_state.y, original_scissor_state.width, original_scissor_state.height);
-			glUseProgram(Gfx::programs.passthrough.id);
+			Gfx::UseProgram(ProgramId::Passthrough);
 			Gfx::BindTexture(primary);
 			glEnable(GL_BLEND);
 			Gfx::DrawFullscreenQuad();
@@ -1708,7 +1730,7 @@ void RenderInterface_GL3::RenderFilters()
 		break;
 		case FilterType::Passthrough:
 		{
-			glUseProgram(Gfx::programs.passthrough.id);
+			Gfx::UseProgram(ProgramId::Passthrough);
 			glBlendFunc(GL_CONSTANT_ALPHA, GL_ZERO);
 			glBlendColor(0.0f, 0.0f, 0.0f, filter.blend_factor);
 
@@ -1725,7 +1747,7 @@ void RenderInterface_GL3::RenderFilters()
 		break;
 		case FilterType::ColorMatrix:
 		{
-			glUseProgram(Gfx::programs.color_matrix.id);
+			Gfx::UseProgram(ProgramId::ColorMatrix);
 			glDisable(GL_BLEND);
 
 			const GLint uniform_location = Gfx::programs.color_matrix.uniform_locations[(int)Gfx::ProgramUniform::ColorMatrix];
@@ -1753,7 +1775,6 @@ void RenderInterface_GL3::RenderFilters()
 
 	Gfx::CheckGLError("RenderFilter");
 	attached_filters.clear();
-	active_program = ProgramId::None;
 }
 
 void RenderInterface_GL3::PushLayer()
@@ -1813,17 +1834,15 @@ void RenderInterface_GL3::CompositeLayer(const Rml::CompositeDestination destina
 	if (has_mask)
 	{
 		has_mask = false;
-
-		const Gfx::FramebufferData& mask = render_state.GetMask();
-		glUseProgram(Gfx::programs.blend_mask.id);
+		Gfx::UseProgram(ProgramId::BlendMask);
 
 		glActiveTexture(GL_TEXTURE1);
-		Gfx::BindTexture(mask);
+		Gfx::BindTexture(render_state.GetMask());
 		glActiveTexture(GL_TEXTURE0);
 	}
 	else
 	{
-		glUseProgram(Gfx::programs.passthrough.id);
+		Gfx::UseProgram(ProgramId::Passthrough);
 	}
 
 	if (blend_mode == BlendMode::Replace)
@@ -1837,7 +1856,6 @@ void RenderInterface_GL3::CompositeLayer(const Rml::CompositeDestination destina
 	if (destination_layer == CompositeDestination::MaskImage)
 		has_mask = true;
 
-	active_program = ProgramId::None;
 	Gfx::CheckGLError("CompositeLayer");
 }
 
@@ -1913,30 +1931,20 @@ Rml::TextureHandle RenderInterface_GL3::RenderToTexture(Rml::Rectanglei bounds)
 	return texture_handle_result;
 }
 
-void RenderInterface_GL3::SubmitTransformUniform(ProgramId program_id, Rml::Vector2f translation)
+void RenderInterface_GL3::SubmitTransformUniform(Rml::Vector2f translation)
 {
-	Gfx::ProgramData* program = nullptr;
-	switch (program_id)
-	{
-	case ProgramId::Texture: program = &Gfx::programs.main_texture; break;
-	case ProgramId::Color: program = &Gfx::programs.main_color; break;
-	case ProgramId::LinearGradient: program = &Gfx::programs.main_linear_gradient; break;
-	case ProgramId::Creation: program = &Gfx::programs.main_creation; break;
-	case ProgramId::None:
-	case ProgramId::All: break;
-	}
-	RMLUI_ASSERT(program);
+	Gfx::ProgramData* program = Gfx::GetProgramData(Gfx::active_program);
+	const size_t program_index = (size_t)Gfx::active_program;
 
-	Gfx::CheckGLError("Uni0");
-	if ((int)program_id & (int)transform_dirty_state)
+	if (program_transform_dirty.test(program_index))
 	{
 		glUniformMatrix4fv(program->uniform_locations[(int)Gfx::ProgramUniform::Transform], 1, false, transform.data());
-		transform_dirty_state = ProgramId((int)transform_dirty_state & ~(int)program_id);
+		program_transform_dirty.set(program_index, false);
 	}
-	Gfx::CheckGLError("Uni1");
 
 	glUniform2fv(program->uniform_locations[(int)Gfx::ProgramUniform::Translate], 1, &translation.x);
-	Gfx::CheckGLError("Uni2");
+
+	Gfx::CheckGLError("SubmitTransformUniform");
 }
 
 bool RmlGL3::Initialize()
@@ -2038,7 +2046,7 @@ void RmlGL3::EndFrame()
 	// Instead, if we had a transparent destination that didn't use pre-multiplied alpha, we would have to perform a manual un-premultiplication step.
 	glActiveTexture(GL_TEXTURE0);
 	Gfx::BindTexture(fb_postprocess);
-	glUseProgram(Gfx::programs.passthrough.id);
+	Gfx::UseProgram(ProgramId::Passthrough);
 	Gfx::DrawFullscreenQuad();
 
 	render_state.EndFrame();

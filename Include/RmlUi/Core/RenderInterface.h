@@ -133,8 +133,8 @@ public:
 
 	/// Called by RmlUi when...
 	virtual CompiledShaderHandle CompileShader(const String& name, const Dictionary& parameters);
-	/// Use the provided shader on the next render command.
-	virtual void AttachShader(CompiledShaderHandle shader);
+	/// Render geometry with the given shader.
+	virtual void RenderShader(CompiledShaderHandle shader, CompiledGeometryHandle geometry, Vector2f translation);
 	/// Called by RmlUi when...
 	virtual void ReleaseCompiledShader(CompiledShaderHandle shader);
 

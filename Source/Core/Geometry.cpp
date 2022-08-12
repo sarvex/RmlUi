@@ -148,8 +148,23 @@ void Geometry::Render(CompiledShaderHandle shader_handle, Vector2f translation)
 	if (!render_interface)
 		return;
 
-	render_interface->AttachShader(shader_handle);
-	Render(translation);
+	if (!compile_attempted)
+	{
+		if (vertices.empty() || indices.empty())
+			return;
+
+		RMLUI_ZoneScoped;
+
+		compile_attempted = true;
+		compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
+			texture ? texture->GetHandle(render_interface) : 0);
+	}
+
+	if (compiled_geometry)
+	{
+		translation = translation.Round();
+		render_interface->RenderShader(shader_handle, compiled_geometry, translation);
+	}
 }
 
 void Geometry::RenderToClipMask(ClipMaskOperation clip_mask, Vector2f translation)
