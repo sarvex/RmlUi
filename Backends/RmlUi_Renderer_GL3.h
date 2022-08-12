@@ -30,8 +30,10 @@
 #define RMLUI_BACKENDS_RENDERER_GL3_H
 
 #include <RmlUi/Core/RenderInterface.h>
+#include <bitset>
 
 struct CompiledFilter;
+enum class ProgramId { None, Texture, Color, LinearGradient, Creation, Passthrough, ColorMatrix, Blur, Dropshadow, BlendMask, Count };
 
 class RenderInterface_GL3 : public Rml::RenderInterface {
 public:
@@ -61,7 +63,7 @@ public:
 	void SetTransform(const Rml::Matrix4f* transform) override;
 
 	Rml::CompiledShaderHandle CompileShader(const Rml::String& name, const Rml::Dictionary& parameters) override;
-	void AttachShader(Rml::CompiledShaderHandle shader) override;
+	void RenderShader(Rml::CompiledShaderHandle shader, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation) override;
 	void ReleaseCompiledShader(Rml::CompiledShaderHandle shader) override;
 
 	Rml::CompiledFilterHandle CompileFilter(const Rml::String& name, const Rml::Dictionary& parameters) override;
@@ -78,13 +80,12 @@ public:
 	static const Rml::TextureHandle TexturePostprocess = Rml::TextureHandle(-2);
 
 private:
-	enum class ProgramId { None, Texture = 1, Color = 2, LinearGradient = 4, Creation = 8, All = (Texture | Color | LinearGradient | Creation) };
-	void SubmitTransformUniform(ProgramId program_id, Rml::Vector2f translation);
+	void SubmitTransformUniform(Rml::Vector2f translation);
 
 	void RenderFilters();
 
 	Rml::Matrix4f transform;
-	ProgramId transform_dirty_state = ProgramId::All;
+	std::bitset<(size_t)ProgramId::Count> program_transform_dirty;
 
 	struct ScissorState {
 		bool enabled;
@@ -93,8 +94,6 @@ private:
 	ScissorState scissor_state = {};
 
 	Rml::Vector<CompiledFilter*> attached_filters;
-
-	ProgramId active_program = ProgramId::None;
 	bool has_mask = false;
 };
 

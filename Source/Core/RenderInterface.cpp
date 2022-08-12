@@ -94,7 +94,7 @@ CompiledShaderHandle RenderInterface::CompileShader(const String& /*name*/, cons
 	return CompiledShaderHandle{};
 }
 
-void RenderInterface::AttachShader(CompiledShaderHandle /*shader*/) {}
+void RenderInterface::RenderShader(CompiledShaderHandle /*shader*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/) {}
 
 void RenderInterface::ReleaseCompiledShader(CompiledShaderHandle /*shader*/) {}
 
