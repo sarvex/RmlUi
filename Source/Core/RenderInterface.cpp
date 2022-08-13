@@ -107,13 +107,9 @@ void RenderInterface::AttachFilter(CompiledFilterHandle /*filter*/) {}
 
 void RenderInterface::ReleaseCompiledFilter(CompiledFilterHandle /*filter*/) {}
 
-void RenderInterface::PushLayer() {}
+void RenderInterface::PushLayer(RenderClear /*clear_new_layer*/, RenderTarget /*render_target_on_pop*/, BlendMode /*blend_mode_on_pop*/) {}
 
-void RenderInterface::PopLayer() {}
-
-void RenderInterface::CompositeLayer(CompositeDestination /*destination*/, BlendMode /*blend_mode*/) {}
-
-TextureHandle RenderInterface::RenderToTexture(Rectanglei /*bounds*/)
+TextureHandle RenderInterface::PopLayer()
 {
 	return {};
 }

@@ -1110,43 +1110,70 @@ void RenderInterface_GL3::SetTransform(const Rml::Matrix4f* new_transform)
 
 class RenderState {
 public:
-	void StackPush()
+	void PushLayer(Rml::RenderClear clear_new_layer, Rml::RenderTarget render_target_on_pop, Rml::BlendMode blend_mode_on_pop)
 	{
-		if (fb_stack_size == (int)fb_stack.size())
+		if (clear_new_layer == Rml::RenderClear::Clone)
 		{
-			constexpr int num_samples = 2;
-			Gfx::FramebufferData fb = {};
+			RMLUI_ASSERT(layers_size > 0);
+			layers.insert(layers.begin() + layers_size, LayerData{GetStackTop(), render_target_on_pop, blend_mode_on_pop});
+			glBindFramebuffer(GL_FRAMEBUFFER, layers[layers_size].framebuffer.framebuffer);
+		}
+		else
+		{
+			if (layers_size == (int)layers.size())
+			{
+				constexpr int num_samples = 2;
+				LayerData layer = {Gfx::FramebufferData{}, render_target_on_pop, blend_mode_on_pop};
 
-			// All framebuffers should share a single stencil buffer.
-			GLuint shared_depth_stencil = (fb_stack_size >= 1 ? fb_stack[0].depth_stencil_buffer : 0);
-			Gfx::CreateFramebuffer(fb, width, height, num_samples, Gfx::FramebufferAttachment::DepthStencil, shared_depth_stencil);
-			fb_stack.push_back(std::move(fb));
+				// All framebuffers should share a single stencil buffer.
+				GLuint shared_depth_stencil = (layers_size >= 1 ? layers[0].framebuffer.depth_stencil_buffer : 0);
+				Gfx::CreateFramebuffer(layer.framebuffer, width, height, num_samples, Gfx::FramebufferAttachment::DepthStencil, shared_depth_stencil);
+				layers.push_back(std::move(layer));
 
-			RMLUI_ASSERT(fb_stack_size + 1 == (int)fb_stack.size());
+				RMLUI_ASSERT(layers_size + 1 == (int)layers.size());
+			}
+
+			layers[layers_size].blend_mode_on_pop = blend_mode_on_pop;
+			layers[layers_size].render_target_on_pop = render_target_on_pop;
+
+			glBindFramebuffer(GL_FRAMEBUFFER, layers[layers_size].framebuffer.framebuffer);
+			if (clear_new_layer == Rml::RenderClear::Clear)
+				glClear(GL_COLOR_BUFFER_BIT);
 		}
 
-		const Gfx::FramebufferData& fb_new = fb_stack[fb_stack_size];
-		fb_stack_size += 1;
-
-		glBindFramebuffer(GL_FRAMEBUFFER, fb_new.framebuffer);
-		glClear(GL_COLOR_BUFFER_BIT);
+		layers_size += 1;
 	}
 
 	void StackPop()
 	{
-		RMLUI_ASSERT(fb_stack_size > 0);
-		fb_stack_size -= 1;
+		RMLUI_ASSERT(layers_size > 0);
+		layers_size -= 1;
+
+		// Remove cloned layers.
+		if (IsCloneOfBelow(layers_size))
+			layers.erase(layers.begin() + layers_size);
 	}
 
 	const Gfx::FramebufferData& GetStackTop() const
 	{
-		RMLUI_ASSERT(fb_stack_size > 0);
-		return fb_stack[fb_stack_size - 1];
+		RMLUI_ASSERT(layers_size > 0);
+		return layers[layers_size - 1].framebuffer;
 	}
 	const Gfx::FramebufferData& GetStackBelow() const
 	{
-		RMLUI_ASSERT(fb_stack_size > 1);
-		return fb_stack[fb_stack_size - 2];
+		RMLUI_ASSERT(layers_size > 1);
+		return layers[layers_size - 2].framebuffer;
+	}
+
+	Rml::RenderTarget GetRenderTarget() const
+	{
+		RMLUI_ASSERT(layers_size > 0);
+		return layers[layers_size - 1].render_target_on_pop;
+	}
+	Rml::BlendMode GetBlendMode() const
+	{
+		RMLUI_ASSERT(layers_size > 0);
+		return layers[layers_size - 1].blend_mode_on_pop;
 	}
 
 	const Gfx::FramebufferData& GetPostprocessPrimary() const { return fb_postprocess_primary; }
@@ -1171,7 +1198,7 @@ public:
 
 	void BeginFrame(int new_width, int new_height)
 	{
-		RMLUI_ASSERT(fb_stack_size == 0);
+		RMLUI_ASSERT(layers_size == 0);
 
 		if (new_width != width || new_height != height)
 		{
@@ -1183,12 +1210,12 @@ public:
 			Gfx::CreateFramebuffer(fb_postprocess_secondary, width, height, 0, Gfx::FramebufferAttachment::None, 0);
 		}
 
-		StackPush();
+		PushLayer(Rml::RenderClear::Clear, Rml::RenderTarget::Layer, Rml::BlendMode::Replace);
 	}
 
 	void EndFrame()
 	{
-		RMLUI_ASSERT(fb_stack_size == 1);
+		RMLUI_ASSERT(layers_size == 1);
 		StackPop();
 	}
 
@@ -1197,12 +1224,15 @@ public:
 private:
 	void DestroyFramebuffers()
 	{
-		RMLUI_ASSERTMSG(fb_stack_size == 0, "Do not call this during frame rendering, that is, between BeginFrame() and EndFrame().");
+		RMLUI_ASSERTMSG(layers_size == 0, "Do not call this during frame rendering, that is, between BeginFrame() and EndFrame().");
 
-		for (Gfx::FramebufferData& fb : fb_stack)
-			Gfx::DestroyFramebuffer(fb);
+		for (int i = (int)layers.size() - 1; i >= 0; i--)
+		{
+			RMLUI_ASSERT(!IsCloneOfBelow(i));
+			Gfx::DestroyFramebuffer(layers[i].framebuffer);
+		}
 
-		fb_stack.clear();
+		layers.clear();
 
 		Gfx::DestroyFramebuffer(fb_postprocess_primary);
 		Gfx::DestroyFramebuffer(fb_postprocess_secondary);
@@ -1210,10 +1240,23 @@ private:
 		Gfx::DestroyFramebuffer(fb_mask);
 	}
 
-	int width = 0, height = 0;
+	bool IsCloneOfBelow(int layer_index) const
+	{
+		const bool result = (layer_index >= 1 && layer_index < (int)layers.size() &&
+			layers[layer_index].framebuffer.framebuffer == layers[layer_index - 1].framebuffer.framebuffer);
+		return result;
+	}
 
-	int fb_stack_size = 0;
-	Rml::Vector<Gfx::FramebufferData> fb_stack;
+	int width = 0, height = 0;
+	int layers_size = 0;
+
+	struct LayerData {
+		Gfx::FramebufferData framebuffer;
+		Rml::RenderTarget render_target_on_pop;
+		Rml::BlendMode blend_mode_on_pop;
+	};
+
+	Rml::Vector<LayerData> layers;
 
 	Gfx::FramebufferData fb_postprocess_primary = {};
 	Gfx::FramebufferData fb_postprocess_secondary = {};
@@ -1777,33 +1820,31 @@ void RenderInterface_GL3::RenderFilters()
 	attached_filters.clear();
 }
 
-void RenderInterface_GL3::PushLayer()
+void RenderInterface_GL3::PushLayer(Rml::RenderClear clear_new_layer, Rml::RenderTarget render_target_on_pop, Rml::BlendMode blend_mode_on_pop)
 {
-	render_state.StackPush();
+	render_state.PushLayer(clear_new_layer, render_target_on_pop, blend_mode_on_pop);
 }
 
-void RenderInterface_GL3::PopLayer()
-{
-	render_state.StackPop();
-	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetStackTop().framebuffer);
-}
-
-void RenderInterface_GL3::CompositeLayer(const Rml::CompositeDestination destination_layer, const Rml::BlendMode blend_mode)
+Rml::TextureHandle RenderInterface_GL3::PopLayer()
 {
 	using Rml::BlendMode;
-	using Rml::CompositeDestination;
+	using Rml::RenderTarget;
 
-	if (has_mask && destination_layer == CompositeDestination::MaskImage)
+	RenderTarget render_target = render_state.GetRenderTarget();
+	BlendMode blend_mode = render_state.GetBlendMode();
+	Rml::TextureHandle texture_handle_result = {};
+
+	if (has_mask && render_target == RenderTarget::MaskImage)
 	{
 		RMLUI_ERROR;
-		return;
+		goto PopRenderState;
 	}
 
 	// Nothing to do if we're just rendering to ourselves without any attached filters.
-	if (destination_layer == CompositeDestination::CurrentLayer && blend_mode == BlendMode::Replace && attached_filters.empty())
+	if (render_target == RenderTarget::Layer && blend_mode == BlendMode::Replace && attached_filters.empty())
 	{
 		has_mask = false;
-		return;
+		goto PopRenderState;
 	}
 
 	{
@@ -1823,86 +1864,54 @@ void RenderInterface_GL3::CompositeLayer(const Rml::CompositeDestination destina
 	// Render the filters, the PostprocessPrimary framebuffer is used for both input and output.
 	RenderFilters();
 
-	// Blit filter back to stack. Apply any mask if active.
-	const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
-	const Gfx::FramebufferData& destination = (destination_layer == CompositeDestination::CurrentLayer
-			? render_state.GetStackTop()
-			: (destination_layer == CompositeDestination::BelowLayer ? render_state.GetStackBelow() : render_state.GetMask()));
-
-	glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
-	Gfx::BindTexture(source);
-	if (has_mask)
+	switch (render_target)
 	{
-		has_mask = false;
-		Gfx::UseProgram(ProgramId::BlendMask);
+	case RenderTarget::Layer:
+	case RenderTarget::MaskImage:
+	{
+		// Blit filter back to stack. Apply any mask if active.
+		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
+		const Gfx::FramebufferData& destination = (render_target == RenderTarget::Layer ? render_state.GetStackBelow() : render_state.GetMask());
 
-		glActiveTexture(GL_TEXTURE1);
-		Gfx::BindTexture(render_state.GetMask());
-		glActiveTexture(GL_TEXTURE0);
+		glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
+		Gfx::BindTexture(source);
+		if (has_mask)
+		{
+			has_mask = false;
+			Gfx::UseProgram(ProgramId::BlendMask);
+
+			glActiveTexture(GL_TEXTURE1);
+			Gfx::BindTexture(render_state.GetMask());
+			glActiveTexture(GL_TEXTURE0);
+		}
+		else
+		{
+			Gfx::UseProgram(ProgramId::Passthrough);
+		}
+
+		if (blend_mode == BlendMode::Replace)
+			glDisable(GL_BLEND);
+
+		Gfx::DrawFullscreenQuad();
+
+		if (blend_mode == BlendMode::Replace)
+			glEnable(GL_BLEND);
+
+		if (render_target == RenderTarget::MaskImage)
+			has_mask = true;
 	}
-	else
+	break;
+	case RenderTarget::RenderTexture:
 	{
-		Gfx::UseProgram(ProgramId::Passthrough);
-	}
+		const bool scissor_initially_enabled = scissor_state.enabled;
+		EnableScissorRegion(false);
 
-	if (blend_mode == BlendMode::Replace)
-		glDisable(GL_BLEND);
-
-	Gfx::DrawFullscreenQuad();
-
-	if (blend_mode == BlendMode::Replace)
-		glEnable(GL_BLEND);
-
-	if (destination_layer == CompositeDestination::MaskImage)
-		has_mask = true;
-
-	Gfx::CheckGLError("CompositeLayer");
-}
-
-Rml::TextureHandle RenderInterface_GL3::RenderToTexture(Rml::Rectanglei bounds)
-{
-	Rml::TextureHandle texture_handle_result = {};
-
-	const bool scissor_initially_enabled = scissor_state.enabled;
-	EnableScissorRegion(false);
-
-#if not defined RMLUI_PLATFORM_EMSCRIPTEN
-	{
-		const Gfx::FramebufferData& source = render_state.GetStackTop();
-		const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
+		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
+		const Gfx::FramebufferData& destination = render_state.GetPostprocessSecondary();
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
 
-		// Blit the desired stack region to the postprocess framebuffer to resolve MSAA. Also flip the image vertically since that convention is used
-		// for textures.
-		glBlitFramebuffer(                                   //
-			bounds.Left(), source.height - bounds.Top(),     // src0
-			bounds.Right(), source.height - bounds.Bottom(), // src1
-			0, 0,                                            // dst0
-			bounds.Width(), bounds.Height(),                 // dst1
-			GL_COLOR_BUFFER_BIT, GL_NEAREST                  //
-		);
-	}
-#else
-	// In OpenGL ES 3.0 the source and destination blit regions must be equal for multisampled buffers, thus we use a two-step approach here.
-	{
-		const Gfx::FramebufferData& source = render_state.GetStackTop();
-		const Gfx::FramebufferData& primary = render_state.GetPostprocessPrimary();
-		const Gfx::FramebufferData& secondary = render_state.GetPostprocessSecondary();
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, secondary.framebuffer);
-
-		// Blit the desired stack region to the postprocess framebuffer to resolve MSAA.
-		glBlitFramebuffer(                                  //
-			bounds.Left(), source.height - bounds.Bottom(), // src0
-			bounds.Right(), source.height - bounds.Top(),   // src1
-			bounds.Left(), source.height - bounds.Bottom(), // dst0
-			bounds.Right(), source.height - bounds.Top(),   // dst1
-			GL_COLOR_BUFFER_BIT, GL_NEAREST                 //
-		);
-
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, secondary.framebuffer);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, primary.framebuffer);
+		Rml::Rectanglei bounds = Rml::Rectanglei::FromPositionSize({scissor_state.x, scissor_state.y}, {scissor_state.width, scissor_state.height});
 
 		// Flip the image vertically, as that convention is used for textures, and move to origin.
 		glBlitFramebuffer(                                  //
@@ -1912,21 +1921,28 @@ Rml::TextureHandle RenderInterface_GL3::RenderToTexture(Rml::Rectanglei bounds)
 			bounds.Width(), 0,                              // dst1
 			GL_COLOR_BUFFER_BIT, GL_NEAREST                 //
 		);
+
+		if (GenerateTexture(texture_handle_result, nullptr, bounds.Size()))
+		{
+			glBindTexture(GL_TEXTURE_2D, (GLuint)texture_handle_result);
+
+			const Gfx::FramebufferData& texture_source = destination;
+			glBindFramebuffer(GL_READ_FRAMEBUFFER, texture_source.framebuffer);
+			glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, bounds.Width(), bounds.Height());
+		}
+
+		EnableScissorRegion(scissor_initially_enabled);
+		Gfx::CheckGLError("RenderToTexture");
 	}
-#endif
-
-	if (GenerateTexture(texture_handle_result, nullptr, bounds.Size()))
-	{
-		glBindTexture(GL_TEXTURE_2D, (GLuint)texture_handle_result);
-
-		const Gfx::FramebufferData& texture_source = render_state.GetPostprocessPrimary();
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, texture_source.framebuffer);
-		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, bounds.Width(), bounds.Height());
+	break;
+	default: break;
 	}
 
-	Gfx::CheckGLError("RenderToTexture");
+PopRenderState:
+	render_state.StackPop();
+	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetStackTop().framebuffer);
 
-	EnableScissorRegion(scissor_initially_enabled);
+	Gfx::CheckGLError("PopLayer");
 
 	return texture_handle_result;
 }
