@@ -40,8 +40,9 @@ namespace Rml {
 class Context;
 
 enum class ClipMaskOperation { Clip, ClipIntersect, ClipOut };
-enum class CompositeDestination { CurrentLayer, BelowLayer, MaskImage };
-enum class BlendMode { Replace, Blend };
+enum class RenderClear { None, Clear, Clone };
+enum class RenderTarget { Layer, MaskImage, RenderTexture };
+enum class BlendMode { Blend, Replace };
 
 /**
 	The abstract base class for application-specific rendering implementation. Your application must provide a concrete
@@ -124,12 +125,15 @@ public:
 	virtual void SetTransform(const Matrix4f* transform);
 
 	/// Called by RmlUi when...
-	virtual void PushLayer();
-	/// Called by RmlUi when...
-	virtual void PopLayer();
-	// Apply effects and mask image to the current layer, and render back to the same or another layer.
 	/// @note Affected by transform: No. Affected by scissor: Yes. Affected by clip mask: Yes.
-	virtual void CompositeLayer(CompositeDestination destination, BlendMode blend_mode);
+	virtual void PushLayer(RenderClear clear_new_layer, RenderTarget render_target_on_pop, BlendMode blend_mode_on_pop);
+	/// Called by RmlUi when...
+	/// @return A handle to the resulting render texture, or zero if the render target is not a render texture.
+	/// @note Should render the current layer to the target specified when this layer was pushed.
+	/// @note Should apply attached filters and mask image, and then clear these attachments.
+	/// @note Render texture targets should be dimensioned and extracted from the bounds of the active scissor.
+	/// @note Affected by transform: No. Affected by scissor: Yes. Affected by clip mask: Yes.
+	virtual TextureHandle PopLayer();
 
 	/// Called by RmlUi when...
 	virtual CompiledShaderHandle CompileShader(const String& name, const Dictionary& parameters);
@@ -140,13 +144,10 @@ public:
 
 	/// Called by RmlUi when...
 	virtual CompiledFilterHandle CompileFilter(const String& name, const Dictionary& parameters);
-	// Apply filter to the next CompositeLayer command.
+	/// Attach filter to be applied on the next call to PopLayer.
 	virtual void AttachFilter(CompiledFilterHandle filter);
 	/// Called by RmlUi when...
 	virtual void ReleaseCompiledFilter(CompiledFilterHandle filter);
-
-	// Render to texture from the current layer.
-	virtual TextureHandle RenderToTexture(Rectanglei bounds);
 
 	/// Get the context currently being rendered. This is only valid during RenderGeometry,
 	/// CompileGeometry, RenderCompiledGeometry, EnableScissorRegion and SetScissorRegion.
