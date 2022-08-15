@@ -34,7 +34,6 @@
 #include <RmlUi/Core/Log.h>
 #include <RmlUi/Core/Platform.h>
 #include <RmlUi/Core/SystemInterface.h>
-#include <deque>
 #include <string.h>
 
 #if defined(RMLUI_PLATFORM_WIN32) && !defined(__MINGW32__)
@@ -1112,37 +1111,47 @@ void RenderInterface_GL3::SetTransform(const Rml::Matrix4f* new_transform)
 
 class RenderState {
 public:
-	void PushLayer(Rml::RenderClear clear_new_layer)
+	// Push a new layer. All references to previously retrieved layers are invalidated.
+	void PushLayer()
 	{
-		const bool clone_current_layer = (clear_new_layer == Rml::RenderClear::Clone);
-		RMLUI_ASSERT(!clone_current_layer || !layers.empty());
+		RMLUI_ASSERT(layers_size <= (int)fb_layers.size());
 
-		const Gfx::FramebufferData* fb = (clone_current_layer ? layers.back().framebuffer : CreateFramebuffer());
-		layers.push_back(LayerData{fb, clone_current_layer});
+		if (layers_size == (int)fb_layers.size())
+		{
+			constexpr int num_samples = 2;
+			// All framebuffers should share a single stencil buffer.
+			GLuint shared_depth_stencil = (fb_layers.empty() ? 0 : fb_layers.front().depth_stencil_buffer);
 
-		glBindFramebuffer(GL_FRAMEBUFFER, fb->framebuffer);
-		if (clear_new_layer == Rml::RenderClear::Clear)
-			glClear(GL_COLOR_BUFFER_BIT);
+			fb_layers.push_back(Gfx::FramebufferData{});
+			Gfx::CreateFramebuffer(fb_layers.back(), width, height, num_samples, Gfx::FramebufferAttachment::DepthStencil, shared_depth_stencil);
+		}
+
+		layers_size += 1;
 	}
 
+	// Push a clone of the active layer. All references to previously retrieved layers are invalidated.
+	void PushLayerClone()
+	{
+		RMLUI_ASSERT(layers_size > 0);
+		fb_layers.insert(fb_layers.begin() + layers_size, Gfx::FramebufferData{fb_layers[layers_size - 1]});
+		layers_size += 1;
+	}
+
+	// Pop the top layer. All references to previously retrieved layers are invalidated.
 	void PopLayer()
 	{
-		RMLUI_ASSERT(!layers.empty());
-		if (!layers.back().is_clone_of_below_layer)
-			ReleaseFramebuffer();
+		RMLUI_ASSERT(layers_size > 0);
+		layers_size -= 1;
 
-		layers.pop_back();
+		// Only cloned framebuffers are removed. Other framebuffers remain for later re-use.
+		if (IsCloneOfBelow(layers_size))
+			fb_layers.erase(fb_layers.begin() + layers_size);
 	}
 
 	const Gfx::FramebufferData& GetTopLayer() const
 	{
-		RMLUI_ASSERT(layers.size() > 0);
-		return *(layers.back().framebuffer);
-	}
-	const Gfx::FramebufferData& GetBelowLayer() const
-	{
-		RMLUI_ASSERT(layers.size() > 1);
-		return *((layers.end() - 2)->framebuffer);
+		RMLUI_ASSERT(layers_size > 0);
+		return fb_layers[layers_size - 1];
 	}
 
 	const Gfx::FramebufferData& GetPostprocessPrimary() { return EnsureFramebufferPostprocess(0); }
@@ -1154,7 +1163,7 @@ public:
 
 	void BeginFrame(int new_width, int new_height)
 	{
-		RMLUI_ASSERT(layers.empty());
+		RMLUI_ASSERT(layers_size == 0);
 
 		if (new_width != width || new_height != height)
 		{
@@ -1164,12 +1173,12 @@ public:
 			DestroyFramebuffers();
 		}
 
-		PushLayer(Rml::RenderClear::Clear);
+		PushLayer();
 	}
 
 	void EndFrame()
 	{
-		RMLUI_ASSERT(layers.size() == 1);
+		RMLUI_ASSERT(layers_size == 1);
 		PopLayer();
 	}
 
@@ -1178,7 +1187,7 @@ public:
 private:
 	void DestroyFramebuffers()
 	{
-		RMLUI_ASSERTMSG(layers.empty(), "Do not call this during frame rendering, that is, between BeginFrame() and EndFrame().");
+		RMLUI_ASSERTMSG(layers_size == 0, "Do not call this during frame rendering, that is, between BeginFrame() and EndFrame().");
 
 		for (Gfx::FramebufferData& fb : fb_layers)
 			Gfx::DestroyFramebuffer(fb);
@@ -1189,35 +1198,11 @@ private:
 			Gfx::DestroyFramebuffer(fb);
 	}
 
-	const Gfx::FramebufferData* CreateFramebuffer()
+	bool IsCloneOfBelow(int layer_index) const
 	{
-		Gfx::FramebufferData* result = nullptr;
-
-		if (next_available_fb_layer < (int)fb_layers.size())
-		{
-			result = &fb_layers[next_available_fb_layer];
-		}
-		else
-		{
-			constexpr int num_samples = 2;
-
-			fb_layers.push_back({});
-			result = &fb_layers.back();
-
-			// All framebuffers should share a single stencil buffer.
-			GLuint shared_depth_stencil = (layers.size() >= 1 ? layers[0].framebuffer->depth_stencil_buffer : 0);
-			Gfx::CreateFramebuffer(*result, width, height, num_samples, Gfx::FramebufferAttachment::DepthStencil, shared_depth_stencil);
-		}
-
-		next_available_fb_layer += 1;
-
+		const bool result =
+			(layer_index >= 1 && layer_index < (int)fb_layers.size() && fb_layers[layer_index].framebuffer == fb_layers[layer_index - 1].framebuffer);
 		return result;
-	}
-
-	void ReleaseFramebuffer()
-	{
-		RMLUI_ASSERT(next_available_fb_layer > 0);
-		next_available_fb_layer -= 1;
 	}
 
 	const Gfx::FramebufferData& EnsureFramebufferPostprocess(int index)
@@ -1230,16 +1215,10 @@ private:
 
 	int width = 0, height = 0;
 
-	struct LayerData {
-		const Gfx::FramebufferData* framebuffer;
-		bool is_clone_of_below_layer;
-	};
+	// The number of active layers is manually tracked since we re-use the framebuffers stored in the fb_layers stack.
+	int layers_size = 0;
 
-	Rml::Vector<LayerData> layers;
-
-	int next_available_fb_layer = 0;
-
-	std::deque<Gfx::FramebufferData> fb_layers;
+	Rml::Vector<Gfx::FramebufferData> fb_layers;
 	Rml::Array<Gfx::FramebufferData, 4> fb_postprocess = {};
 };
 
@@ -1679,6 +1658,7 @@ void RenderInterface_GL3::AttachFilter(Rml::CompiledFilterHandle filter)
 
 void RenderInterface_GL3::ReleaseCompiledFilter(Rml::CompiledFilterHandle filter)
 {
+	RMLUI_ASSERT(attached_filters.empty());
 	delete reinterpret_cast<CompiledFilter*>(filter);
 }
 
@@ -1801,7 +1781,14 @@ void RenderInterface_GL3::RenderFilters()
 
 void RenderInterface_GL3::PushLayer(Rml::RenderClear clear_new_layer)
 {
-	render_state.PushLayer(clear_new_layer);
+	if (clear_new_layer == Rml::RenderClear::Clone)
+		render_state.PushLayerClone();
+	else
+		render_state.PushLayer();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
+	if (clear_new_layer == Rml::RenderClear::Clear)
+		glClear(GL_COLOR_BUFFER_BIT);
 }
 
 Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode)
@@ -1829,6 +1816,9 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 	// Render the filters, the PostprocessPrimary framebuffer is used for both input and output.
 	RenderFilters();
 
+	// Pop the active layer, thereby activating the beneath layer.
+	render_state.PopLayer();
+
 	switch (render_target)
 	{
 	case RenderTarget::Layer:
@@ -1836,7 +1826,7 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 	{
 		// Blit filter back to stack. Apply any mask if active.
 		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
-		const Gfx::FramebufferData& destination = (render_target == RenderTarget::Layer ? render_state.GetBelowLayer() : render_state.GetMask());
+		const Gfx::FramebufferData& destination = (render_target == RenderTarget::Layer ? render_state.GetTopLayer() : render_state.GetMask());
 
 		glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
 		Gfx::BindTexture(source);
@@ -1902,7 +1892,6 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 	default: break;
 	}
 
-	render_state.PopLayer();
 	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
 
 	Gfx::CheckGLError("PopLayer");
@@ -1991,6 +1980,7 @@ void RmlGL3::BeginFrame()
 #endif
 
 	render_state.BeginFrame(viewport_width, viewport_height);
+	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
 
 	glClearStencil(0);
 	glStencilMask(GLuint(-1));
