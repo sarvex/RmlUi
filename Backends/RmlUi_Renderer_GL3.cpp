@@ -34,6 +34,7 @@
 #include <RmlUi/Core/Log.h>
 #include <RmlUi/Core/Platform.h>
 #include <RmlUi/Core/SystemInterface.h>
+#include <deque>
 #include <string.h>
 
 #if defined(RMLUI_PLATFORM_WIN32) && !defined(__MINGW32__)
@@ -587,7 +588,8 @@ static bool CreateFramebuffer(FramebufferData& out_fb, int width, int height, in
 
 void DestroyFramebuffer(FramebufferData& fb)
 {
-	glDeleteFramebuffers(1, &fb.framebuffer);
+	if (fb.framebuffer)
+		glDeleteFramebuffers(1, &fb.framebuffer);
 	if (fb.color_tex_buffer)
 		glDeleteTextures(1, &fb.color_tex_buffer);
 	if (fb.color_render_buffer)
@@ -1112,93 +1114,58 @@ class RenderState {
 public:
 	void PushLayer(Rml::RenderClear clear_new_layer, Rml::RenderTarget render_target_on_pop, Rml::BlendMode blend_mode_on_pop)
 	{
-		if (clear_new_layer == Rml::RenderClear::Clone)
-		{
-			RMLUI_ASSERT(layers_size > 0);
-			layers.insert(layers.begin() + layers_size, LayerData{GetStackTop(), render_target_on_pop, blend_mode_on_pop});
-			glBindFramebuffer(GL_FRAMEBUFFER, layers[layers_size].framebuffer.framebuffer);
-		}
-		else
-		{
-			if (layers_size == (int)layers.size())
-			{
-				constexpr int num_samples = 2;
-				LayerData layer = {Gfx::FramebufferData{}, render_target_on_pop, blend_mode_on_pop};
+		const bool clone_current_layer = (clear_new_layer == Rml::RenderClear::Clone);
+		RMLUI_ASSERT(!clone_current_layer || !layers.empty());
 
-				// All framebuffers should share a single stencil buffer.
-				GLuint shared_depth_stencil = (layers_size >= 1 ? layers[0].framebuffer.depth_stencil_buffer : 0);
-				Gfx::CreateFramebuffer(layer.framebuffer, width, height, num_samples, Gfx::FramebufferAttachment::DepthStencil, shared_depth_stencil);
-				layers.push_back(std::move(layer));
+		const Gfx::FramebufferData* fb = (clone_current_layer ? layers.back().framebuffer : CreateFramebuffer());
+		layers.push_back(LayerData{fb, render_target_on_pop, blend_mode_on_pop, clone_current_layer});
 
-				RMLUI_ASSERT(layers_size + 1 == (int)layers.size());
-			}
-
-			layers[layers_size].blend_mode_on_pop = blend_mode_on_pop;
-			layers[layers_size].render_target_on_pop = render_target_on_pop;
-
-			glBindFramebuffer(GL_FRAMEBUFFER, layers[layers_size].framebuffer.framebuffer);
-			if (clear_new_layer == Rml::RenderClear::Clear)
-				glClear(GL_COLOR_BUFFER_BIT);
-		}
-
-		layers_size += 1;
+		glBindFramebuffer(GL_FRAMEBUFFER, fb->framebuffer);
+		if (clear_new_layer == Rml::RenderClear::Clear)
+			glClear(GL_COLOR_BUFFER_BIT);
 	}
 
-	void StackPop()
+	void PopLayer()
 	{
-		RMLUI_ASSERT(layers_size > 0);
-		layers_size -= 1;
+		RMLUI_ASSERT(!layers.empty());
+		if (!layers.back().is_clone_of_below_layer)
+			ReleaseFramebuffer();
 
-		// Remove cloned layers.
-		if (IsCloneOfBelow(layers_size))
-			layers.erase(layers.begin() + layers_size);
+		layers.pop_back();
 	}
 
-	const Gfx::FramebufferData& GetStackTop() const
+	const Gfx::FramebufferData& GetTopLayer() const
 	{
-		RMLUI_ASSERT(layers_size > 0);
-		return layers[layers_size - 1].framebuffer;
+		RMLUI_ASSERT(layers.size() > 0);
+		return *(layers.back().framebuffer);
 	}
-	const Gfx::FramebufferData& GetStackBelow() const
+	const Gfx::FramebufferData& GetBelowLayer() const
 	{
-		RMLUI_ASSERT(layers_size > 1);
-		return layers[layers_size - 2].framebuffer;
+		RMLUI_ASSERT(layers.size() > 1);
+		return *((layers.end() - 2)->framebuffer);
 	}
 
 	Rml::RenderTarget GetRenderTarget() const
 	{
-		RMLUI_ASSERT(layers_size > 0);
-		return layers[layers_size - 1].render_target_on_pop;
+		RMLUI_ASSERT(!layers.empty());
+		return layers.back().render_target_on_pop;
 	}
 	Rml::BlendMode GetBlendMode() const
 	{
-		RMLUI_ASSERT(layers_size > 0);
-		return layers[layers_size - 1].blend_mode_on_pop;
+		RMLUI_ASSERT(!layers.empty());
+		return layers.back().blend_mode_on_pop;
 	}
 
-	const Gfx::FramebufferData& GetPostprocessPrimary() const { return fb_postprocess_primary; }
-	const Gfx::FramebufferData& GetPostprocessSecondary() const { return fb_postprocess_secondary; }
-	const Gfx::FramebufferData& GetPostprocessTertiary()
-	{
-		// This one is more rarily used, so we create it on demand.
-		if (!fb_postprocess_tertiary.framebuffer)
-			Gfx::CreateFramebuffer(fb_postprocess_tertiary, width, height, 0, Gfx::FramebufferAttachment::None, 0);
-		return fb_postprocess_tertiary;
-	}
-	const Gfx::FramebufferData& GetMask()
-	{
-		// This one too we create on demand.
-		// @performance We could try to assign this to e.g. Secondary and then move it to a new buffer if that one is used. Or more generally make a
-		// system to allocate and deallocate framebuffers as necessary.
-		if (!fb_mask.framebuffer)
-			Gfx::CreateFramebuffer(fb_mask, width, height, 0, Gfx::FramebufferAttachment::None, 0);
-		return fb_mask;
-	}
-	void SwapPostprocessPrimarySecondary() { std::swap(fb_postprocess_primary, fb_postprocess_secondary); }
+	const Gfx::FramebufferData& GetPostprocessPrimary() { return EnsureFramebufferPostprocess(0); }
+	const Gfx::FramebufferData& GetPostprocessSecondary() { return EnsureFramebufferPostprocess(1); }
+	const Gfx::FramebufferData& GetPostprocessTertiary() { return EnsureFramebufferPostprocess(2); }
+	const Gfx::FramebufferData& GetMask() { return EnsureFramebufferPostprocess(3); }
+
+	void SwapPostprocessPrimarySecondary() { std::swap(fb_postprocess[0], fb_postprocess[1]); }
 
 	void BeginFrame(int new_width, int new_height)
 	{
-		RMLUI_ASSERT(layers_size == 0);
+		RMLUI_ASSERT(layers.empty());
 
 		if (new_width != width || new_height != height)
 		{
@@ -1206,8 +1173,6 @@ public:
 			height = new_height;
 
 			DestroyFramebuffers();
-			Gfx::CreateFramebuffer(fb_postprocess_primary, width, height, 0, Gfx::FramebufferAttachment::None, 0);
-			Gfx::CreateFramebuffer(fb_postprocess_secondary, width, height, 0, Gfx::FramebufferAttachment::None, 0);
 		}
 
 		PushLayer(Rml::RenderClear::Clear, Rml::RenderTarget::Layer, Rml::BlendMode::Replace);
@@ -1215,8 +1180,8 @@ public:
 
 	void EndFrame()
 	{
-		RMLUI_ASSERT(layers_size == 1);
-		StackPop();
+		RMLUI_ASSERT(layers.size() == 1);
+		PopLayer();
 	}
 
 	void Shutdown() { DestroyFramebuffers(); }
@@ -1224,44 +1189,71 @@ public:
 private:
 	void DestroyFramebuffers()
 	{
-		RMLUI_ASSERTMSG(layers_size == 0, "Do not call this during frame rendering, that is, between BeginFrame() and EndFrame().");
+		RMLUI_ASSERTMSG(layers.empty(), "Do not call this during frame rendering, that is, between BeginFrame() and EndFrame().");
 
-		for (int i = (int)layers.size() - 1; i >= 0; i--)
-		{
-			RMLUI_ASSERT(!IsCloneOfBelow(i));
-			Gfx::DestroyFramebuffer(layers[i].framebuffer);
-		}
+		for (Gfx::FramebufferData& fb : fb_layers)
+			Gfx::DestroyFramebuffer(fb);
 
-		layers.clear();
+		fb_layers.clear();
 
-		Gfx::DestroyFramebuffer(fb_postprocess_primary);
-		Gfx::DestroyFramebuffer(fb_postprocess_secondary);
-		Gfx::DestroyFramebuffer(fb_postprocess_tertiary);
-		Gfx::DestroyFramebuffer(fb_mask);
+		for (Gfx::FramebufferData& fb : fb_postprocess)
+			Gfx::DestroyFramebuffer(fb);
 	}
 
-	bool IsCloneOfBelow(int layer_index) const
+	const Gfx::FramebufferData* CreateFramebuffer()
 	{
-		const bool result = (layer_index >= 1 && layer_index < (int)layers.size() &&
-			layers[layer_index].framebuffer.framebuffer == layers[layer_index - 1].framebuffer.framebuffer);
+		Gfx::FramebufferData* result = nullptr;
+
+		if (next_available_fb_layer < (int)fb_layers.size())
+		{
+			result = &fb_layers[next_available_fb_layer];
+		}
+		else
+		{
+			constexpr int num_samples = 2;
+
+			fb_layers.push_back({});
+			result = &fb_layers.back();
+
+			// All framebuffers should share a single stencil buffer.
+			GLuint shared_depth_stencil = (layers.size() >= 1 ? layers[0].framebuffer->depth_stencil_buffer : 0);
+			Gfx::CreateFramebuffer(*result, width, height, num_samples, Gfx::FramebufferAttachment::DepthStencil, shared_depth_stencil);
+		}
+
+		next_available_fb_layer += 1;
+
 		return result;
 	}
 
+	void ReleaseFramebuffer()
+	{
+		RMLUI_ASSERT(next_available_fb_layer > 0);
+		next_available_fb_layer -= 1;
+	}
+
+	const Gfx::FramebufferData& EnsureFramebufferPostprocess(int index)
+	{
+		Gfx::FramebufferData& fb = fb_postprocess[index];
+		if (!fb.framebuffer)
+			Gfx::CreateFramebuffer(fb, width, height, 0, Gfx::FramebufferAttachment::None, 0);
+		return fb;
+	}
+
 	int width = 0, height = 0;
-	int layers_size = 0;
 
 	struct LayerData {
-		Gfx::FramebufferData framebuffer;
+		const Gfx::FramebufferData* framebuffer;
 		Rml::RenderTarget render_target_on_pop;
 		Rml::BlendMode blend_mode_on_pop;
+		bool is_clone_of_below_layer;
 	};
 
 	Rml::Vector<LayerData> layers;
 
-	Gfx::FramebufferData fb_postprocess_primary = {};
-	Gfx::FramebufferData fb_postprocess_secondary = {};
-	Gfx::FramebufferData fb_postprocess_tertiary = {};
-	Gfx::FramebufferData fb_mask = {};
+	int next_available_fb_layer = 0;
+
+	std::deque<Gfx::FramebufferData> fb_layers;
+	Rml::Array<Gfx::FramebufferData, 4> fb_postprocess = {};
 };
 
 static RenderState render_state;
@@ -1852,7 +1844,7 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer()
 		// the multi-sampled framebuffer in any case.
 		// @performance If we have BlendMode::Replace and no filters or mask then we can just blit directly to the destination. This is particularly
 		// common when compositing to the mask layer. Alternatively, make the mask layer into R8 texture, then we need to do this step first anyway.
-		const Gfx::FramebufferData& source = render_state.GetStackTop();
+		const Gfx::FramebufferData& source = render_state.GetTopLayer();
 		const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
@@ -1871,7 +1863,7 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer()
 	{
 		// Blit filter back to stack. Apply any mask if active.
 		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
-		const Gfx::FramebufferData& destination = (render_target == RenderTarget::Layer ? render_state.GetStackBelow() : render_state.GetMask());
+		const Gfx::FramebufferData& destination = (render_target == RenderTarget::Layer ? render_state.GetBelowLayer() : render_state.GetMask());
 
 		glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
 		Gfx::BindTexture(source);
@@ -1939,8 +1931,8 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer()
 	}
 
 PopRenderState:
-	render_state.StackPop();
-	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetStackTop().framebuffer);
+	render_state.PopLayer();
+	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
 
 	Gfx::CheckGLError("PopLayer");
 
@@ -2044,7 +2036,7 @@ void RmlGL3::BeginFrame()
 
 void RmlGL3::EndFrame()
 {
-	const Gfx::FramebufferData& fb_active = render_state.GetStackTop();
+	const Gfx::FramebufferData& fb_active = render_state.GetTopLayer();
 	const Gfx::FramebufferData& fb_postprocess = render_state.GetPostprocessPrimary();
 
 	// Resolve MSAA to postprocess framebuffer.
