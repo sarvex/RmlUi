@@ -70,8 +70,8 @@ public:
 	void AttachFilter(Rml::CompiledFilterHandle filter) override;
 	void ReleaseCompiledFilter(Rml::CompiledFilterHandle filter) override;
 
-	void PushLayer(Rml::RenderClear clear_new_layer, Rml::RenderTarget render_target_on_pop, Rml::BlendMode blend_mode_on_pop) override;
-	Rml::TextureHandle PopLayer() override;
+	void PushLayer(Rml::RenderClear clear_new_layer) override;
+	Rml::TextureHandle PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode) override;
 
 	static const Rml::TextureHandle TextureIgnoreBinding = Rml::TextureHandle(-1);
 	static const Rml::TextureHandle TexturePostprocess = Rml::TextureHandle(-2);

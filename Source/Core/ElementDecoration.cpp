@@ -225,7 +225,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			scissor_region.IntersectValid(Rectanglei(filter_rectangle));
 			render_state.SetScissorRegion(scissor_region);
 
-			render_interface->PushLayer(RenderClear::Clone, RenderTarget::Layer, BlendMode::Replace);
+			render_interface->PushLayer(RenderClear::Clone);
 
 			const int i0 = num_backgrounds;
 			for (int i = i0; i < i0 + num_backdrop_filters; i++)
@@ -234,7 +234,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				decorator.decorator->RenderElement(element, decorator.decorator_data);
 			}
 
-			render_interface->PopLayer();
+			render_interface->PopLayer(RenderTarget::Layer, BlendMode::Replace);
 		}
 	}
 
@@ -242,7 +242,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 	{
 		if (render_stage == RenderStage::Enter)
 		{
-			render_interface->PushLayer(RenderClear::Clear, RenderTarget::Layer, BlendMode::Blend);
+			render_interface->PushLayer(RenderClear::Clear);
 		}
 		else if (render_stage == RenderStage::Exit)
 		{
@@ -250,7 +250,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 
 			if (num_mask_images > 0)
 			{
-				render_interface->PushLayer(RenderClear::Clear, RenderTarget::MaskImage, BlendMode::Replace);
+				render_interface->PushLayer(RenderClear::Clear);
 
 				const int i0_mask = num_backgrounds + num_backdrop_filters + num_filters;
 				for (int i = i0_mask; i < i0_mask + num_mask_images; i++)
@@ -259,7 +259,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 					decorator.decorator->RenderElement(element, decorator.decorator_data);
 				}
 
-				render_interface->PopLayer();
+				render_interface->PopLayer(RenderTarget::MaskImage, BlendMode::Replace);
 			}
 			
 			// Find the region being affected by the active filters and apply it as a scissor.
@@ -282,7 +282,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				decorator.decorator->RenderElement(element, decorator.decorator_data);
 			}
 
-			render_interface->PopLayer();
+			render_interface->PopLayer(RenderTarget::Layer, BlendMode::Blend);
 		}
 	}
 }

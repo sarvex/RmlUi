@@ -1112,13 +1112,13 @@ void RenderInterface_GL3::SetTransform(const Rml::Matrix4f* new_transform)
 
 class RenderState {
 public:
-	void PushLayer(Rml::RenderClear clear_new_layer, Rml::RenderTarget render_target_on_pop, Rml::BlendMode blend_mode_on_pop)
+	void PushLayer(Rml::RenderClear clear_new_layer)
 	{
 		const bool clone_current_layer = (clear_new_layer == Rml::RenderClear::Clone);
 		RMLUI_ASSERT(!clone_current_layer || !layers.empty());
 
 		const Gfx::FramebufferData* fb = (clone_current_layer ? layers.back().framebuffer : CreateFramebuffer());
-		layers.push_back(LayerData{fb, render_target_on_pop, blend_mode_on_pop, clone_current_layer});
+		layers.push_back(LayerData{fb, clone_current_layer});
 
 		glBindFramebuffer(GL_FRAMEBUFFER, fb->framebuffer);
 		if (clear_new_layer == Rml::RenderClear::Clear)
@@ -1145,17 +1145,6 @@ public:
 		return *((layers.end() - 2)->framebuffer);
 	}
 
-	Rml::RenderTarget GetRenderTarget() const
-	{
-		RMLUI_ASSERT(!layers.empty());
-		return layers.back().render_target_on_pop;
-	}
-	Rml::BlendMode GetBlendMode() const
-	{
-		RMLUI_ASSERT(!layers.empty());
-		return layers.back().blend_mode_on_pop;
-	}
-
 	const Gfx::FramebufferData& GetPostprocessPrimary() { return EnsureFramebufferPostprocess(0); }
 	const Gfx::FramebufferData& GetPostprocessSecondary() { return EnsureFramebufferPostprocess(1); }
 	const Gfx::FramebufferData& GetPostprocessTertiary() { return EnsureFramebufferPostprocess(2); }
@@ -1175,7 +1164,7 @@ public:
 			DestroyFramebuffers();
 		}
 
-		PushLayer(Rml::RenderClear::Clear, Rml::RenderTarget::Layer, Rml::BlendMode::Replace);
+		PushLayer(Rml::RenderClear::Clear);
 	}
 
 	void EndFrame()
@@ -1243,8 +1232,6 @@ private:
 
 	struct LayerData {
 		const Gfx::FramebufferData* framebuffer;
-		Rml::RenderTarget render_target_on_pop;
-		Rml::BlendMode blend_mode_on_pop;
 		bool is_clone_of_below_layer;
 	};
 
@@ -1812,32 +1799,18 @@ void RenderInterface_GL3::RenderFilters()
 	attached_filters.clear();
 }
 
-void RenderInterface_GL3::PushLayer(Rml::RenderClear clear_new_layer, Rml::RenderTarget render_target_on_pop, Rml::BlendMode blend_mode_on_pop)
+void RenderInterface_GL3::PushLayer(Rml::RenderClear clear_new_layer)
 {
-	render_state.PushLayer(clear_new_layer, render_target_on_pop, blend_mode_on_pop);
+	render_state.PushLayer(clear_new_layer);
 }
 
-Rml::TextureHandle RenderInterface_GL3::PopLayer()
+Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode)
 {
 	using Rml::BlendMode;
 	using Rml::RenderTarget;
+	RMLUI_ASSERT(!(has_mask && render_target == RenderTarget::MaskImage));
 
-	RenderTarget render_target = render_state.GetRenderTarget();
-	BlendMode blend_mode = render_state.GetBlendMode();
 	Rml::TextureHandle texture_handle_result = {};
-
-	if (has_mask && render_target == RenderTarget::MaskImage)
-	{
-		RMLUI_ERROR;
-		goto PopRenderState;
-	}
-
-	// Nothing to do if we're just rendering to ourselves without any attached filters.
-	if (render_target == RenderTarget::Layer && blend_mode == BlendMode::Replace && attached_filters.empty())
-	{
-		has_mask = false;
-		goto PopRenderState;
-	}
 
 	{
 		// Blit stack to filter rendering buffer. Do this regardless of whether we actually have any filters to be applied, because we need to resolve
@@ -1924,13 +1897,11 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer()
 		}
 
 		EnableScissorRegion(scissor_initially_enabled);
-		Gfx::CheckGLError("RenderToTexture");
 	}
 	break;
 	default: break;
 	}
 
-PopRenderState:
 	render_state.PopLayer();
 	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
 
