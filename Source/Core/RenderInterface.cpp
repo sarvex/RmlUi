@@ -107,9 +107,9 @@ void RenderInterface::AttachFilter(CompiledFilterHandle /*filter*/) {}
 
 void RenderInterface::ReleaseCompiledFilter(CompiledFilterHandle /*filter*/) {}
 
-void RenderInterface::PushLayer(RenderClear /*clear_new_layer*/, RenderTarget /*render_target_on_pop*/, BlendMode /*blend_mode_on_pop*/) {}
+void RenderInterface::PushLayer(RenderClear /*clear_new_layer*/) {}
 
-TextureHandle RenderInterface::PopLayer()
+TextureHandle RenderInterface::PopLayer(RenderTarget /*render_target*/, BlendMode /*blend_mode*/)
 {
 	return {};
 }

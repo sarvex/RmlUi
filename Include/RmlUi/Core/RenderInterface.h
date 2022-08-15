@@ -126,14 +126,14 @@ public:
 
 	/// Called by RmlUi when...
 	/// @note Affected by transform: No. Affected by scissor: Yes. Affected by clip mask: Yes.
-	virtual void PushLayer(RenderClear clear_new_layer, RenderTarget render_target_on_pop, BlendMode blend_mode_on_pop);
+	virtual void PushLayer(RenderClear clear_new_layer);
 	/// Called by RmlUi when...
 	/// @return A handle to the resulting render texture, or zero if the render target is not a render texture.
-	/// @note Should render the current layer to the target specified when this layer was pushed.
+	/// @note Should render the current layer to the target specified using the given blend mode.
 	/// @note Should apply attached filters and mask image, and then clear these attachments.
 	/// @note Render texture targets should be dimensioned and extracted from the bounds of the active scissor.
 	/// @note Affected by transform: No. Affected by scissor: Yes. Affected by clip mask: Yes.
-	virtual TextureHandle PopLayer();
+	virtual TextureHandle PopLayer(RenderTarget render_target, BlendMode blend_mode);
 
 	/// Called by RmlUi when...
 	virtual CompiledShaderHandle CompileShader(const String& name, const Dictionary& parameters);
