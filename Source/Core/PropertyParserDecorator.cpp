@@ -79,12 +79,33 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 	}
 	const DecoratorClass decorator_class = it_decorator_class->second;
 
-	DecoratorDeclarationList decorators;
+	BoxArea default_paint_area = BoxArea::Auto;
+	bool paint_area_configurable = false;
+	char list_delimiter = ',';
+
+	switch (decorator_class)
+	{
+	case DecoratorClass::Background:
+		default_paint_area = BoxArea::Padding;
+		paint_area_configurable = true;
+		break;
+	case DecoratorClass::MaskImage:
+		default_paint_area = BoxArea::Border;
+		paint_area_configurable = true;
+		break;
+	case DecoratorClass::BackdropFilter:
+		list_delimiter = ' ';
+		default_paint_area = BoxArea::Border;
+		break;
+	case DecoratorClass::Filter: list_delimiter = ' '; break;
+	case DecoratorClass::Invalid: break;
+	}
 
 	// Make sure we don't split inside the parenthesis since they may appear in decorator shorthands.
 	StringList decorator_string_list;
-	StringUtilities::ExpandString(decorator_string_list, decorator_string_value, ',', '(', ')');
+	StringUtilities::ExpandString(decorator_string_list, decorator_string_value, list_delimiter, '(', ')', true);
 
+	DecoratorDeclarationList decorators;
 	decorators.value = decorator_string_value;
 	decorators.list.reserve(decorator_string_list.size());
 
@@ -96,26 +117,7 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 		const bool invalid_parenthesis = (shorthand_open == String::npos || shorthand_close == String::npos || shorthand_open >= shorthand_close);
 
 		// Find the paint area for the decorator.
-		BoxArea paint_area = BoxArea::Auto;
-		bool paint_area_configurable = false;
-
-		switch (decorator_class)
-		{
-		case DecoratorClass::Background:
-			paint_area = BoxArea::Padding;
-			paint_area_configurable = true;
-			break;
-		case DecoratorClass::MaskImage:
-			paint_area = BoxArea::Border;
-			paint_area_configurable = true;
-			break;
-		case DecoratorClass::BackdropFilter:
-			paint_area = BoxArea::Border;
-			break;
-		case DecoratorClass::Filter:
-		case DecoratorClass::Invalid:
-			break;
-		}
+		BoxArea paint_area = default_paint_area;
 
 		// Look-up keywords for customized paint area.
 		{

@@ -102,29 +102,29 @@ TEST_CASE("animation.filter")
 			"drop-shadow(rgba(127,0,0,255) 30px 20px 1px)",
 		},
 		{
-			"opacity(0), brightness(2)",
+			"opacity(0) brightness(2)",
 			"none",
-			"opacity(0.25), brightness(1.75)",
+			"opacity(0.25) brightness(1.75)",
 		},
 		{
-			"opacity(0), brightness(0)",
+			"opacity(0) brightness(0)",
 			"opacity(0.5)",
-			"opacity(0.125), brightness(0.25)",
+			"opacity(0.125) brightness(0.25)",
 		},
 		{
 			"opacity(0.5)",
-			"opacity(0), brightness(0)",
-			"opacity(0.375), brightness(0.75)",
+			"opacity(0) brightness(0)",
+			"opacity(0.375) brightness(0.75)",
 		},
 		{
-			"opacity(0), brightness(0)",
-			"brightness(1), opacity(0.5)", // discrete interpolation due to non-matching types
-			"opacity(0), brightness(0)",
+			"opacity(0) brightness(0)",
+			"brightness(1) opacity(0.5)", // discrete interpolation due to non-matching types
+			"opacity(0) brightness(0)",
 		},
 		{
 			"none", // Test initial values of various filters.
-			"brightness(2.00), contrast(2.00), grayscale(1.00), hue-rotate(4rad), invert(1.00), opacity(0.00), sepia(1.00), saturate(2.00)",
-			"brightness(1.25), contrast(1.25), grayscale(0.25), hue-rotate(1rad), invert(0.25), opacity(0.75), sepia(0.25), saturate(1.25)",
+			"brightness(2.00) contrast(2.00) grayscale(1.00) hue-rotate(4rad) invert(1.00) opacity(0.00) sepia(1.00) saturate(2.00)",
+			"brightness(1.25) contrast(1.25) grayscale(0.25) hue-rotate(1rad) invert(0.25) opacity(0.75) sepia(0.25) saturate(1.25)",
 		},
 	};
 
