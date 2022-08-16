@@ -55,7 +55,7 @@ class PropertyDefinition;
 class RMLUICORE_API DecoratorInstancer
 {
 public:
-	DecoratorInstancer(DecoratorClass decorator_classes = DecoratorClass::Background);
+	DecoratorInstancer(DecoratorClass decorator_class = DecoratorClass::Image);
 	virtual ~DecoratorInstancer();
 
 	/// Instances a decorator given the property tag and attributes from the RCSS file.
@@ -69,7 +69,7 @@ public:
 	const PropertySpecification& GetPropertySpecification() const;
 
 	/// Returns the decorator classes supported by this decorator.
-	DecoratorClass GetDecoratorClasses() const;
+	DecoratorClass GetDecoratorClass() const;
 
 protected:
 	/// Registers a property for the decorator.
@@ -85,7 +85,7 @@ protected:
 	ShorthandId RegisterShorthand(const String& shorthand_name, const String& property_names, ShorthandType type);
 
 private:
-	DecoratorClass decorator_classes;
+	DecoratorClass decorator_class;
 	PropertySpecification properties;
 };
 

@@ -36,12 +36,6 @@
 namespace Rml {
 
 PropertyParserDecorator::PropertyParserDecorator() :
-	decorator_class_map{
-		{"background", DecoratorClass::Background},
-		{"filter", DecoratorClass::Filter},
-		{"backdrop-filter", DecoratorClass::BackdropFilter},
-		{"mask-image", DecoratorClass::MaskImage},
-	},
 	area_keywords{
 		{"border-box", BoxArea::Border},
 		{"padding-box", BoxArea::Padding},
@@ -71,34 +65,38 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 
 	RMLUI_ZoneScoped;
 
-	auto it_decorator_class = decorator_class_map.find(parameters.empty() ? String("background") : parameters.begin()->first);
-	if (it_decorator_class == decorator_class_map.end())
-	{
-		RMLUI_ERRORMSG("Invalid decorator parser parameter.");
-		return false;
-	}
-	const DecoratorClass decorator_class = it_decorator_class->second;
-
+	DecoratorClass decorator_class = DecoratorClass::Image;
 	BoxArea default_paint_area = BoxArea::Auto;
 	bool paint_area_configurable = false;
 	char list_delimiter = ',';
 
-	switch (decorator_class)
+	const String& parser_type = parameters.empty() ? String("background") : parameters.begin()->first;
+
+	if (parser_type == "background")
 	{
-	case DecoratorClass::Background:
 		default_paint_area = BoxArea::Padding;
 		paint_area_configurable = true;
-		break;
-	case DecoratorClass::MaskImage:
+	}
+	else if (parser_type == "mask-image")
+	{
 		default_paint_area = BoxArea::Border;
 		paint_area_configurable = true;
-		break;
-	case DecoratorClass::BackdropFilter:
+	}
+	else if (parser_type  == "filter")
+	{
+		decorator_class = DecoratorClass::Filter;
+		list_delimiter = ' ';
+	}
+	else if (parser_type  == "backdrop-filter")
+	{
+		decorator_class = DecoratorClass::Filter;
 		list_delimiter = ' ';
 		default_paint_area = BoxArea::Border;
-		break;
-	case DecoratorClass::Filter: list_delimiter = ' '; break;
-	case DecoratorClass::Invalid: break;
+	}
+	else
+	{
+		RMLUI_ERRORMSG("Invalid decorator parser parameter.");
+		return false;
 	}
 
 	// Make sure we don't split inside the parenthesis since they may appear in decorator shorthands.
@@ -159,7 +157,7 @@ bool PropertyParserDecorator::ParseValue(Property& property, const String& decor
 				return false;
 			}
 
-			if ((instancer->GetDecoratorClasses() & decorator_class) == DecoratorClass::Invalid)
+			if (instancer->GetDecoratorClass() != decorator_class)
 			{
 				Log::Message(Log::LT_WARNING, "Decorator type '%s' used in unsupported property.", type.c_str());
 				return false;
