@@ -35,20 +35,9 @@
 namespace Rml {
 
 enum class DecoratorClass : byte {
-	Invalid = 0,
-	Background = 1 << 0,
-	Filter = 1 << 1,
-	BackdropFilter = 1 << 2,
-	MaskImage = 1 << 3,
+	Image,  // Applies to 'background' and 'image-mask' properties.
+	Filter, // Applies to 'filter' and 'backdrop-filter' properties.
 };
-inline DecoratorClass operator|(DecoratorClass a, DecoratorClass b)
-{
-	return DecoratorClass(byte(a) | byte(b));
-}
-inline DecoratorClass operator&(DecoratorClass a, DecoratorClass b)
-{
-	return DecoratorClass(byte(a) & byte(b));
-}
 
 struct ColorStop {
 	Colourb color;

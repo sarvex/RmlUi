@@ -104,28 +104,13 @@ void ElementDecoration::ReloadDecorators()
 
 		const int list_size = (int)decorator_list.size();
 
-		DecoratorClass decorator_class = DecoratorClass::Invalid;
 		switch (id)
 		{
-		case PropertyId::Decorator:
-			decorator_class = DecoratorClass::Background;
-			num_backgrounds = list_size;
-			break;
-		case PropertyId::Filter:
-			decorator_class = DecoratorClass::Filter;
-			num_filters = list_size;
-			break;
-		case PropertyId::BackdropFilter:
-			decorator_class = DecoratorClass::BackdropFilter;
-			num_backdrop_filters = list_size;
-			break;
-		case PropertyId::MaskImage:
-			decorator_class = DecoratorClass::MaskImage;
-			num_mask_images = list_size;
-			break;
-		default:
-			RMLUI_ERROR;
-			break;
+		case PropertyId::Decorator: num_backgrounds = list_size; break;
+		case PropertyId::Filter: num_filters = list_size; break;
+		case PropertyId::BackdropFilter: num_backdrop_filters = list_size; break;
+		case PropertyId::MaskImage: num_mask_images = list_size; break;
+		default: RMLUI_ERROR; break;
 		}
 
 		for (size_t i = 0; i < decorator_list.size() && i < decorators_ptr->list.size(); i++)
@@ -134,7 +119,7 @@ void ElementDecoration::ReloadDecorators()
 			const DecoratorDeclaration& declaration = decorators_ptr->list[i];
 
 #ifdef RMLUI_DEBUG
-			const bool is_filter = (decorator_class == DecoratorClass::Filter);
+			const bool is_filter = (id == PropertyId::Filter);
 			RMLUI_ASSERT((is_filter && declaration.paint_area == BoxArea::Auto) || (!is_filter && declaration.paint_area != BoxArea::Auto));
 #endif
 
@@ -142,7 +127,6 @@ void ElementDecoration::ReloadDecorators()
 			{
 				DecoratorHandle decorator_handle;
 				decorator_handle.decorator_data = 0;
-				decorator_handle.decorator_class = decorator_class;
 				decorator_handle.decorator = decorator;
 				decorator_handle.paint_area = declaration.paint_area;
 

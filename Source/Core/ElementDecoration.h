@@ -75,7 +75,6 @@ private:
 	{
 		SharedPtr<const Decorator> decorator;
 		DecoratorDataHandle decorator_data;
-		DecoratorClass decorator_class;
 		BoxArea paint_area;
 	};
 

@@ -90,7 +90,7 @@ void DecoratorShader::RenderElement(Element* element, DecoratorDataHandle handle
 	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
 }
 
-DecoratorShaderInstancer::DecoratorShaderInstancer() : DecoratorInstancer(DecoratorClass::Background), ids{}
+DecoratorShaderInstancer::DecoratorShaderInstancer() : DecoratorInstancer(DecoratorClass::Image), ids{}
 {
 	ids.value = RegisterProperty("value", String()).AddParser("string").GetId();
 	RegisterShorthand("decorator", "value", ShorthandType::FallThrough);

@@ -81,7 +81,7 @@ void DecoratorBlur::ModifyScissorRegion(Element* element, Rectanglef& scissor_re
 	scissor_region.Extend(blur_extent);
 }
 
-DecoratorBlurInstancer::DecoratorBlurInstancer() : DecoratorInstancer(DecoratorClass::Filter | DecoratorClass::BackdropFilter)
+DecoratorBlurInstancer::DecoratorBlurInstancer() : DecoratorInstancer(DecoratorClass::Filter)
 {
 	ids.radius = RegisterProperty("radius", "0px").AddParser("length").GetId();
 	RegisterShorthand("decorator", "radius", ShorthandType::FallThrough);

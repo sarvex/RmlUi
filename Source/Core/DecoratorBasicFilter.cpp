@@ -75,7 +75,7 @@ void DecoratorBasicFilter::RenderElement(Element* /*element*/, DecoratorDataHand
 }
 
 DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer(ValueType value_type, const char* default_value) :
-	DecoratorInstancer(DecoratorClass::Filter | DecoratorClass::BackdropFilter), ids{}
+	DecoratorInstancer(DecoratorClass::Filter), ids{}
 {
 	switch (value_type)
 	{

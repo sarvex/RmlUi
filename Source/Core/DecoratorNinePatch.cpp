@@ -180,7 +180,7 @@ void DecoratorNinePatch::RenderElement(Element* element, DecoratorDataHandle ele
 	data->Render(element->GetAbsoluteOffset(BoxArea::Padding));
 }
 
-DecoratorNinePatchInstancer::DecoratorNinePatchInstancer() : DecoratorInstancer(DecoratorClass::Background | DecoratorClass::MaskImage)
+DecoratorNinePatchInstancer::DecoratorNinePatchInstancer() : DecoratorInstancer(DecoratorClass::Image)
 {
 	sprite_outer_id = RegisterProperty("outer", "").AddParser("string").GetId();
 	sprite_inner_id = RegisterProperty("inner", "").AddParser("string").GetId();

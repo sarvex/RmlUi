@@ -38,6 +38,7 @@
 #include "../../Include/RmlUi/Core/TransformPrimitive.h"
 #include "../../Include/RmlUi/Core/Variant.h"
 #include "TransformUtilities.h"
+#include <algorithm>
 
 namespace Rml {
 
@@ -165,6 +166,16 @@ bool TypeConverter<DecoratorsPtr, String>::Convert(const DecoratorsPtr& src, Str
 	else
 	{
 		dest.clear();
+		const bool any_filters = std::any_of(src->list.begin(), src->list.end(), [](const DecoratorDeclaration& declaration) {
+			if (const DecoratorInstancer* instancer = declaration.instancer)
+			{
+				if (instancer->GetDecoratorClass() == DecoratorClass::Filter)
+					return true;
+			}
+			return false;
+		});
+
+		const String delimiter = (any_filters ? " " : ", ");
 		for (const DecoratorDeclaration& declaration : src->list)
 		{
 			dest += declaration.type;
@@ -172,10 +183,10 @@ bool TypeConverter<DecoratorsPtr, String>::Convert(const DecoratorsPtr& src, Str
 			{
 				dest += '(' + instancer->GetPropertySpecification().PropertiesToString(declaration.properties, false, ' ') + ')';
 			}
-			dest += ", ";
+			dest += delimiter;
 		}
-		if (dest.size() > 2)
-			dest.resize(dest.size() - 2);
+		if (dest.size() > delimiter.size())
+			dest.resize(dest.size() - delimiter.size());
 	}
 	return true;
 }
@@ -186,7 +197,6 @@ bool TypeConverter<FontEffectsPtr, FontEffectsPtr>::Convert(const FontEffectsPtr
 	dest = src;
 	return true;
 }
-
 
 bool TypeConverter<FontEffectsPtr, String>::Convert(const FontEffectsPtr& src, String& dest)
 {
