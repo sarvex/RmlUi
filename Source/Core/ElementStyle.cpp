@@ -382,7 +382,10 @@ static float ComputeLength(NumericValue value, Element* element)
 		font_size = element->GetComputedValues().font_size();
 		break;
 	case Unit::REM:
-		doc_font_size = DefaultComputedValues.font_size();
+		if (ElementDocument* document = element->GetOwnerDocument())
+			doc_font_size = document->GetComputedValues().font_size();
+		else
+			doc_font_size = DefaultComputedValues.font_size();
 		break;
 	case Unit::DP:
 		if (Context* context = element->GetContext())
