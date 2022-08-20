@@ -1,0 +1,74 @@
+<rml>
+<head>
+    <title>linear-gradient</title>
+    <link type="text/rcss" href="../style.rcss"/>
+	<meta name="Description" content="A variety of linear-gradient backgrounds. Each group should match their description." />
+	<meta name="Backend" content="Requires support for shader effects in the backend." />
+	<link rel="source" href="https://www.w3.org/TR/css-images-3/#linear-gradients" />
+	<style>
+		body {
+			background: #ddd;
+			color: #444;
+		}
+		div {
+			margin: 5dp;
+			width: 200dp;
+			height: 100dp;
+			box-sizing: border-box;
+			border: 1dp #bbb;
+			float: left;
+		}
+		group {
+			margin-left: 1em;
+			display: block;
+			margin-bottom: 1em;
+		}
+		
+		.yellow-blue > :nth-child(1) { decorator: linear-gradient(yellow, blue); }
+		.yellow-blue > :nth-child(2) { decorator: linear-gradient(yellow, blue); }
+		.yellow-blue > :nth-child(3) { decorator: linear-gradient(180deg, yellow, blue); }
+		/*
+		.yellow-blue > :nth-child(4) { decorator: linear-gradient(to bottom, yellow, blue); }
+		.yellow-blue > :nth-child(5) { decorator: linear-gradient(to top, blue, yellow); }
+		.yellow-blue > :nth-child(6) { decorator: linear-gradient(to bottom, yellow 0%, blue 100%); }
+		*/
+		
+		.yellow-blue-angle > :nth-child(1) { decorator: linear-gradient(135deg, yellow, blue); }
+		.yellow-blue-angle > :nth-child(2) { decorator: linear-gradient(-45deg, blue, yellow); }
+		
+		.three-color > :nth-child(1) { decorator: linear-gradient(yellow, blue 20%, #0f0); }
+		
+		/*
+		.corner-to-corner > :nth-child(1) { decorator: linear-gradient(to top right, red, white, blue); }
+		*/
+	</style>
+</head>
+
+<body>
+Yellow (top) to blue (bottom)
+<group class="yellow-blue">
+	<div/>
+	<div/>
+	<div/>
+	<div/>
+	<div/>
+	<div/>
+</group>
+
+Yellow (top-left) to blue (bottom-right)
+<group class="yellow-blue-angle">
+	<div/>
+	<div/>
+</group>
+
+Yellow (top), blue, green (bottom)
+<group class="three-color">
+	<div/>
+</group>
+
+Corner-to-corner, red (bottom-left), white, blue (top-right)
+<group class="corner-to-corner">
+	<div/>
+</group>
+</body>
+</rml>

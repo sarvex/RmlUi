@@ -171,6 +171,7 @@ struct DefaultInstancers {
 	DecoratorBlurInstancer decorator_blur;
 	DecoratorDropShadowInstancer decorator_drop_shadow;
 	DecoratorLinearGradientInstancer decorator_linear_gradient;
+	DecoratorRadialGradientInstancer decorator_radial_gradient;
 	DecoratorBasicFilterInstancer decorator_hue_rotate = {DecoratorBasicFilterInstancer::ValueType::Angle, "0rad"};
 	DecoratorBasicFilterInstancer decorator_basic_filter_d0 = {DecoratorBasicFilterInstancer::ValueType::NumberPercent, "0"};
 	DecoratorBasicFilterInstancer decorator_basic_filter_d1 = {DecoratorBasicFilterInstancer::ValueType::NumberPercent, "1"};
@@ -271,6 +272,7 @@ bool Factory::Initialise()
 	RegisterDecoratorInstancer("blur", &default_instancers->decorator_blur);
 	RegisterDecoratorInstancer("drop-shadow", &default_instancers->decorator_drop_shadow);
 	RegisterDecoratorInstancer("linear-gradient", &default_instancers->decorator_linear_gradient);
+	RegisterDecoratorInstancer("radial-gradient", &default_instancers->decorator_radial_gradient);
 	RegisterDecoratorInstancer("hue-rotate", &default_instancers->decorator_hue_rotate);
 	RegisterDecoratorInstancer("shader", &default_instancers->decorator_shader);
 	
