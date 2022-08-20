@@ -119,9 +119,16 @@ void main() {
 	finalColor = fragColor;
 }
 )";
+enum class ShaderGradientFunction { Linear, Radial, RepeatingLinear, RepeatingRadial }; // Must match shader defines below.
 static const char* shader_frag_main_linear_gradient = RMLUI_SHADER_HEADER R"(
-uniform vec2 _p0;
-uniform vec2 _p1;
+#define LINEAR 0
+#define RADIAL 1
+#define REPEATING_LINEAR 2
+#define REPEATING_RADIAL 3
+
+uniform int _func; // One of above defines
+uniform vec2 _p0;  // linear: starting point,       radial: center
+uniform vec2 _v;   // linear: gradient line vector, radial: inverted 2d radius of ellipse's ending shape 
 uniform vec4 _stop_colors[MAX_NUM_STOPS];
 uniform float _stop_positions[MAX_NUM_STOPS]; // normalized, 0 -> p0, 1 -> p1.
 uniform int _num_stops;
@@ -142,11 +149,19 @@ vec4 mix_stop_colors(float t) {
 }
 
 void main() {
-	vec2 v = _p1 - _p0;
-	float d_square = dot(v, v);
+	float t = 0;
 
-	vec2 V = fragTexCoord - _p0;
-	float t = dot(v, V) / d_square;
+	if (_func == LINEAR)
+	{
+		float dist_square = dot(_v, _v);
+		vec2 V = fragTexCoord - _p0;
+		t = dot(_v, V) / dist_square;
+	}
+	else if (_func == RADIAL)
+	{
+		vec2 V = fragTexCoord - _p0;
+		t = length( V * _v );
+	}
 
 	finalColor = fragColor * mix_stop_colors(t);
 }
@@ -286,8 +301,9 @@ enum class ProgramUniform {
 	TexCoordMax,
 	Weights,
 	TexMask,
+	Func,
 	P0,
-	P1,
+	V,
 	StopColors,
 	StopPositions,
 	NumStops,
@@ -295,8 +311,8 @@ enum class ProgramUniform {
 	Count
 };
 static const char* const program_uniform_names[(size_t)ProgramUniform::Count] = {"_translate", "_transform", "_tex", "_value", "_color",
-	"_color_matrix", "_texelOffset", "_texCoordMin", "_texCoordMax", "_weights[0]", "_texMask", "_p0", "_p1", "_stop_colors[0]", "_stop_positions[0]",
-	"_num_stops", "_dimensions"};
+	"_color_matrix", "_texelOffset", "_texCoordMin", "_texCoordMax", "_weights[0]", "_texMask", "_func", "_p0", "_v", "_stop_colors[0]",
+	"_stop_positions[0]", "_num_stops", "_dimensions"};
 
 enum class VertexAttribute { Position, Color0, TexCoord0, Count };
 static const char* const vertex_attribute_names[(size_t)VertexAttribute::Count] = {"inPosition", "inColor0", "inTexCoord0"};
@@ -1234,7 +1250,7 @@ static inline Rml::Colourf ToPremultipliedAlpha(Rml::Colourb c0)
 	return result;
 }
 
-enum class CompiledShaderType { Invalid = 0, LinearGradient, Creation };
+enum class CompiledShaderType { Invalid = 0, LinearGradient, RadialGradient, Creation };
 struct CompiledShader {
 	CompiledShaderType type;
 
@@ -1242,8 +1258,8 @@ struct CompiledShader {
 	Gfx::ProgramData* program;
 
 	// Linear gradient
-	float angle;
-	Rml::Vector2f p0, p1;
+	Rml::Vector2f p0;
+	Rml::Vector2f p1_or_radius; // linear-gradient: p1, radial-gradient: radius
 	Rml::ColorStopList color_stop_list;
 
 	// Shader
@@ -1257,9 +1273,15 @@ Rml::CompiledShaderHandle RenderInterface_GL3::CompileShader(const Rml::String& 
 	if (name == "linear-gradient")
 	{
 		shader.type = CompiledShaderType::LinearGradient;
-		shader.angle = Rml::Get(parameters, "angle", 0.f);
 		shader.p0 = Rml::Get(parameters, "p0", Rml::Vector2f(0.f));
-		shader.p1 = Rml::Get(parameters, "p1", Rml::Vector2f(0.f));
+		shader.p1_or_radius = Rml::Get(parameters, "p1", Rml::Vector2f(0.f));
+		shader.color_stop_list = Rml::Get<Rml::ColorStopList>(parameters, "color_stop_list", {});
+	}
+	else if (name == "radial-gradient")
+	{
+		shader.type = CompiledShaderType::RadialGradient;
+		shader.p0 = Rml::Get(parameters, "center", Rml::Vector2f(0.f));
+		shader.p1_or_radius = Rml::Get(parameters, "radius", Rml::Vector2f(0.f));
 		shader.color_stop_list = Rml::Get<Rml::ColorStopList>(parameters, "color_stop_list", {});
 	}
 	else if (name == "shader")
@@ -1469,7 +1491,7 @@ void RenderInterface_GL3::RenderShader(Rml::CompiledShaderHandle shader_handle, 
 		float stop_positions[MAX_NUM_STOPS];
 		Rml::Colourf stop_colors[MAX_NUM_STOPS];
 
-		// @performance: Generate this data on CompileShader().
+		// @performance: Generate this data on CompileShader() (same for radial gradient).
 		for (int i = 0; i < num_stops; i++)
 		{
 			const Rml::ColorStop& stop = shader.color_stop_list[i];
@@ -1478,11 +1500,45 @@ void RenderInterface_GL3::RenderShader(Rml::CompiledShaderHandle shader_handle, 
 			stop_colors[i] = ToPremultipliedAlpha(stop.color);
 		}
 
+		const ShaderGradientFunction func = ShaderGradientFunction::Linear;
+		const Rml::Vector2f v = shader.p1_or_radius - shader.p0;
 		const auto& locations = Gfx::programs.main_linear_gradient.uniform_locations;
 
 		Gfx::UseProgram(ProgramId::LinearGradient);
+		glUniform1i(locations[(int)Gfx::ProgramUniform::Func], static_cast<int>(func));
 		glUniform2fv(locations[(int)Gfx::ProgramUniform::P0], 1, &shader.p0.x);
-		glUniform2fv(locations[(int)Gfx::ProgramUniform::P1], 1, &shader.p1.x);
+		glUniform2fv(locations[(int)Gfx::ProgramUniform::V], 1, &v.x);
+		glUniform1i(locations[(int)Gfx::ProgramUniform::NumStops], num_stops);
+		glUniform1fv(locations[(int)Gfx::ProgramUniform::StopPositions], num_stops, stop_positions);
+		glUniform4fv(locations[(int)Gfx::ProgramUniform::StopColors], num_stops, stop_colors[0]);
+
+		SubmitTransformUniform(translation);
+		glBindVertexArray(geometry.vao);
+		glDrawElements(GL_TRIANGLES, geometry.draw_count, GL_UNSIGNED_INT, (const GLvoid*)0);
+	}
+	break;
+	case CompiledShaderType::RadialGradient:
+	{
+		const int num_stops = Rml::Math::Min((int)shader.color_stop_list.size(), MAX_NUM_STOPS);
+		float stop_positions[MAX_NUM_STOPS];
+		Rml::Colourf stop_colors[MAX_NUM_STOPS];
+
+		for (int i = 0; i < num_stops; i++)
+		{
+			const Rml::ColorStop& stop = shader.color_stop_list[i];
+			RMLUI_ASSERT(stop.position.unit == Rml::Unit::NUMBER);
+			stop_positions[i] = stop.position.number;
+			stop_colors[i] = ToPremultipliedAlpha(stop.color);
+		}
+
+		const ShaderGradientFunction func = ShaderGradientFunction::Radial;
+		const auto& locations = Gfx::programs.main_linear_gradient.uniform_locations;
+		Rml::Vector2f inv_radius = Rml::Vector2f(1.f) / Rml::Math::Max(shader.p1_or_radius, Rml::Vector2f(1.f));
+
+		Gfx::UseProgram(ProgramId::LinearGradient);
+		glUniform1i(locations[(int)Gfx::ProgramUniform::Func], static_cast<int>(func));
+		glUniform2fv(locations[(int)Gfx::ProgramUniform::P0], 1, &shader.p0.x);
+		glUniform2fv(locations[(int)Gfx::ProgramUniform::V], 1, &inv_radius.x);
 		glUniform1i(locations[(int)Gfx::ProgramUniform::NumStops], num_stops);
 		glUniform1fv(locations[(int)Gfx::ProgramUniform::StopPositions], num_stops, stop_positions);
 		glUniform4fv(locations[(int)Gfx::ProgramUniform::StopColors], num_stops, stop_colors[0]);

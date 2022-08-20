@@ -102,5 +102,58 @@ private:
 	GradientPropertyIds ids;
 };
 
+namespace RadialGradient {
+	enum class Shape { Circle, Ellipse, Unspecified };
+	enum class SizeType { ClosestSide, FarthestSide, ClosestCorner, FarthestCorner, LengthPercentage };
+	enum class PositionX { Left, Center, Right };
+	enum class PositionY { Top, Center, Bottom };
+
+	struct Size {
+		SizeType type;
+		NumericValue x, y;
+	};
+	struct Position {
+		NumericValue x, y;
+	};
+} // namespace RadialGradient
+
+class DecoratorRadialGradient : public Decorator {
+public:
+	DecoratorRadialGradient();
+	virtual ~DecoratorRadialGradient();
+
+	bool Initialise(RadialGradient::Shape shape, RadialGradient::Size size, RadialGradient::Position position, const ColorStopList& color_stops);
+
+	DecoratorDataHandle GenerateElementData(Element* element, BoxArea paint_area) const override;
+	void ReleaseElementData(DecoratorDataHandle element_data) const override;
+
+	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
+
+private:
+	RadialGradient::Shape shape;
+	RadialGradient::Size size;
+	RadialGradient::Position position;
+
+	ColorStopList color_stops;
+};
+
+class DecoratorRadialGradientInstancer : public DecoratorInstancer {
+public:
+	DecoratorRadialGradientInstancer();
+	~DecoratorRadialGradientInstancer();
+
+	SharedPtr<Decorator> InstanceDecorator(const String& name, const PropertyDictionary& properties,
+		const DecoratorInstancerInterface& instancer_interface) override;
+
+private:
+	struct GradientPropertyIds {
+		PropertyId ending_shape;
+		PropertyId size_x, size_y;
+		PropertyId position_x, position_y;
+		PropertyId color_stop_list;
+	};
+	GradientPropertyIds ids;
+};
+
 } // namespace Rml
 #endif
