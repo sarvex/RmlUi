@@ -33,10 +33,10 @@
 
 namespace Rml {
 
-PropertyParserColorStopList::PropertyParserColorStopList(PropertyParser* parser_color, PropertyParser* parser_number_length_percent) :
-	parser_color(parser_color), parser_number_length_percent(parser_number_length_percent)
+PropertyParserColorStopList::PropertyParserColorStopList(PropertyParser* parser_color, PropertyParser* parser_length_percent) :
+	parser_color(parser_color), parser_length_percent(parser_length_percent)
 {
-	RMLUI_ASSERT(parser_color && parser_number_length_percent);
+	RMLUI_ASSERT(parser_color && parser_length_percent);
 }
 
 PropertyParserColorStopList::~PropertyParserColorStopList() {}
@@ -77,11 +77,11 @@ bool PropertyParserColorStopList::ParseValue(Property& property, const String& v
 		Property p_position(LengthPercentageAuto::Auto);
 		if (color_stop_str_pair.size() == 2 && color_stop_str_pair[1] != "auto")
 		{
-			if (!parser_number_length_percent->ParseValue(p_position, color_stop_str_pair[1], empty_parameter_map))
+			if (!parser_length_percent->ParseValue(p_position, color_stop_str_pair[1], empty_parameter_map))
 				return false;
 		}
 
-		if (Any(p_position.unit & Unit::NUMBER_LENGTH_PERCENT))
+		if (Any(p_position.unit & Unit::LENGTH_PERCENT))
 			color_stop.position = NumericValue(p_position.Get<float>(), p_position.unit);
 		else if (p_position.unit != Unit::KEYWORD)
 			return false;

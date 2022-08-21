@@ -537,7 +537,7 @@ DecoratorRadialGradientInstancer::DecoratorRadialGradientInstancer() : Decorator
 
 	ids.color_stop_list = RegisterProperty("color-stops", "").AddParser("color_stop_list").GetId();
 
-	RegisterShorthand("shape", "ending-shape, size-x, size-y, at, position-x, position-y", ShorthandType::FallThrough);
+	RegisterShorthand("shape", "ending-shape, size-x, size-y, at, position-x, position-y, position-x", ShorthandType::FallThrough);
 
 	RegisterShorthand("decorator", "shape?, color-stops#", ShorthandType::RecursiveCommaSeparated);
 }
@@ -562,9 +562,11 @@ SharedPtr<Decorator> DecoratorRadialGradientInstancer::InstanceDecorator(const S
 	Shape shape = (Shape)p_ending_shape->Get<int>();
 	if (shape == Shape::Unspecified)
 	{
-		const bool circle_sized = (Any(p_size_x->unit & Unit::LENGTH) && p_size_y->unit == Unit::KEYWORD);
+		const bool circle_sized = (Any(p_size_x->unit & Unit::LENGTH_PERCENT) && p_size_y->unit == Unit::KEYWORD);
 		shape = (circle_sized ? Shape::Circle : Shape::Ellipse);
 	}
+	if (shape == Shape::Circle && (p_size_x->unit == Unit::PERCENT || p_size_y->unit != Unit::KEYWORD))
+		return nullptr;
 
 	Size size = {};
 	if (p_size_x->unit == Unit::KEYWORD)

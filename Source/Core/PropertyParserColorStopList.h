@@ -41,7 +41,7 @@ namespace Rml {
 class PropertyParserColorStopList : public PropertyParser
 {
 public:
-	PropertyParserColorStopList(PropertyParser* parser_color, PropertyParser* parser_number_length_percent);
+	PropertyParserColorStopList(PropertyParser* parser_color, PropertyParser* parser_length_percent);
 	virtual ~PropertyParserColorStopList();
 
 	/// Called to parse a RCSS colour declaration.
@@ -53,7 +53,7 @@ public:
 
 private:
 	PropertyParser* parser_color;
-	PropertyParser* parser_number_length_percent;
+	PropertyParser* parser_length_percent;
 };
 
 } // namespace Rml
