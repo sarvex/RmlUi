@@ -33,7 +33,7 @@
 #include <bitset>
 
 struct CompiledFilter;
-enum class ProgramId { None, Texture, Color, LinearGradient, Creation, Passthrough, ColorMatrix, Blur, Dropshadow, BlendMask, Count };
+enum class ProgramId { None, Texture, Color, Gradient, Creation, Passthrough, ColorMatrix, Blur, Dropshadow, BlendMask, Count };
 
 class RenderInterface_GL3 : public Rml::RenderInterface {
 public:

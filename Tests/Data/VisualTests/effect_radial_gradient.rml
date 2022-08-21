@@ -56,10 +56,18 @@
 		.problematic > :nth-child(4) { decorator: radial-gradient(circle closest-side at 0px, red, yellow, green); }
 		.problematic > :nth-child(5) { decorator: radial-gradient(5px 0.1px, red, yellow, green); }
 		.problematic > :nth-child(6) { decorator: radial-gradient(0px 0px, red, yellow, green); }
+		
+		.repeating > :nth-child(1) { decorator: repeating-radial-gradient(circle 30px, red, yellow, green 90%, red); }
+		.repeating > :nth-child(2) { decorator: repeating-radial-gradient(farthest-side at left bottom, red, yellow 50px, green 90%, red); }
+		.repeating > :nth-child(3) { decorator: repeating-radial-gradient(closest-side at 20px 30px, red, yellow, green 90%, red); }
+		.repeating > :nth-child(4) { decorator: repeating-radial-gradient(circle closest-side at -15% 50%, red, yellow, green 90%, red); }
+		
+		.repeating > :nth-child(5) { decorator: repeating-radial-gradient(red, yellow 20px, green 40px); }
+		.repeating > :nth-child(6) { decorator: repeating-radial-gradient(circle 20px, red, yellow, green 100%, yellow 150%, red 200%); }
+		.repeating > :nth-child(7) { decorator: repeating-radial-gradient(circle 30px, red -30px, yellow); }
+		.repeating > :nth-child(8) { decorator: repeating-radial-gradient(circle 30px, red 15px, yellow); }
 	</style>
 </head>
-
-
 
 <body>
 Ellipse, yellow (center) to green (corners) [equivalent]
@@ -81,6 +89,18 @@ Ellipse, red (center), yellow, green (corners)
 
 Red (bottom-left), yellow, green (top-right)
 <group class="origin-bottom-left">
+	<div/>
+</group>
+
+Repeating radial gradients
+<group class="repeating">
+	<div/>
+	<div/>
+	<div/>
+	<div/>
+	<div/>
+	<div/>
+	<div/>
 	<div/>
 </group>
 
