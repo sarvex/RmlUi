@@ -71,10 +71,12 @@ private:
 
 class DecoratorLinearGradient : public Decorator {
 public:
+	enum class Corner { TopRight, BottomRight, BottomLeft, TopLeft, None, Count = None };
+
 	DecoratorLinearGradient();
 	virtual ~DecoratorLinearGradient();
 
-	bool Initialise(bool repeating, float angle, const ColorStopList& color_stops);
+	bool Initialise(bool repeating, Corner corner, float angle, const ColorStopList& color_stops);
 
 	DecoratorDataHandle GenerateElementData(Element* element, BoxArea paint_area) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
@@ -82,7 +84,15 @@ public:
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
 
 private:
+	struct LinearGradientShape {
+		Vector2f p0, p1;
+		float length;
+	};
+	// Find the starting and ending points for the gradient line with the given angle or corner, and dimensions.
+	LinearGradientShape CalculateLinearGradientShape(Vector2f box_dimensions) const;
+
 	bool repeating = false;
+	Corner corner;
 	float angle;
 	ColorStopList color_stops;
 };
@@ -96,8 +106,20 @@ public:
 		const DecoratorInstancerInterface& instancer_interface) override;
 
 private:
+	enum class Direction {
+		None = 0,
+		Top = 1,
+		Right = 2,
+		Bottom = 4,
+		Left = 8,
+		TopLeft = Top | Left,
+		TopRight = Top | Right,
+		BottomRight = Bottom | Right,
+		BottomLeft = Bottom | Left,
+	};
 	struct GradientPropertyIds {
 		PropertyId angle;
+		PropertyId direction_to, direction_x, direction_y;
 		PropertyId color_stop_list;
 	};
 	GradientPropertyIds ids;
