@@ -250,8 +250,9 @@ DecoratorLinearGradient::DecoratorLinearGradient() {}
 
 DecoratorLinearGradient::~DecoratorLinearGradient() {}
 
-bool DecoratorLinearGradient::Initialise(float in_angle, const ColorStopList& in_color_stops)
+bool DecoratorLinearGradient::Initialise(bool in_repeating, float in_angle, const ColorStopList& in_color_stops)
 {
+	repeating = in_repeating;
 	angle = in_angle;
 	color_stops = in_color_stops;
 	return !color_stops.empty();
@@ -301,7 +302,7 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 	const Vector2f dimensions = box.GetSize(box_area);
 	LinearGradientShape gradient_shape = CalculateLinearGradientShape(angle, dimensions);
 
-	// One-pixel minimum color stop spacing for anti-aliasing.
+	// One-pixel minimum color stop spacing to avoid aliasing.
 	const float soft_spacing = 1.f / gradient_shape.length;
 
 	ColorStopList resolved_stops = ResolveColorStops(element, gradient_shape.length, soft_spacing, color_stops);
@@ -312,6 +313,7 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 			{"p0", Variant(gradient_shape.p0)},
 			{"p1", Variant(gradient_shape.p1)},
 			{"length", Variant(gradient_shape.length)},
+			{"repeating", Variant(repeating)},
 			{"color_stop_list", Variant(std::move(resolved_stops))},
 		});
 
@@ -357,7 +359,7 @@ DecoratorLinearGradientInstancer::DecoratorLinearGradientInstancer() : Decorator
 
 DecoratorLinearGradientInstancer::~DecoratorLinearGradientInstancer() {}
 
-SharedPtr<Decorator> DecoratorLinearGradientInstancer::InstanceDecorator(const String& /*name*/, const PropertyDictionary& properties_,
+SharedPtr<Decorator> DecoratorLinearGradientInstancer::InstanceDecorator(const String& name, const PropertyDictionary& properties_,
 	const DecoratorInstancerInterface& /*interface_*/)
 {
 	const Property* p_angle = properties_.GetProperty(ids.angle);
@@ -368,11 +370,12 @@ SharedPtr<Decorator> DecoratorLinearGradientInstancer::InstanceDecorator(const S
 		return nullptr;
 
 	const float angle = ComputeAngle(p_angle->GetNumericValue());
+	const bool repeating = (name == "repeating-linear-gradient");
 
 	const ColorStopList& color_stop_list = p_color_stop_list->value.GetReference<ColorStopList>();
 
 	auto decorator = MakeShared<DecoratorLinearGradient>();
-	if (decorator->Initialise(angle, color_stop_list))
+	if (decorator->Initialise(repeating, angle, color_stop_list))
 		return decorator;
 
 	return nullptr;
@@ -385,9 +388,10 @@ DecoratorRadialGradient::DecoratorRadialGradient() {}
 
 DecoratorRadialGradient::~DecoratorRadialGradient() {}
 
-bool DecoratorRadialGradient::Initialise(RadialGradient::Shape in_shape, RadialGradient::Size in_size, RadialGradient::Position in_position,
-	const ColorStopList& in_color_stops)
+bool DecoratorRadialGradient::Initialise(bool in_repeating, RadialGradient::Shape in_shape, RadialGradient::Size in_size,
+	RadialGradient::Position in_position, const ColorStopList& in_color_stops)
 {
+	repeating = in_repeating;
 	shape = in_shape;
 	size = in_size;
 	position = in_position;
@@ -448,14 +452,14 @@ static RadialGradientShape CalculateRadialGradientShape(Element* element, Radial
 	break;
 	case RadialGradient::SizeType::LengthPercentage:
 	{
-		result.radius = Abs({
-			element->ResolveNumericValue(size.x, d.x),
-			(is_circle ? result.radius.x : element->ResolveNumericValue(size.y, d.y)),
-		});
+		result.radius.x = element->ResolveNumericValue(size.x, d.x);
+		result.radius.y = (is_circle ? result.radius.x : element->ResolveNumericValue(size.y, d.y));
+		result.radius = Abs(result.radius);
 	}
 	break;
 	}
 
+	result.radius = Math::Max(result.radius, Vector2f(1.f));
 	return result;
 }
 
@@ -472,7 +476,7 @@ DecoratorDataHandle DecoratorRadialGradient::GenerateElementData(Element* elemen
 
 	RadialGradientShape gradient_shape = CalculateRadialGradientShape(element, shape, size, position, dimensions);
 
-	// One-pixel minimum color stop spacing to avoid anti-aliasing.
+	// One-pixel minimum color stop spacing to avoid aliasing.
 	const float soft_spacing = 1.f / Math::Min(gradient_shape.radius.x, gradient_shape.radius.y);
 
 	ColorStopList resolved_stops = ResolveColorStops(element, gradient_shape.radius.x, soft_spacing, color_stops);
@@ -481,6 +485,7 @@ DecoratorDataHandle DecoratorRadialGradient::GenerateElementData(Element* elemen
 		Dictionary{
 			{"center", Variant(gradient_shape.center)},
 			{"radius", Variant(gradient_shape.radius)},
+			{"repeating", Variant(repeating)},
 			{"color_stop_list", Variant(std::move(resolved_stops))},
 		});
 
@@ -539,7 +544,7 @@ DecoratorRadialGradientInstancer::DecoratorRadialGradientInstancer() : Decorator
 
 DecoratorRadialGradientInstancer::~DecoratorRadialGradientInstancer() {}
 
-SharedPtr<Decorator> DecoratorRadialGradientInstancer::InstanceDecorator(const String& /*name*/, const PropertyDictionary& properties_,
+SharedPtr<Decorator> DecoratorRadialGradientInstancer::InstanceDecorator(const String& name, const PropertyDictionary& properties_,
 	const DecoratorInstancerInterface& /*interface_*/)
 {
 	const Property* p_ending_shape = properties_.GetProperty(ids.ending_shape);
@@ -597,10 +602,11 @@ SharedPtr<Decorator> DecoratorRadialGradientInstancer::InstanceDecorator(const S
 	if (p_color_stop_list->unit != Unit::COLORSTOPLIST)
 		return nullptr;
 
+	const bool repeating = (name == "repeating-radial-gradient");
 	const ColorStopList& color_stop_list = p_color_stop_list->value.GetReference<ColorStopList>();
 
 	auto decorator = MakeShared<DecoratorRadialGradient>();
-	if (decorator->Initialise(shape, size, position, color_stop_list))
+	if (decorator->Initialise(repeating, shape, size, position, color_stop_list))
 		return decorator;
 
 	return nullptr;

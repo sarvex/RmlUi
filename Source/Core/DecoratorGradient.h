@@ -74,7 +74,7 @@ public:
 	DecoratorLinearGradient();
 	virtual ~DecoratorLinearGradient();
 
-	bool Initialise(float angle, const ColorStopList& color_stops);
+	bool Initialise(bool repeating, float angle, const ColorStopList& color_stops);
 
 	DecoratorDataHandle GenerateElementData(Element* element, BoxArea paint_area) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
@@ -82,6 +82,7 @@ public:
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
 
 private:
+	bool repeating = false;
 	float angle;
 	ColorStopList color_stops;
 };
@@ -122,7 +123,8 @@ public:
 	DecoratorRadialGradient();
 	virtual ~DecoratorRadialGradient();
 
-	bool Initialise(RadialGradient::Shape shape, RadialGradient::Size size, RadialGradient::Position position, const ColorStopList& color_stops);
+	bool Initialise(bool repeating, RadialGradient::Shape shape, RadialGradient::Size size, RadialGradient::Position position,
+		const ColorStopList& color_stops);
 
 	DecoratorDataHandle GenerateElementData(Element* element, BoxArea paint_area) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
@@ -130,6 +132,7 @@ public:
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
 
 private:
+	bool repeating = false;
 	RadialGradient::Shape shape;
 	RadialGradient::Size size;
 	RadialGradient::Position position;

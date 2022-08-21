@@ -272,7 +272,9 @@ bool Factory::Initialise()
 	RegisterDecoratorInstancer("blur", &default_instancers->decorator_blur);
 	RegisterDecoratorInstancer("drop-shadow", &default_instancers->decorator_drop_shadow);
 	RegisterDecoratorInstancer("linear-gradient", &default_instancers->decorator_linear_gradient);
+	RegisterDecoratorInstancer("repeating-linear-gradient", &default_instancers->decorator_linear_gradient);
 	RegisterDecoratorInstancer("radial-gradient", &default_instancers->decorator_radial_gradient);
+	RegisterDecoratorInstancer("repeating-radial-gradient", &default_instancers->decorator_radial_gradient);
 	RegisterDecoratorInstancer("hue-rotate", &default_instancers->decorator_hue_rotate);
 	RegisterDecoratorInstancer("shader", &default_instancers->decorator_shader);
 	

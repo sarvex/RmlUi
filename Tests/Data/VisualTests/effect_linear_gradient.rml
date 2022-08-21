@@ -9,6 +9,7 @@
 		body {
 			background: #ddd;
 			color: #444;
+			width: 900dp;
 		}
 		div {
 			margin: 5dp;
@@ -41,6 +42,9 @@
 		/*
 		.corner-to-corner > :nth-child(1) { decorator: linear-gradient(to top right, red, white, blue); }
 		*/
+		
+		.repeating > :nth-child(1) { decorator: repeating-linear-gradient(50deg, red, white, blue 20%); }
+		.repeating > :nth-child(2) { decorator: repeating-linear-gradient(red, blue 20px, red 40px); }
 	</style>
 </head>
 
@@ -68,6 +72,14 @@ Yellow (top), blue, green (bottom)
 
 Corner-to-corner, red (bottom-left), white, blue (top-right)
 <group class="corner-to-corner">
+	<div/>
+</group>
+
+Repeating linear gradients
+<group class="repeating">
+	<div/>
+	<div/>
+	<div/>
 	<div/>
 </group>
 </body>
