@@ -65,13 +65,13 @@
 .transform, .filter.transform_all > .box { transform: rotate3d(0.2, 0.4, 0.1, 15deg); }
 
 .mask {
-	decorator: gradient(horizontal #f00 #ff0);
-	mask-image: image(icon-invader scale-none 15px 50%), gradient(horizontal #0000 #000f);
+	decorator: horizontal-gradient(#f00 #ff0);
+	mask-image: image(icon-invader scale-none 15px 50%), horizontal-gradient(#0000 #000f);
 	padding-left: 38dp;
 }
 .big.mask {
-	decorator: gradient(horizontal #f00 #ff0);
-	mask-image: image("/assets/rmlui.tga" scale-down left), gradient(horizontal #0000 #000f);
+	decorator: horizontal-gradient(#f00 #ff0);
+	mask-image: image("/assets/rmlui.tga" scale-down left), horizontal-gradient(#0000 #000f);
 	padding-left: 200dp;
 }
 
