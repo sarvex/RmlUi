@@ -28,20 +28,25 @@
 		.yellow-blue > :nth-child(1) { decorator: linear-gradient(yellow, blue); }
 		.yellow-blue > :nth-child(2) { decorator: linear-gradient(yellow, blue); }
 		.yellow-blue > :nth-child(3) { decorator: linear-gradient(180deg, yellow, blue); }
-		/*
 		.yellow-blue > :nth-child(4) { decorator: linear-gradient(to bottom, yellow, blue); }
 		.yellow-blue > :nth-child(5) { decorator: linear-gradient(to top, blue, yellow); }
 		.yellow-blue > :nth-child(6) { decorator: linear-gradient(to bottom, yellow 0%, blue 100%); }
-		*/
+		
 		
 		.yellow-blue-angle > :nth-child(1) { decorator: linear-gradient(135deg, yellow, blue); }
 		.yellow-blue-angle > :nth-child(2) { decorator: linear-gradient(-45deg, blue, yellow); }
 		
 		.three-color > :nth-child(1) { decorator: linear-gradient(yellow, blue 20%, #0f0); }
 		
-		/*
 		.corner-to-corner > :nth-child(1) { decorator: linear-gradient(to top right, red, white, blue); }
-		*/
+		.corner-to-corner > :nth-child(2) { decorator: linear-gradient(to bottom right, red, white, blue); }
+		.corner-to-corner > :nth-child(3) { decorator: linear-gradient(to bottom left, red, white, blue); }
+		.corner-to-corner > :nth-child(4) { decorator: linear-gradient(to top left, red, white, blue); }
+		
+		.corner-to-corner > :nth-child(5) { decorator: linear-gradient(to top right, red 49%, white, blue 51%); }
+		.corner-to-corner > :nth-child(6) { decorator: linear-gradient(to bottom right, red 49%, white, blue 51%); }
+		.corner-to-corner > :nth-child(7) { decorator: linear-gradient(to bottom left, red 48%, white, blue 52%); width: 50dp; }
+		.corner-to-corner > :nth-child(8) { decorator: linear-gradient(to top left, red 48%, white, blue 52%); width: 50dp; }
 		
 		.repeating > :nth-child(1) { decorator: repeating-linear-gradient(50deg, red, white, blue 20%); }
 		.repeating > :nth-child(2) { decorator: repeating-linear-gradient(red, blue 20px, red 40px); }
@@ -49,7 +54,7 @@
 </head>
 
 <body>
-Yellow (top) to blue (bottom)
+Yellow (top) to blue (bottom) [equivalent]
 <group class="yellow-blue">
 	<div/>
 	<div/>
@@ -59,7 +64,7 @@ Yellow (top) to blue (bottom)
 	<div/>
 </group>
 
-Yellow (top-left) to blue (bottom-right)
+Yellow (top-left) to blue (bottom-right) [equivalent]
 <group class="yellow-blue-angle">
 	<div/>
 	<div/>
@@ -70,8 +75,15 @@ Yellow (top), blue, green (bottom)
 	<div/>
 </group>
 
-Corner-to-corner, red (bottom-left), white, blue (top-right)
+Corner-to-corner, first: red (bottom-left), white, blue (top-right)
 <group class="corner-to-corner">
+	<div/>
+	<div/>
+	<div/>
+	<div/>
+	<div/>
+	<div/>
+	<div/>
 	<div/>
 </group>
 

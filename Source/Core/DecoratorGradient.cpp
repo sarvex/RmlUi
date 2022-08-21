@@ -250,44 +250,13 @@ DecoratorLinearGradient::DecoratorLinearGradient() {}
 
 DecoratorLinearGradient::~DecoratorLinearGradient() {}
 
-bool DecoratorLinearGradient::Initialise(bool in_repeating, float in_angle, const ColorStopList& in_color_stops)
+bool DecoratorLinearGradient::Initialise(bool in_repeating, Corner in_corner, float in_angle, const ColorStopList& in_color_stops)
 {
 	repeating = in_repeating;
+	corner = in_corner;
 	angle = in_angle;
 	color_stops = in_color_stops;
 	return !color_stops.empty();
-}
-
-// Returns the point along the input line ('line_point', 'line_vector') closest to the input 'point'.
-static Vector2f IntersectionPointToLineNormal(const Vector2f point, const Vector2f line_point, const Vector2f line_vector)
-{
-	const Vector2f delta = line_point - point;
-	return line_point - delta.DotProduct(line_vector) * line_vector;
-}
-
-struct LinearGradientShape {
-	Vector2f p0, p1;
-	float length;
-};
-
-// Find the starting and ending points for the gradient line with the given angle and dimensions.
-static LinearGradientShape CalculateLinearGradientShape(float angle, Vector2f dim)
-{
-	enum { TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT, TOP_LEFT, COUNT };
-	const Vector2f corners[COUNT] = {Vector2f(dim.x, 0), dim, Vector2f(0, dim.y), Vector2f(0, 0)};
-	const Vector2f center = 0.5f * dim;
-
-	using uint = unsigned int;
-	const uint quadrant = uint(Math::NormaliseAnglePositive(angle) * (4.f / (2.f * Math::RMLUI_PI))) % 4u;
-	const uint quadrant_opposite = (quadrant + 2u) % 4u;
-
-	const Vector2f line_vector = Vector2f(Math::Sin(angle), -Math::Cos(angle));
-	const Vector2f starting_point = IntersectionPointToLineNormal(corners[quadrant_opposite], center, line_vector);
-	const Vector2f ending_point = IntersectionPointToLineNormal(corners[quadrant], center, line_vector);
-
-	const float distance = Math::AbsoluteValue(dim.x * line_vector.x) + Math::AbsoluteValue(-dim.y * line_vector.y);
-
-	return {starting_point, ending_point, distance};
 }
 
 DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* element, BoxArea box_area) const
@@ -300,7 +269,8 @@ DecoratorDataHandle DecoratorLinearGradient::GenerateElementData(Element* elemen
 
 	const Box& box = element->GetBox();
 	const Vector2f dimensions = box.GetSize(box_area);
-	LinearGradientShape gradient_shape = CalculateLinearGradientShape(angle, dimensions);
+
+	LinearGradientShape gradient_shape = CalculateLinearGradientShape(dimensions);
 
 	// One-pixel minimum color stop spacing to avoid aliasing.
 	const float soft_spacing = 1.f / gradient_shape.length;
@@ -346,15 +316,60 @@ void DecoratorLinearGradient::RenderElement(Element* element, DecoratorDataHandl
 	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
 }
 
+// Returns the point along the input line ('line_point', 'line_vector') closest to the input 'point'.
+static Vector2f IntersectionPointToLineNormal(const Vector2f point, const Vector2f line_point, const Vector2f line_vector)
+{
+	const Vector2f delta = line_point - point;
+	return line_point - delta.DotProduct(line_vector) * line_vector;
+}
+
+DecoratorLinearGradient::LinearGradientShape DecoratorLinearGradient::CalculateLinearGradientShape(Vector2f dim) const
+{
+	using uint = unsigned int;
+	const Vector2f corners[(int)Corner::Count] = {Vector2f(dim.x, 0), dim, Vector2f(0, dim.y), Vector2f(0, 0)};
+	const Vector2f center = 0.5f * dim;
+
+	uint quadrant = 0;
+	Vector2f line_vector;
+
+	if (corner == Corner::None)
+	{
+		// Find the target quadrant and unit vector for the given angle.
+		quadrant = uint(Math::NormaliseAnglePositive(angle) * (4.f / (2.f * Math::RMLUI_PI))) % 4u;
+		line_vector = Vector2f(Math::Sin(angle), -Math::Cos(angle));
+	}
+	else
+	{
+		// Quadrant given by the corner, need to find the vector perpendicular to the line connecting the neighboring corners.
+		quadrant = uint(corner);
+		const Vector2f v_neighbors = (corners[(quadrant + 1u) % 4u] - corners[(quadrant + 3u) % 4u]).Normalise();
+		line_vector = {v_neighbors.y, -v_neighbors.x};
+	}
+
+	const uint quadrant_opposite = (quadrant + 2u) % 4u;
+
+	const Vector2f starting_point = IntersectionPointToLineNormal(corners[quadrant_opposite], center, line_vector);
+	const Vector2f ending_point = IntersectionPointToLineNormal(corners[quadrant], center, line_vector);
+
+	const float length = Math::AbsoluteValue(dim.x * line_vector.x) + Math::AbsoluteValue(-dim.y * line_vector.y);
+
+	return LinearGradientShape{starting_point, ending_point, length};
+}
+
 /**
     Linear gradient instancer.
  */
 DecoratorLinearGradientInstancer::DecoratorLinearGradientInstancer() : DecoratorInstancer(DecoratorClass::Image)
 {
 	ids.angle = RegisterProperty("angle", "180deg").AddParser("angle").GetId();
+	ids.direction_to = RegisterProperty("to", "unspecified").AddParser("keyword", "unspecified, to").GetId();
+	// See Direction enum for keyword values.
+	ids.direction_x = RegisterProperty("direction-x", "unspecified").AddParser("keyword", "unspecified=0, left=8, right=2").GetId();
+	ids.direction_y = RegisterProperty("direction-y", "unspecified").AddParser("keyword", "unspecified=0, top=1, bottom=4").GetId();
 	ids.color_stop_list = RegisterProperty("color-stops", "").AddParser("color_stop_list").GetId();
 
-	RegisterShorthand("decorator", "angle?, color-stops#", ShorthandType::RecursiveCommaSeparated);
+	RegisterShorthand("direction", "angle, to, direction-x, direction-y, direction-x", ShorthandType::FallThrough);
+	RegisterShorthand("decorator", "direction?, color-stops#", ShorthandType::RecursiveCommaSeparated);
 }
 
 DecoratorLinearGradientInstancer::~DecoratorLinearGradientInstancer() {}
@@ -363,19 +378,50 @@ SharedPtr<Decorator> DecoratorLinearGradientInstancer::InstanceDecorator(const S
 	const DecoratorInstancerInterface& /*interface_*/)
 {
 	const Property* p_angle = properties_.GetProperty(ids.angle);
-	if (!p_angle || !Any(p_angle->unit & Unit::ANGLE))
-		return nullptr;
+	const Property* p_direction_to = properties_.GetProperty(ids.direction_to);
+	const Property* p_direction_x = properties_.GetProperty(ids.direction_x);
+	const Property* p_direction_y = properties_.GetProperty(ids.direction_y);
 	const Property* p_color_stop_list = properties_.GetProperty(ids.color_stop_list);
-	if (!p_color_stop_list || p_color_stop_list->unit != Unit::COLORSTOPLIST)
+
+	if (!p_angle || !p_direction_to || !p_direction_x || !p_direction_y || !p_color_stop_list)
 		return nullptr;
 
-	const float angle = ComputeAngle(p_angle->GetNumericValue());
+	using Corner = DecoratorLinearGradient::Corner;
+	Corner corner = Corner::None;
+	float angle = 0.f;
+
+	if (p_direction_to->Get<bool>())
+	{
+		const Direction direction = (Direction)(p_direction_x->Get<int>() | p_direction_y->Get<int>());
+		switch (direction)
+		{
+		case Direction::Top: angle = 0.f; break;
+		case Direction::Right: angle = 0.5f * Math::RMLUI_PI; break;
+		case Direction::Bottom: angle = Math::RMLUI_PI; break;
+		case Direction::Left: angle = 1.5f * Math::RMLUI_PI; break;
+		case Direction::TopLeft: corner = Corner::TopLeft; break;
+		case Direction::TopRight: corner = Corner::TopRight; break;
+		case Direction::BottomRight: corner = Corner::BottomRight; break;
+		case Direction::BottomLeft: corner = Corner::BottomLeft; break;
+		case Direction::None:
+		default: return nullptr; break;
+		}
+	}
+	else
+	{
+		if (Any(p_angle->unit & Unit::ANGLE))
+			angle = ComputeAngle(p_angle->GetNumericValue());
+		else
+			return nullptr;
+	}
+
+	if (p_color_stop_list->unit != Unit::COLORSTOPLIST)
+		return nullptr;
+	const ColorStopList& color_stop_list = p_color_stop_list->value.GetReference<ColorStopList>();
 	const bool repeating = (name == "repeating-linear-gradient");
 
-	const ColorStopList& color_stop_list = p_color_stop_list->value.GetReference<ColorStopList>();
-
 	auto decorator = MakeShared<DecoratorLinearGradient>();
-	if (decorator->Initialise(repeating, angle, color_stop_list))
+	if (decorator->Initialise(repeating, corner, angle, color_stop_list))
 		return decorator;
 
 	return nullptr;
