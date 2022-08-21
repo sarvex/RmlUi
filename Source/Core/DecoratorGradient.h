@@ -125,12 +125,12 @@ private:
 	GradientPropertyIds ids;
 };
 
-namespace RadialGradient {
-	enum class Shape { Circle, Ellipse, Unspecified };
-	enum class SizeType { ClosestSide, FarthestSide, ClosestCorner, FarthestCorner, LengthPercentage };
+class RadialGradientDefines {
+public:
 	enum class PositionX { Left, Center, Right };
 	enum class PositionY { Top, Center, Bottom };
-
+	enum class Shape { Circle, Ellipse, Unspecified };
+	enum class SizeType { ClosestSide, FarthestSide, ClosestCorner, FarthestCorner, LengthPercentage };
 	struct Size {
 		SizeType type;
 		NumericValue x, y;
@@ -138,15 +138,14 @@ namespace RadialGradient {
 	struct Position {
 		NumericValue x, y;
 	};
-} // namespace RadialGradient
+};
 
-class DecoratorRadialGradient : public Decorator {
+class DecoratorRadialGradient : public Decorator, public RadialGradientDefines {
 public:
 	DecoratorRadialGradient();
 	virtual ~DecoratorRadialGradient();
 
-	bool Initialise(bool repeating, RadialGradient::Shape shape, RadialGradient::Size size, RadialGradient::Position position,
-		const ColorStopList& color_stops);
+	bool Initialise(bool repeating, Shape shape, Size size, Position position, const ColorStopList& color_stops);
 
 	DecoratorDataHandle GenerateElementData(Element* element, BoxArea paint_area) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
@@ -154,15 +153,20 @@ public:
 	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
 
 private:
+	struct RadialGradientShape {
+		Vector2f center, radius;
+	};
+	RadialGradientShape CalculateRadialGradientShape(Element* element, Vector2f dimensions) const;
+
 	bool repeating = false;
-	RadialGradient::Shape shape;
-	RadialGradient::Size size;
-	RadialGradient::Position position;
+	Shape shape;
+	Size size;
+	Position position;
 
 	ColorStopList color_stops;
 };
 
-class DecoratorRadialGradientInstancer : public DecoratorInstancer {
+class DecoratorRadialGradientInstancer : public DecoratorInstancer, public RadialGradientDefines {
 public:
 	DecoratorRadialGradientInstancer();
 	~DecoratorRadialGradientInstancer();

@@ -434,8 +434,7 @@ DecoratorRadialGradient::DecoratorRadialGradient() {}
 
 DecoratorRadialGradient::~DecoratorRadialGradient() {}
 
-bool DecoratorRadialGradient::Initialise(bool in_repeating, RadialGradient::Shape in_shape, RadialGradient::Size in_size,
-	RadialGradient::Position in_position, const ColorStopList& in_color_stops)
+bool DecoratorRadialGradient::Initialise(bool in_repeating, Shape in_shape, Size in_size, Position in_position, const ColorStopList& in_color_stops)
 {
 	repeating = in_repeating;
 	shape = in_shape;
@@ -443,70 +442,6 @@ bool DecoratorRadialGradient::Initialise(bool in_repeating, RadialGradient::Shap
 	position = in_position;
 	color_stops = in_color_stops;
 	return !color_stops.empty();
-}
-
-struct RadialGradientShape {
-	Vector2f center, radius;
-};
-// Find the starting and ending points for the gradient line with the given angle and dimensions.
-static RadialGradientShape CalculateRadialGradientShape(Element* element, RadialGradient::Shape shape, RadialGradient::Size size,
-	RadialGradient::Position position, Vector2f dimensions)
-{
-	RadialGradientShape result;
-	result.center.x = element->ResolveNumericValue(position.x, dimensions.x);
-	result.center.y = element->ResolveNumericValue(position.y, dimensions.y);
-	const bool is_circle = (shape == RadialGradient::Shape::Circle);
-
-	auto Abs = [](Vector2f v) { return Vector2f{Math::AbsoluteValue(v.x), Math::AbsoluteValue(v.y)}; };
-	auto d = dimensions;
-	auto c = result.center;
-	Vector2f r;
-
-	switch (size.type)
-	{
-	case RadialGradient::SizeType::ClosestSide:
-	{
-		r = Abs(Math::Min(c, d - c));
-		result.radius = (is_circle ? Vector2f(Math::Min(r.x, r.y)) : r);
-	}
-	break;
-	case RadialGradient::SizeType::FarthestSide:
-	{
-		r = Abs(Math::Max(c, d - c));
-		result.radius = (is_circle ? Vector2f(Math::Max(r.x, r.y)) : r);
-	}
-	break;
-	case RadialGradient::SizeType::ClosestCorner:
-	case RadialGradient::SizeType::FarthestCorner:
-	{
-		if (size.type == RadialGradient::SizeType::ClosestCorner)
-			r = Abs(Math::Min(c, d - c)); // Same as closest-side.
-		else
-			r = Abs(Math::Max(c, d - c)); // Same as farthest-side.
-
-		if (is_circle)
-		{
-			result.radius = Vector2f(r.Magnitude());
-		}
-		else
-		{
-			r = Math::Max(r, Vector2f(1)); // In case r.x ~= 0
-			result.radius.x = Math::SquareRoot(2.f * r.x * r.x);
-			result.radius.y = result.radius.x * (r.y / r.x);
-		}
-	}
-	break;
-	case RadialGradient::SizeType::LengthPercentage:
-	{
-		result.radius.x = element->ResolveNumericValue(size.x, d.x);
-		result.radius.y = (is_circle ? result.radius.x : element->ResolveNumericValue(size.y, d.y));
-		result.radius = Abs(result.radius);
-	}
-	break;
-	}
-
-	result.radius = Math::Max(result.radius, Vector2f(1.f));
-	return result;
 }
 
 DecoratorDataHandle DecoratorRadialGradient::GenerateElementData(Element* element, BoxArea box_area) const
@@ -520,7 +455,7 @@ DecoratorDataHandle DecoratorRadialGradient::GenerateElementData(Element* elemen
 	const Box& box = element->GetBox();
 	const Vector2f dimensions = box.GetSize(box_area);
 
-	RadialGradientShape gradient_shape = CalculateRadialGradientShape(element, shape, size, position, dimensions);
+	RadialGradientShape gradient_shape = CalculateRadialGradientShape(element, dimensions);
 
 	// One-pixel minimum color stop spacing to avoid aliasing.
 	const float soft_spacing = 1.f / Math::Min(gradient_shape.radius.x, gradient_shape.radius.y);
@@ -564,13 +499,71 @@ void DecoratorRadialGradient::RenderElement(Element* element, DecoratorDataHandl
 	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
 }
 
+DecoratorRadialGradient::RadialGradientShape DecoratorRadialGradient::CalculateRadialGradientShape(Element* element, Vector2f dimensions) const
+{
+	RadialGradientShape result;
+	result.center.x = element->ResolveNumericValue(position.x, dimensions.x);
+	result.center.y = element->ResolveNumericValue(position.y, dimensions.y);
+	const bool is_circle = (shape == Shape::Circle);
+
+	auto Abs = [](Vector2f v) { return Vector2f{Math::AbsoluteValue(v.x), Math::AbsoluteValue(v.y)}; };
+	auto d = dimensions;
+	auto c = result.center;
+	Vector2f r;
+
+	switch (size.type)
+	{
+	case SizeType::ClosestSide:
+	{
+		r = Abs(Math::Min(c, d - c));
+		result.radius = (is_circle ? Vector2f(Math::Min(r.x, r.y)) : r);
+	}
+	break;
+	case SizeType::FarthestSide:
+	{
+		r = Abs(Math::Max(c, d - c));
+		result.radius = (is_circle ? Vector2f(Math::Max(r.x, r.y)) : r);
+	}
+	break;
+	case SizeType::ClosestCorner:
+	case SizeType::FarthestCorner:
+	{
+		if (size.type == SizeType::ClosestCorner)
+			r = Abs(Math::Min(c, d - c)); // Same as closest-side.
+		else
+			r = Abs(Math::Max(c, d - c)); // Same as farthest-side.
+
+		if (is_circle)
+		{
+			result.radius = Vector2f(r.Magnitude());
+		}
+		else
+		{
+			r = Math::Max(r, Vector2f(1)); // In case r.x ~= 0
+			result.radius.x = Math::SquareRoot(2.f * r.x * r.x);
+			result.radius.y = result.radius.x * (r.y / r.x);
+		}
+	}
+	break;
+	case SizeType::LengthPercentage:
+	{
+		result.radius.x = element->ResolveNumericValue(size.x, d.x);
+		result.radius.y = (is_circle ? result.radius.x : element->ResolveNumericValue(size.y, d.y));
+		result.radius = Abs(result.radius);
+	}
+	break;
+	}
+
+	result.radius = Math::Max(result.radius, Vector2f(1.f));
+	return result;
+}
+
 /**
     Radial gradient instancer.
  */
 DecoratorRadialGradientInstancer::DecoratorRadialGradientInstancer() : DecoratorInstancer(DecoratorClass::Image)
 {
 	ids.ending_shape = RegisterProperty("ending-shape", "unspecified").AddParser("keyword", "circle, ellipse, unspecified").GetId();
-
 	ids.size_x = RegisterProperty("size-x", "farthest-corner")
 					 .AddParser("keyword", "closest-side, farthest-side, closest-corner, farthest-corner")
 					 .AddParser("length_percent")
@@ -602,8 +595,6 @@ SharedPtr<Decorator> DecoratorRadialGradientInstancer::InstanceDecorator(const S
 
 	if (!p_ending_shape || !p_size_x || !p_size_y || !p_position_x || !p_position_y || !p_color_stop_list)
 		return nullptr;
-
-	using namespace RadialGradient;
 
 	Shape shape = (Shape)p_ending_shape->Get<int>();
 	if (shape == Shape::Unspecified)
