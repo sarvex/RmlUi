@@ -31,19 +31,19 @@
 		
 		.circle > :nth-child(1) { decorator: radial-gradient(circle, yellow, green); }
 		
-		.three-color > :nth-child(1) { decorator: radial-gradient(red, yellow, green); }
+		.three_color > :nth-child(1) { decorator: radial-gradient(red, yellow, green); }
 		
-		.origin-bottom-left > :nth-child(1) { decorator: radial-gradient(farthest-side at left bottom, red, yellow 50px, green); }
+		.origin_bottom_left > :nth-child(1) { decorator: radial-gradient(farthest-side at left bottom, red, yellow 50px, green); }
 		
-		.closest-side-ellipse > :nth-child(1) { decorator: radial-gradient(closest-side at 20px 30px, red, yellow, green); }
-		.closest-side-ellipse > :nth-child(2) { decorator: radial-gradient(20px 30px at 20px 30px, red, yellow, green); }
+		.closest_side_ellipse > :nth-child(1) { decorator: radial-gradient(closest-side at 20px 30px, red, yellow, green); }
+		.closest_side_ellipse > :nth-child(2) { decorator: radial-gradient(20px 30px at 20px 30px, red, yellow, green); }
 		
-		.closest-side-circle > :nth-child(1) { decorator: radial-gradient(circle closest-side at 20px 30px, red, yellow, green); }
-		.closest-side-circle > :nth-child(2) { decorator: radial-gradient(20px 20px at 20px 30px, red, yellow, green); }
+		.closest_side_circle > :nth-child(1) { decorator: radial-gradient(circle closest-side at 20px 30px, red, yellow, green); }
+		.closest_side_circle > :nth-child(2) { decorator: radial-gradient(20px 20px at 20px 30px, red, yellow, green); }
 		
-		.closest-corner-ellipse > :nth-child(1) { decorator: radial-gradient(closest-corner at 20px 30px, red, yellow, green); }
+		.closest_corner_ellipse > :nth-child(1) { decorator: radial-gradient(closest-corner at 20px 30px, red, yellow, green); }
 		
-		.closest-corner-circle > :nth-child(1) { decorator: radial-gradient(circle closest-corner at 20px 30px, red, yellow, green); }
+		.closest_corner_circle > :nth-child(1) { decorator: radial-gradient(circle closest-corner at 20px 30px, red, yellow, green); }
 		
 		.sharp > :nth-child(1) { decorator: radial-gradient(circle closest-side, red 50%, yellow 50%, green); }
 		.sharp > :nth-child(2) { decorator: radial-gradient(red 50%, yellow 50%, green); }
@@ -83,12 +83,12 @@ Circle, yellow (center) to green (corners)
 </group>
 
 Ellipse, red (center), yellow, green (corners)
-<group class="three-color">
+<group class="three_color">
 	<div/>
 </group>
 
 Red (bottom-left), yellow, green (top-right)
-<group class="origin-bottom-left">
+<group class="origin_bottom_left">
 	<div/>
 </group>
 
@@ -105,24 +105,24 @@ Repeating radial gradients
 </group>
 
 Ellipse (top-left, closest-side), red, yellow, green [equivalent]
-<group class="closest-side-ellipse">
+<group class="closest_side_ellipse">
 	<div/>
 	<div/>
 </group>
 
 Circle (top-left, closest-side), red, yellow, green [equivalent]
-<group class="closest-side-circle">
+<group class="closest_side_circle">
 	<div/>
 	<div/>
 </group>
 
 Ellipse (top-left, closest-corner), red, yellow, green
-<group class="closest-corner-ellipse">
+<group class="closest_corner_ellipse">
 	<div/>
 </group>
 
 Circle (top-left, closest-corner), red, yellow, green
-<group class="closest-corner-circle">
+<group class="closest_corner_circle">
 	<div/>
 </group>
 
