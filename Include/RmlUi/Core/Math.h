@@ -45,8 +45,7 @@ using Rectanglef = Rectangle<float>;
 
 namespace Math {
 
-// The constant PI.
-extern RMLUICORE_API const float RMLUI_PI;
+constexpr float RMLUI_PI = 3.141592653f;
 
 template < typename Type >
 Type Max(Type a, Type b)
