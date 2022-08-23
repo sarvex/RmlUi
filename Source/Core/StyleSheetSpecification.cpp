@@ -60,7 +60,7 @@ struct DefaultStyleSheetParsers : NonCopyMoveable {
 	PropertyParserAnimation animation = PropertyParserAnimation(PropertyParserAnimation::ANIMATION_PARSER);
 	PropertyParserAnimation transition = PropertyParserAnimation(PropertyParserAnimation::TRANSITION_PARSER);
 	PropertyParserColour color = PropertyParserColour();
-	PropertyParserColorStopList color_stop_list = PropertyParserColorStopList(&color, &length_percent);
+	PropertyParserColorStopList color_stop_list = PropertyParserColorStopList(&color);
 	PropertyParserDecorator decorator = PropertyParserDecorator();
 	PropertyParserFontEffect font_effect = PropertyParserFontEffect();
 	PropertyParserTransform transform = PropertyParserTransform();

@@ -33,15 +33,15 @@
 
 namespace Rml {
 
-PropertyParserColorStopList::PropertyParserColorStopList(PropertyParser* parser_color, PropertyParser* parser_length_percent) :
-	parser_color(parser_color), parser_length_percent(parser_length_percent)
+PropertyParserColorStopList::PropertyParserColorStopList(PropertyParser* parser_color) :
+	parser_color(parser_color), parser_length_percent_angle(Unit::LENGTH_PERCENT | Unit::ANGLE, Unit::PERCENT)
 {
-	RMLUI_ASSERT(parser_color && parser_length_percent);
+	RMLUI_ASSERT(parser_color);
 }
 
 PropertyParserColorStopList::~PropertyParserColorStopList() {}
 
-bool PropertyParserColorStopList::ParseValue(Property& property, const String& value, const ParameterMap& /*parameters*/) const
+bool PropertyParserColorStopList::ParseValue(Property& property, const String& value, const ParameterMap& parameters) const
 {
 	const ParameterMap empty_parameter_map;
 
@@ -54,39 +54,42 @@ bool PropertyParserColorStopList::ParseValue(Property& property, const String& v
 	if (color_stop_str_list.empty())
 		return false;
 
+	const Unit accepted_units = (parameters.count("angle") ? (Unit::ANGLE | Unit::PERCENT) : Unit::LENGTH_PERCENT);
+
 	ColorStopList color_stops;
 	color_stops.reserve(color_stop_str_list.size());
 
-	using Style::LengthPercentageAuto;
-
 	for (const String& color_stop_str : color_stop_str_list)
 	{
-		StringList color_stop_str_pair;
-		StringUtilities::ExpandString(color_stop_str_pair, color_stop_str, ' ', '(', ')', true);
+		StringList values;
+		StringUtilities::ExpandString(values, color_stop_str, ' ', '(', ')', true);
 
-		if (color_stop_str_pair.empty() || color_stop_str_pair.size() > 2)
+		if (values.empty() || values.size() > 3)
 			return false;
 
 		Property p_color;
-		if (!parser_color->ParseValue(p_color, color_stop_str_pair[0], empty_parameter_map))
+		if (!parser_color->ParseValue(p_color, values[0], empty_parameter_map))
 			return false;
 
 		ColorStop color_stop = {};
 		color_stop.color = p_color.Get<Colourb>();
 
-		Property p_position(LengthPercentageAuto::Auto);
-		if (color_stop_str_pair.size() == 2 && color_stop_str_pair[1] != "auto")
+		if (values.size() <= 1)
+			color_stops.push_back(color_stop);
+
+		for (size_t i = 1; i < values.size(); i++)
 		{
-			if (!parser_length_percent->ParseValue(p_position, color_stop_str_pair[1], empty_parameter_map))
+			Property p_position(Style::LengthPercentageAuto::Auto);
+			if (!parser_length_percent_angle.ParseValue(p_position, values[i], empty_parameter_map))
 				return false;
+
+			if (Any(p_position.unit & accepted_units))
+				color_stop.position = NumericValue(p_position.Get<float>(), p_position.unit);
+			else if (p_position.unit != Unit::KEYWORD)
+				return false;
+
+			color_stops.push_back(color_stop);
 		}
-
-		if (Any(p_position.unit & Unit::LENGTH_PERCENT))
-			color_stop.position = NumericValue(p_position.Get<float>(), p_position.unit);
-		else if (p_position.unit != Unit::KEYWORD)
-			return false;
-
-		color_stops.push_back(color_stop);
 	}
 
 	property.value = Variant(std::move(color_stops));

@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -31,17 +31,17 @@
 
 #include "../../Include/RmlUi/Core/PropertyParser.h"
 #include "../../Include/RmlUi/Core/Types.h"
+#include "PropertyParserNumber.h"
 
 namespace Rml {
 
 /**
-	A property parser that parses gradients.
+    A property parser that parses gradients.
  */
 
-class PropertyParserColorStopList : public PropertyParser
-{
+class PropertyParserColorStopList : public PropertyParser {
 public:
-	PropertyParserColorStopList(PropertyParser* parser_color, PropertyParser* parser_length_percent);
+	PropertyParserColorStopList(PropertyParser* parser_color);
 	virtual ~PropertyParserColorStopList();
 
 	/// Called to parse a RCSS colour declaration.
@@ -53,7 +53,7 @@ public:
 
 private:
 	PropertyParser* parser_color;
-	PropertyParser* parser_length_percent;
+	PropertyParserNumber parser_length_percent_angle;
 };
 
 } // namespace Rml

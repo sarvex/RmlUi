@@ -119,16 +119,19 @@ void main() {
 	finalColor = fragColor;
 }
 )";
-enum class ShaderGradientFunction { Linear, Radial, RepeatingLinear, RepeatingRadial }; // Must match shader defines below.
+enum class ShaderGradientFunction { Linear, Radial, Conic, RepeatingLinear, RepeatingRadial, RepeatingConic }; // Must match shader defines below.
 static const char* shader_frag_main_gradient = RMLUI_SHADER_HEADER R"(
 #define LINEAR 0
 #define RADIAL 1
-#define REPEATING_LINEAR 2
-#define REPEATING_RADIAL 3
+#define CONIC 2
+#define REPEATING_LINEAR 3
+#define REPEATING_RADIAL 4
+#define REPEATING_CONIC 5
+#define PI 3.14159265
 
 uniform int _func; // one of above defines
-uniform vec2 _p;   // linear: starting point,         radial: center
-uniform vec2 _v;   // linear: vector to ending point, radial: 2d curvature (inverse radius)
+uniform vec2 _p;   // linear: starting point,         radial: center,                        conic: center
+uniform vec2 _v;   // linear: vector to ending point, radial: 2d curvature (inverse radius), conic: angled unit vector
 uniform vec4 _stop_colors[MAX_NUM_STOPS];
 uniform float _stop_positions[MAX_NUM_STOPS]; // normalized, 0 -> starting point, 1 -> ending point
 uniform int _num_stops;
@@ -160,8 +163,14 @@ void main() {
 		vec2 V = fragTexCoord - _p;
 		t = length(_v * V);
 	}
+	else if (_func == CONIC || _func == REPEATING_CONIC)
+	{
+		mat2 R = mat2(_v.x, -_v.y, _v.y, _v.x);
+		vec2 V = R * (fragTexCoord - _p);
+		t = 0.5 + atan(-V.x, V.y) / (2.0 * PI);
+	}
 
-	if (_func == REPEATING_LINEAR || _func == REPEATING_RADIAL)
+	if (_func == REPEATING_LINEAR || _func == REPEATING_RADIAL || _func == REPEATING_CONIC)
 	{
 		float t0 = _stop_positions[0];
 		float t1 = _stop_positions[_num_stops - 1];
@@ -1310,6 +1319,16 @@ Rml::CompiledShaderHandle RenderInterface_GL3::CompileShader(const Rml::String& 
 		shader.gradient_function = (repeating ? ShaderGradientFunction::RepeatingRadial : ShaderGradientFunction::Radial);
 		shader.p = Rml::Get(parameters, "center", Rml::Vector2f(0.f));
 		shader.v = Rml::Vector2f(1.f) / Rml::Get(parameters, "radius", Rml::Vector2f(1.f));
+		ApplyColorStopList(shader, parameters);
+	}
+	else if (name == "conic-gradient")
+	{
+		shader.type = CompiledShaderType::Gradient;
+		const bool repeating = Rml::Get(parameters, "repeating", false);
+		shader.gradient_function = (repeating ? ShaderGradientFunction::RepeatingConic : ShaderGradientFunction::Conic);
+		shader.p = Rml::Get(parameters, "center", Rml::Vector2f(0.f));
+		const float angle = Rml::Get(parameters, "angle", 0.f);
+		shader.v = {Rml::Math::Cos(angle), Rml::Math::Sin(angle)};
 		ApplyColorStopList(shader, parameters);
 	}
 	else if (name == "shader")

@@ -53,7 +53,7 @@ static ColorStopList ResolveColorStops(Element* element, const float gradient_li
 	ColorStopList stops = unresolved_stops;
 	const int num_stops = (int)stops.size();
 
-	// Resolve all lengths and percentages to numbers. After this step all stops with a unit other than Number are considered as Auto.
+	// Resolve all lengths, percentages, and angles to numbers. After this step all stops with a unit other than Number are considered as Auto.
 	for (ColorStop& stop : stops)
 	{
 		if (Any(stop.position.unit & Unit::LENGTH))
@@ -64,6 +64,10 @@ static ColorStopList ResolveColorStops(Element* element, const float gradient_li
 		else if (stop.position.unit == Unit::PERCENT)
 		{
 			stop.position = NumericValue(stop.position.number * 0.01f, Unit::NUMBER);
+		}
+		else if (Any(stop.position.unit & Unit::ANGLE))
+		{
+			stop.position = NumericValue(ComputeAngle(stop.position) * (1.f / (2.f * Math::RMLUI_PI)), Unit::NUMBER);
 		}
 	}
 
@@ -138,6 +142,31 @@ static ColorStopList ResolveColorStops(Element* element, const float gradient_li
 	RMLUI_ASSERT(std::all_of(stops.begin(), stops.end(), [](auto&& stop) { return stop.position.unit == Unit::NUMBER; }));
 
 	return stops;
+}
+
+static Vector2Numeric ComputePosition(const Property* p_position[2])
+{
+	Vector2Numeric position;
+	for (int dimension = 0; dimension < 2; dimension++)
+	{
+		NumericValue& value = position[dimension];
+		const Property& property = *p_position[dimension];
+		if (property.unit == Unit::KEYWORD)
+		{
+			enum { TOP_LEFT, CENTER, BOTTOM_RIGHT };
+			switch (property.Get<int>())
+			{
+			case TOP_LEFT: value = NumericValue(0.f, Unit::PERCENT); break;
+			case CENTER: value = NumericValue(50.f, Unit::PERCENT); break;
+			case BOTTOM_RIGHT: value = NumericValue(100.f, Unit::PERCENT); break;
+			}
+		}
+		else
+		{
+			value = property.GetNumericValue();
+		}
+	}
+	return position;
 }
 
 /**
@@ -422,10 +451,7 @@ SharedPtr<Decorator> DecoratorLinearGradientInstancer::InstanceDecorator(const S
 	}
 	else
 	{
-		if (Any(p_angle->unit & Unit::ANGLE))
-			angle = ComputeAngle(p_angle->GetNumericValue());
-		else
-			return nullptr;
+		angle = ComputeAngle(p_angle->GetNumericValue());
 	}
 
 	if (p_color_stop_list->unit != Unit::COLORSTOPLIST)
@@ -447,10 +473,12 @@ DecoratorRadialGradient::DecoratorRadialGradient() {}
 
 DecoratorRadialGradient::~DecoratorRadialGradient() {}
 
-bool DecoratorRadialGradient::Initialise(bool in_repeating, Shape in_shape, Size in_size, Position in_position, const ColorStopList& in_color_stops)
+bool DecoratorRadialGradient::Initialise(bool in_repeating, Shape in_shape, SizeType in_size_type, Vector2Numeric in_size, Vector2Numeric in_position,
+	const ColorStopList& in_color_stops)
 {
 	repeating = in_repeating;
 	shape = in_shape;
+	size_type = in_size_type;
 	size = in_size;
 	position = in_position;
 	color_stops = in_color_stops;
@@ -463,7 +491,7 @@ DecoratorDataHandle DecoratorRadialGradient::GenerateElementData(Element* elemen
 	if (!render_interface)
 		return INVALID_DECORATORDATAHANDLE;
 
-	RMLUI_ASSERT(!color_stops.empty());
+	RMLUI_ASSERT(!color_stops.empty() && (shape == Shape::Circle || shape == Shape::Ellipse));
 
 	const Box& box = element->GetBox();
 	const Vector2f dimensions = box.GetSize(box_area);
@@ -524,7 +552,7 @@ DecoratorRadialGradient::RadialGradientShape DecoratorRadialGradient::CalculateR
 	auto c = result.center;
 	Vector2f r;
 
-	switch (size.type)
+	switch (size_type)
 	{
 	case SizeType::ClosestSide:
 	{
@@ -541,7 +569,7 @@ DecoratorRadialGradient::RadialGradientShape DecoratorRadialGradient::CalculateR
 	case SizeType::ClosestCorner:
 	case SizeType::FarthestCorner:
 	{
-		if (size.type == SizeType::ClosestCorner)
+		if (size_type == SizeType::ClosestCorner)
 			r = Abs(Math::Min(c, d - c)); // Same as closest-side.
 		else
 			r = Abs(Math::Max(c, d - c)); // Same as farthest-side.
@@ -602,12 +630,14 @@ SharedPtr<Decorator> DecoratorRadialGradientInstancer::InstanceDecorator(const S
 	const Property* p_ending_shape = properties_.GetProperty(ids.ending_shape);
 	const Property* p_size_x = properties_.GetProperty(ids.size_x);
 	const Property* p_size_y = properties_.GetProperty(ids.size_y);
-	const Property* p_position_x = properties_.GetProperty(ids.position_x);
-	const Property* p_position_y = properties_.GetProperty(ids.position_y);
+	const Property* p_position[2] = {properties_.GetProperty(ids.position_x), properties_.GetProperty(ids.position_y)};
 	const Property* p_color_stop_list = properties_.GetProperty(ids.color_stop_list);
 
-	if (!p_ending_shape || !p_size_x || !p_size_y || !p_position_x || !p_position_y || !p_color_stop_list)
+	if (!p_ending_shape || !p_size_x || !p_size_y || !p_position[0] || !p_position[1] || !p_color_stop_list)
 		return nullptr;
+
+	using SizeType = DecoratorRadialGradient::SizeType;
+	using Shape = DecoratorRadialGradient::Shape;
 
 	Shape shape = (Shape)p_ending_shape->Get<int>();
 	if (shape == Shape::Unspecified)
@@ -618,47 +648,142 @@ SharedPtr<Decorator> DecoratorRadialGradientInstancer::InstanceDecorator(const S
 	if (shape == Shape::Circle && (p_size_x->unit == Unit::PERCENT || p_size_y->unit != Unit::KEYWORD))
 		return nullptr;
 
-	Size size = {};
+	SizeType size_type = {};
+	Vector2Numeric size;
 	if (p_size_x->unit == Unit::KEYWORD)
 	{
-		size.type = (SizeType)p_size_x->Get<int>();
+		size_type = (SizeType)p_size_x->Get<int>();
 	}
 	else
 	{
-		size.type = SizeType::LengthPercentage;
+		size_type = SizeType::LengthPercentage;
 		size.x = p_size_x->GetNumericValue();
 		size.y = (p_size_y->unit == Unit::KEYWORD ? size.x : p_size_y->GetNumericValue());
 	}
 
-	Position position = {};
-	for (int dimension = 0; dimension < 2; dimension++)
-	{
-		NumericValue& value = (dimension == 0 ? position.x : position.y);
-		const Property& property = (dimension == 0 ? *p_position_x : *p_position_y);
-		if (property.unit == Unit::KEYWORD)
-		{
-			enum { TOP_LEFT, CENTER, BOTTOM_RIGHT };
-			switch (property.Get<int>())
-			{
-			case TOP_LEFT: value = NumericValue(0.f, Unit::PERCENT); break;
-			case CENTER: value = NumericValue(50.f, Unit::PERCENT); break;
-			case BOTTOM_RIGHT: value = NumericValue(100.f, Unit::PERCENT); break;
-			}
-		}
-		else
-		{
-			value = property.GetNumericValue();
-		}
-	}
+	const Vector2Numeric position = ComputePosition(p_position);
+	const bool repeating = (name == "repeating-radial-gradient");
 
 	if (p_color_stop_list->unit != Unit::COLORSTOPLIST)
 		return nullptr;
-
-	const bool repeating = (name == "repeating-radial-gradient");
 	const ColorStopList& color_stop_list = p_color_stop_list->value.GetReference<ColorStopList>();
 
 	auto decorator = MakeShared<DecoratorRadialGradient>();
-	if (decorator->Initialise(repeating, shape, size, position, color_stop_list))
+	if (decorator->Initialise(repeating, shape, size_type, size, position, color_stop_list))
+		return decorator;
+
+	return nullptr;
+}
+
+/**
+    Conic gradient.
+ */
+DecoratorConicGradient::DecoratorConicGradient() {}
+
+DecoratorConicGradient::~DecoratorConicGradient() {}
+
+bool DecoratorConicGradient::Initialise(bool in_repeating, float in_angle, Vector2Numeric in_position, const ColorStopList& in_color_stops)
+{
+	repeating = in_repeating;
+	angle = in_angle;
+	position = in_position;
+	color_stops = in_color_stops;
+	return !color_stops.empty();
+}
+
+DecoratorDataHandle DecoratorConicGradient::GenerateElementData(Element* element, BoxArea box_area) const
+{
+	RenderInterface* render_interface = element->GetRenderInterface();
+	if (!render_interface)
+		return INVALID_DECORATORDATAHANDLE;
+
+	RMLUI_ASSERT(!color_stops.empty());
+
+	const Box& box = element->GetBox();
+	const Vector2f dimensions = box.GetSize(box_area);
+
+	const Vector2f center =
+		Vector2f{element->ResolveNumericValue(position.x, dimensions.x), element->ResolveNumericValue(position.y, dimensions.y)}.Round();
+
+	ColorStopList resolved_stops = ResolveColorStops(element, 1.f, 0.f, color_stops);
+
+	CompiledShaderHandle effect_handle = render_interface->CompileShader("conic-gradient",
+		Dictionary{
+			{"angle", Variant(angle)},
+			{"center", Variant(center)},
+			{"repeating", Variant(repeating)},
+			{"color_stop_list", Variant(std::move(resolved_stops))},
+		});
+
+	Geometry geometry(render_interface);
+
+	const ComputedValues& computed = element->GetComputedValues();
+	const byte alpha = byte(computed.opacity() * 255.f);
+	GeometryUtilities::GenerateBackground(&geometry, box, Vector2f(), computed.border_radius(), Colourb(255, alpha), box_area);
+
+	const Vector2f render_offset = box.GetPosition(box_area);
+	for (Vertex& vertex : geometry.GetVertices())
+		vertex.tex_coord = vertex.position - render_offset;
+
+	BasicEffectElementData* element_data = GetBasicEffectElementDataPool().AllocateAndConstruct(std::move(geometry), effect_handle);
+	return reinterpret_cast<DecoratorDataHandle>(element_data);
+}
+
+void DecoratorConicGradient::ReleaseElementData(DecoratorDataHandle handle) const
+{
+	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
+	RenderInterface* render_interface = element_data->geometry.GetRenderInterface();
+	render_interface->ReleaseCompiledShader(element_data->effect);
+
+	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
+}
+
+void DecoratorConicGradient::RenderElement(Element* element, DecoratorDataHandle handle) const
+{
+	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
+	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
+}
+
+/**
+    Conic gradient instancer.
+ */
+DecoratorConicGradientInstancer::DecoratorConicGradientInstancer() : DecoratorInstancer(DecoratorClass::Image)
+{
+	RegisterProperty("from", "from").AddParser("keyword", "from");
+	ids.angle = RegisterProperty("angle", "0deg").AddParser("angle").GetId();
+
+	RegisterProperty("at", "unspecified").AddParser("keyword", "at, unspecified");
+	ids.position_x = RegisterProperty("position-x", "center").AddParser("keyword", "left, center, right").AddParser("length_percent").GetId();
+	ids.position_y = RegisterProperty("position-y", "center").AddParser("keyword", "top, center, bottom").AddParser("length_percent").GetId();
+
+	ids.color_stop_list = RegisterProperty("color-stops", "").AddParser("color_stop_list", "angle").GetId();
+
+	RegisterShorthand("shape", "from, angle, at, position-x, position-y, position-x", ShorthandType::FallThrough);
+	RegisterShorthand("decorator", "shape?, color-stops#", ShorthandType::RecursiveCommaSeparated);
+}
+
+DecoratorConicGradientInstancer::~DecoratorConicGradientInstancer() {}
+
+SharedPtr<Decorator> DecoratorConicGradientInstancer::InstanceDecorator(const String& name, const PropertyDictionary& properties_,
+	const DecoratorInstancerInterface& /*interface_*/)
+{
+	const Property* p_angle = properties_.GetProperty(ids.angle);
+	const Property* p_position[2] = {properties_.GetProperty(ids.position_x), properties_.GetProperty(ids.position_y)};
+	const Property* p_color_stop_list = properties_.GetProperty(ids.color_stop_list);
+
+	if (!p_angle || !p_position[0] || !p_position[1] || !p_color_stop_list)
+		return nullptr;
+
+	const float angle = ComputeAngle(p_angle->GetNumericValue());
+	const Vector2Numeric position = ComputePosition(p_position);
+	const bool repeating = (name == "repeating-conic-gradient");
+
+	if (p_color_stop_list->unit != Unit::COLORSTOPLIST)
+		return nullptr;
+	const ColorStopList& color_stop_list = p_color_stop_list->value.GetReference<ColorStopList>();
+
+	auto decorator = MakeShared<DecoratorConicGradient>();
+	if (decorator->Initialise(repeating, angle, position, color_stop_list))
 		return decorator;
 
 	return nullptr;
