@@ -185,7 +185,7 @@ void TestNavigator::ProcessEvent(Rml::Event& event)
 		}
 		else if (key_identifier == Rml::Input::KI_R && key_ctrl)
 		{
-			LoadActiveTest();
+			LoadActiveTest(true);
 		}
 		else if (key_identifier == Rml::Input::KI_S && key_ctrl)
 		{
@@ -349,10 +349,11 @@ void TestNavigator::ProcessEvent(Rml::Event& event)
 	}
 }
 
-void TestNavigator::LoadActiveTest()
+void TestNavigator::LoadActiveTest(bool keep_scroll_position)
 {
 	const TestSuite& suite = CurrentSuite();
-	viewer->LoadTest(suite.GetDirectory(), suite.GetFilename(), suite.GetIndex(), suite.GetNumTests(), suite.GetFilterIndex(), suite.GetNumFilteredTests(), suite_index, (int)test_suites.size());
+	viewer->LoadTest(suite.GetDirectory(), suite.GetFilename(), suite.GetIndex(), suite.GetNumTests(), suite.GetFilterIndex(),
+		suite.GetNumFilteredTests(), suite_index, (int)test_suites.size(), keep_scroll_position);
 	viewer->ShowSource(source_state);
 	ShowReference(false, true);
 	UpdateGoToText();
