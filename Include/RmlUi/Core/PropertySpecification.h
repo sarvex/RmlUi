@@ -56,6 +56,8 @@ enum class ShorthandType
 	RecursiveRepeat,
 	// Comma-separated list of properties or shorthands, the number of declared values must match the specified.
 	RecursiveCommaSeparated,
+	// The 'background' shorthand takes comma-separated decorators, with the last value optionally specifying a background-color.
+	Background,
 	// The 'flex' shorthand has some special behavior but otherwise acts like 'FallThrough'.
 	Flex
 };

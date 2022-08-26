@@ -27,15 +27,19 @@
  */
 
 #include "../Common/TestsInterface.h"
+#include "../Common/TestsShell.h"
+#include "../Common/TypesToString.h"
+#include <RmlUi/Core/ComputedValues.h>
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/Core.h>
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/ElementDocument.h>
+#include <RmlUi/Core/StyleSheetTypes.h>
 #include <doctest.h>
 
 using namespace Rml;
 
-TEST_CASE("Properties")
+TEST_CASE("Properties.flex")
 {
 	const Vector2i window_size(1024, 768);
 
@@ -89,4 +93,99 @@ TEST_CASE("Properties")
 	}
 
 	Rml::Shutdown();
+}
+
+static const String document_background = R"(
+<rml>
+<head>
+	<style>
+		body {
+			left: 0;
+			top: 0;
+			right: 0;
+			bottom: 0;
+		}
+		div {
+			display: block;
+			height: 128px;
+			width: 128px;
+			%s;
+		}
+	</style>
+</head>
+
+<body>
+<div/>
+</body>
+</rml>
+)";
+
+TEST_CASE("Properties.background")
+{
+	Context* context = TestsShell::GetContext();
+	REQUIRE(context);
+
+	struct BackgroundTestCase {
+		String style;
+
+		struct ExpectedValues {
+			Colourb background_color;
+			int num_decorators;
+			int num_warnings;
+		} expected;
+	};
+
+	const Colourb transparent(0, 0);
+	const Colourb blue(0, 0, 255);
+
+	// clang-format off
+	BackgroundTestCase tests[] = {
+		{"",                                                   {transparent, 0, 0}},
+		{"background: blue",                                   {blue,        0, 0}},
+		{"background: none",                                   {transparent, 0, 0}},
+		{"background: image(url.png)",                         {transparent, 1, 0}},
+		{"background: image(url.png), blue",                   {blue,        1, 0}},
+		{"background: blue, image(url.png)",                   {transparent, 2, 1}},
+		{"background: blue; background: none",                 {transparent, 0, 0}},
+		{"background: none, blue",                             {blue,        0, 0}},
+		{"background: blue; background: none",                 {transparent, 0, 0}},
+		{"background: blue; background: image(url.png)",       {transparent, 1, 0}},
+		{"background: image(url.png); background: blue",       {blue,        1, 0}},
+		{"background: image(url.png); background: none, blue", {blue,        0, 0}},
+		{"background: image(url.png) border-box, none, blue;", {blue,        2, 1}},
+		{"background: image(url.png) border-box, tiled-horizontal(a, b, c);",       {transparent, 2, 0}},
+		{"background: image(url.png) border-box, tiled-horizontal(a, b, c), blue;", {blue,        2, 0}},
+	};
+	// clang-format on
+
+	for (const BackgroundTestCase& test : tests)
+	{
+		INFO(test.style);
+		TestsShell::SetNumExpectedWarnings(test.expected.num_warnings);
+
+		const String document_str =
+			CreateString(document_background.size() + test.style.size() + 64, document_background.c_str(), test.style.c_str());
+
+		ElementDocument* document = context->LoadDocumentFromMemory(document_str);
+		document->Show();
+		TestsShell::RenderLoop();
+
+		Element* element = document->GetChild(0);
+		const Colourb background_color = element->GetComputedValues().background_color();
+		CHECK(background_color == test.expected.background_color);
+
+		int num_decorators = 0;
+		const Property* property = element->GetLocalProperty(PropertyId::Decorator);
+		if (property && property->unit == Unit::DECORATOR)
+		{
+			if (DecoratorsPtr decorators_ptr = property->Get<DecoratorsPtr>())
+				num_decorators = (int)decorators_ptr->list.size();
+		}
+
+		CHECK(num_decorators == test.expected.num_decorators);
+
+		document->Close();
+	}
+
+	TestsShell::ShutdownShell();
 }

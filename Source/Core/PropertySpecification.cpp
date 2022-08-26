@@ -272,18 +272,19 @@ bool PropertySpecification::ParseShorthandDeclaration(PropertyDictionary& dictio
 	if (!shorthand_definition)
 		return false;
 
-	const SplitOption split_option =
-		(shorthand_definition->type == ShorthandType::RecursiveCommaSeparated ? SplitOption::Comma : SplitOption::Whitespace);
+	const ShorthandType shorthand_type = shorthand_definition->type;
+	const bool split_by_comma = (shorthand_type == ShorthandType::RecursiveCommaSeparated || shorthand_type == ShorthandType::Background);
 
 	StringList property_values;
-	if (!ParsePropertyValues(property_values, property_value, split_option) || property_values.empty())
+	if (!ParsePropertyValues(property_values, property_value, split_by_comma ? SplitOption::Comma : SplitOption::Whitespace) ||
+		property_values.empty())
 		return false;
 
 	// Handle the special behavior of the flex shorthand first, otherwise it acts like 'FallThrough'.
 	if (shorthand_definition->type == ShorthandType::Flex)
 	{
-		RMLUI_ASSERT(shorthand_definition->items.size() == 3);
-		if (!property_values.empty() && property_values[0] == "none")
+		RMLUI_ASSERT(shorthand_definition->items.size() == 3 && !property_values.empty());
+		if (property_values[0] == "none")
 		{
 			property_values = {"0", "0", "auto"};
 		}
@@ -305,10 +306,9 @@ bool PropertySpecification::ParseShorthandDeclaration(PropertyDictionary& dictio
 		}
 	}
 
-	// If this definition is a 'box'-style shorthand (x-top, x-right, x-bottom, x-left, etc) and there are fewer
-	// than four values
-	if (shorthand_definition->type == ShorthandType::Box &&
-		property_values.size() < 4)
+	
+	// If this definition is a 'box'-style shorthand (x-top, x-right, x-bottom, x-left, etc) and there are fewer than four values
+	if (shorthand_definition->type == ShorthandType::Box && property_values.size() < 4)
 	{
 		// This array tells which property index each side is parsed from
 		Array<int, 4> box_side_to_value_index = { 0,0,0,0 };
@@ -404,6 +404,39 @@ bool PropertySpecification::ParseShorthandDeclaration(PropertyDictionary& dictio
 			
 			if (item.repeats)
 				break;
+		}
+	}
+	else if (shorthand_definition->type == ShorthandType::Background)
+	{
+		RMLUI_ASSERT(shorthand_definition->items.size() == 2 && !property_values.empty());
+		RMLUI_ASSERT(shorthand_definition->items[0].property_id == PropertyId::Decorator);
+		RMLUI_ASSERT(shorthand_definition->items[1].property_id == PropertyId::BackgroundColor);
+		const ShorthandItem& decorator = shorthand_definition->items[0];
+		const ShorthandItem& background_color = shorthand_definition->items[1];
+
+		String buffer;
+		const String* decorator_str = &property_value;
+
+		Property p_color;
+		if (background_color.property_definition->ParseValue(p_color, property_values.back()))
+		{
+			property_values.pop_back();
+			StringUtilities::JoinString(buffer, property_values, ',');
+			decorator_str = &buffer;
+		}
+		else
+		{
+			p_color = *background_color.property_definition->GetDefaultValue();
+		}
+
+		dictionary.SetProperty(PropertyId::BackgroundColor, p_color);
+
+		if (!decorator_str->empty())
+		{
+			Property p_decorator;
+			if (!decorator.property_definition->ParseValue(p_decorator, *decorator_str))
+				return false;
+			dictionary.SetProperty(PropertyId::Decorator, p_decorator);
 		}
 	}
 	else
