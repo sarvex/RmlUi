@@ -254,7 +254,7 @@ bool PropertySpecification::ParsePropertyDeclaration(PropertyDictionary& diction
 		return false;
 
 	StringList property_values;
-	if (!ParsePropertyValues(property_values, property_value, false) || property_values.size() == 0)
+	if (!ParsePropertyValues(property_values, property_value, SplitOption::None) || property_values.empty())
 		return false;
 
 	Property new_property;
@@ -268,13 +268,15 @@ bool PropertySpecification::ParsePropertyDeclaration(PropertyDictionary& diction
 // Parses a property declaration, setting any parsed and validated properties on the given dictionary.
 bool PropertySpecification::ParseShorthandDeclaration(PropertyDictionary& dictionary, ShorthandId shorthand_id, const String& property_value) const
 {
-	StringList property_values;
-	if (!ParsePropertyValues(property_values, property_value, true) || property_values.size() == 0)
-		return false;
-
-	// Parse as a shorthand.
 	const ShorthandDefinition* shorthand_definition = GetShorthand(shorthand_id);
 	if (!shorthand_definition)
+		return false;
+
+	const SplitOption split_option =
+		(shorthand_definition->type == ShorthandType::RecursiveCommaSeparated ? SplitOption::Comma : SplitOption::Whitespace);
+
+	StringList property_values;
+	if (!ParsePropertyValues(property_values, property_value, split_option) || property_values.empty())
 		return false;
 
 	// Handle the special behavior of the flex shorthand first, otherwise it acts like 'FallThrough'.
@@ -362,15 +364,12 @@ bool PropertySpecification::ParseShorthandDeclaration(PropertyDictionary& dictio
 	}
 	else if (shorthand_definition->type == ShorthandType::RecursiveCommaSeparated)
 	{
-		StringList subvalues;
-		StringUtilities::ExpandString(subvalues, property_value);
-
 		size_t num_optional = 0;
 		for (auto& item : shorthand_definition->items)
 			if (item.optional)
 				num_optional += 1;
 
-		if (subvalues.size() + num_optional < shorthand_definition->items.size())
+		if (property_values.size() + num_optional < shorthand_definition->items.size())
 		{
 			// Not enough subvalues declared.
 			return false;
@@ -378,18 +377,18 @@ bool PropertySpecification::ParseShorthandDeclaration(PropertyDictionary& dictio
 
 		size_t subvalue_i = 0;
 		String temp_subvalue; 
-		for (size_t i = 0; i < shorthand_definition->items.size() && subvalue_i < subvalues.size(); i++)
+		for (size_t i = 0; i < shorthand_definition->items.size() && subvalue_i < property_values.size(); i++)
 		{
 			bool result = false;
 
-			const String* subvalue = &subvalues[subvalue_i];
+			const String* subvalue = &property_values[subvalue_i];
 
 			const ShorthandItem& item = shorthand_definition->items[i];
 			if (item.repeats)
 			{
-				subvalues.erase(subvalues.begin(), subvalues.begin() + subvalue_i);
+				property_values.erase(property_values.begin(), property_values.begin() + subvalue_i);
 				temp_subvalue.clear();
-				StringUtilities::JoinString(temp_subvalue, subvalues);
+				StringUtilities::JoinString(temp_subvalue, property_values);
 				subvalue = &temp_subvalue;
 			}
 
@@ -480,173 +479,140 @@ String PropertySpecification::PropertiesToString(const PropertyDictionary& dicti
 	return result;
 }
 
-bool PropertySpecification::ParsePropertyValues(StringList& values_list, const String& values, bool split_values) const
+bool PropertySpecification::ParsePropertyValues(StringList& values_list, const String& values, const SplitOption split_option) const
 {
+	const bool split_values = (split_option != SplitOption::None);
+	const bool split_by_comma = (split_option == SplitOption::Comma);
+	const bool split_by_whitespace = (split_option == SplitOption::Whitespace);
+
 	String value;
 
-	enum ParseState { VALUE, VALUE_PARENTHESIS, VALUE_QUOTE };
+	auto SubmitValue = [&]() {
+		value = StringUtilities::StripWhitespace(value);
+		if (value.size() > 0)
+		{
+			values_list.push_back(value);
+			value.clear();
+		}
+	};
+
+	enum ParseState { VALUE, VALUE_PARENTHESIS, VALUE_QUOTE, VALUE_QUOTE_ESCAPE_NEXT };
 	ParseState state = VALUE;
 	int open_parentheses = 0;
-
 	size_t character_index = 0;
-	bool escape_next = false;
 
 	while (character_index < values.size())
 	{
 		const char character = values[character_index];
 		character_index++;
 
-		const bool escape_character = escape_next;
-		escape_next = false;
-
 		switch (state)
 		{
-			case VALUE:
+		case VALUE:
+		{
+			if (character == ';')
 			{
-				if (character == ';')
+				value = StringUtilities::StripWhitespace(value);
+				if (value.size() > 0)
 				{
-					value = StringUtilities::StripWhitespace(value);
-					if (value.size() > 0)
-					{
-						values_list.push_back(value);
-						value.clear();
-					}
+					values_list.push_back(value);
+					value.clear();
 				}
-				else if (StringUtilities::IsWhitespace(character))
-				{
-					if (split_values)
-					{
-						value = StringUtilities::StripWhitespace(value);
-						if (value.size() > 0)
-						{
-							values_list.push_back(value);
-							value.clear();
-						}
-					}
-					else
-						value += character;
-				}
-				else if (character == '"')
-				{
-					if (split_values)
-					{
-						value = StringUtilities::StripWhitespace(value);
-						if (value.size() > 0)
-						{
-							values_list.push_back(value);
-							value.clear();
-						}
-						state = VALUE_QUOTE;
-					}
-					else
-					{
-						value += ' ';
-						state = VALUE_QUOTE;
-					}
-				}
-				else if (character == '(')
-				{
-					open_parentheses = 1;
+			}
+			else if (split_by_comma ? (character == ',') : StringUtilities::IsWhitespace(character))
+			{
+				if (split_values)
+					SubmitValue();
+				else
 					value += character;
+			}
+			else if (character == '"')
+			{
+				state = VALUE_QUOTE;
+				if (split_by_whitespace)
+					SubmitValue();
+				else
+					value += (split_by_comma ? '"' : ' ');
+			}
+			else if (character == '(')
+			{
+				open_parentheses = 1;
+				value += character;
+				state = VALUE_PARENTHESIS;
+			}
+			else
+			{
+				value += character;
+			}
+		}
+		break;
+		case VALUE_PARENTHESIS:
+		{
+			if (character == '(')
+			{
+				open_parentheses++;
+			}
+			else if (character == ')')
+			{
+				open_parentheses--;
+				if (open_parentheses == 0)
+					state = VALUE;
+			}
+			else if (character == '"')
+			{
+				state = VALUE_QUOTE;
+			}
+
+			value += character;
+		}
+		break;
+		case VALUE_QUOTE:
+		{
+			if (character == '"')
+			{
+				if (open_parentheses == 0)
+				{
+					state = VALUE;
+					if (split_by_whitespace)
+						SubmitValue();
+					else
+						value += (split_by_comma ? '"' : ' ');
+				}
+				else
+				{
 					state = VALUE_PARENTHESIS;
-				}
-				else
-				{
 					value += character;
 				}
 			}
-			break;
-
-			case VALUE_PARENTHESIS:
+			else if (character == '\\')
 			{
-				if (escape_character)
-				{
-					if (character == ')' || character == '(' || character == '\\')
-					{
-						value += character;
-					}
-					else
-					{
-						value += '\\';
-						value += character;
-					}
-				}
-				else
-				{
-					if (character == '(')
-					{
-						open_parentheses++;
-						value += character;
-					}
-					else if (character == ')')
-					{
-						open_parentheses--;
-						value += character;
-						if (open_parentheses == 0)
-							state = VALUE;
-					}
-					else if (character == '\\')
-					{
-						escape_next = true;
-					}
-					else
-					{
-						value += character;
-					}
-				}
+				state = VALUE_QUOTE_ESCAPE_NEXT;
 			}
-			break;
-
-			case VALUE_QUOTE:
+			else
 			{
-				if (escape_character)
-				{
-					if (character == '"' || character == '\\')
-					{
-						value += character;
-					}
-					else
-					{
-						value += '\\';
-						value += character;
-					}
-				}
-				else
-				{
-					if (character == '"')
-					{
-						if (split_values)
-						{
-							value = StringUtilities::StripWhitespace(value);
-							if (value.size() > 0)
-							{
-								values_list.push_back(value);
-								value.clear();
-							}
-						}
-						else
-							value += ' ';
-						state = VALUE;
-					}
-					else if (character == '\\')
-					{
-						escape_next = true;
-					}
-					else
-					{
-						value += character;
-					}
-				}
+				value += character;
 			}
+		}
+		break;
+		case VALUE_QUOTE_ESCAPE_NEXT:
+		{
+			if (character == '"' || character == '\\')
+			{
+				value += character;
+			}
+			else
+			{
+				value += '\\';
+				value += character;
+			}
+			state = VALUE_QUOTE;
+		}
+		break;
 		}
 	}
 
 	if (state == VALUE)
-	{
-		value = StringUtilities::StripWhitespace(value);
-		if (value.size() > 0)
-			values_list.push_back(value);
-	}
+		SubmitValue();
 
 	return true;
 }
