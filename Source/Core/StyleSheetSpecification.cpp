@@ -374,10 +374,6 @@ void StyleSheetSpecification::RegisterDefaultProperties()
 	RegisterProperty(PropertyId::Clip, "clip", "auto", false, false).AddParser("keyword", "auto, none, always").AddParser("number");
 	RegisterProperty(PropertyId::Visibility, "visibility", "visible", false, false).AddParser("keyword", "visible, hidden");
 
-	// Need some work on this if we are to include images.
-	RegisterProperty(PropertyId::BackgroundColor, "background-color", "transparent", false, false).AddParser("color");
-	RegisterShorthand(ShorthandId::Background, "background", "background-color", ShorthandType::FallThrough);
-
 	RegisterProperty(PropertyId::Color, "color", "white", true, false).AddParser("color");
 
 	RegisterProperty(PropertyId::CaretColor, "caret-color", "auto", true, false).AddParser("keyword", "auto").AddParser("color");
@@ -432,6 +428,9 @@ void StyleSheetSpecification::RegisterDefaultProperties()
 	RegisterProperty(PropertyId::MaskImage, "mask-image", "", false, false).AddParser("decorator", "mask-image");
 
 	RegisterProperty(PropertyId::BoxShadow, "box-shadow", "none", false, false).AddParser("shadow");
+
+	RegisterProperty(PropertyId::BackgroundColor, "background-color", "transparent", false, false).AddParser("color");
+	RegisterShorthand(ShorthandId::Background, "background", "decorator, background-color", ShorthandType::Background);
 
 	// Rare properties (not added to computed values)
 	RegisterProperty(PropertyId::FillImage, "fill-image", "", false, false).AddParser("string");
