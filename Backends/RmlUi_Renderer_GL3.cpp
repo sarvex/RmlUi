@@ -97,7 +97,7 @@ void main() {
     gl_Position = outPos;
 }
 )";
-static const char* shader_frag_main_texture = RMLUI_SHADER_HEADER R"(
+static const char* shader_frag_texture = RMLUI_SHADER_HEADER R"(
 uniform sampler2D _tex;
 in vec2 fragTexCoord;
 in vec4 fragColor;
@@ -109,7 +109,7 @@ void main() {
 	finalColor = fragColor * texColor;
 }
 )";
-static const char* shader_frag_main_color = RMLUI_SHADER_HEADER R"(
+static const char* shader_frag_color = RMLUI_SHADER_HEADER R"(
 in vec2 fragTexCoord;
 in vec4 fragColor;
 
@@ -120,7 +120,7 @@ void main() {
 }
 )";
 enum class ShaderGradientFunction { Linear, Radial, Conic, RepeatingLinear, RepeatingRadial, RepeatingConic }; // Must match shader defines below.
-static const char* shader_frag_main_gradient = RMLUI_SHADER_HEADER R"(
+static const char* shader_frag_gradient = RMLUI_SHADER_HEADER R"(
 #define LINEAR 0
 #define RADIAL 1
 #define CONIC 2
@@ -181,7 +181,7 @@ void main() {
 }
 )";
 // "Creation" by Danilo Guanabara, based on: https://www.shadertoy.com/view/XsXXDn
-static const char* shader_frag_main_creation = RMLUI_SHADER_HEADER R"(
+static const char* shader_frag_creation = RMLUI_SHADER_HEADER R"(
 uniform float _value;
 uniform vec2 _dimensions;
 
@@ -239,7 +239,7 @@ void main() {
 	finalColor = _color_matrix * texColor;
 }
 )";
-static const char* shader_frag_dropshadow = RMLUI_SHADER_HEADER R"(
+static const char* shader_frag_drop_shadow = RMLUI_SHADER_HEADER R"(
 uniform sampler2D _tex;
 uniform vec2 _texCoordMin;
 uniform vec2 _texCoordMax;
@@ -269,7 +269,7 @@ void main() {
 #define RMLUI_SHADER_BLUR_HEADER \
 	RMLUI_SHADER_HEADER "\n#define BLUR_SIZE " RMLUI_STRINGIFY(BLUR_SIZE) "\n#define NUM_WEIGHTS " RMLUI_STRINGIFY(NUM_WEIGHTS)
 
-static const char* vert_blur = RMLUI_SHADER_BLUR_HEADER R"(
+static const char* shader_vert_blur = RMLUI_SHADER_BLUR_HEADER R"(
 uniform vec2 _texelOffset;
 
 in vec3 inPosition;
@@ -283,7 +283,7 @@ void main() {
     gl_Position = vec4(inPosition, 1.0);
 }
 )";
-static const char* frag_blur = RMLUI_SHADER_BLUR_HEADER R"(
+static const char* shader_frag_blur = RMLUI_SHADER_BLUR_HEADER R"(
 uniform sampler2D _tex;
 uniform float _weights[NUM_WEIGHTS];
 uniform vec2 _texCoordMin;
@@ -301,9 +301,38 @@ void main() {
 }
 )";
 
-namespace Gfx {
-
-enum class ProgramUniform {
+enum class ProgramId {
+	None,
+	Color,
+	Texture,
+	Gradient,
+	Creation,
+	Passthrough,
+	ColorMatrix,
+	DropShadow,
+	BlendMask,
+	Blur,
+	Count,
+};
+enum class VertShaderId {
+	Main,
+	Passthrough,
+	Blur,
+	Count,
+};
+enum class FragShaderId {
+	Color,
+	Texture,
+	Gradient,
+	Creation,
+	Passthrough,
+	ColorMatrix,
+	DropShadow,
+	BlendMask,
+	Blur,
+	Count,
+};
+enum class UniformId {
 	Translate,
 	Transform,
 	Tex,
@@ -322,14 +351,105 @@ enum class ProgramUniform {
 	StopPositions,
 	NumStops,
 	Dimensions,
-	Count
+	Count,
 };
-static const char* const program_uniform_names[(size_t)ProgramUniform::Count] = {"_translate", "_transform", "_tex", "_value", "_color",
-	"_color_matrix", "_texelOffset", "_texCoordMin", "_texCoordMax", "_weights[0]", "_texMask", "_func", "_p", "_v", "_stop_colors[0]",
-	"_stop_positions[0]", "_num_stops", "_dimensions"};
+
+namespace Gfx {
+
+static const char* const program_uniform_names[(size_t)UniformId::Count] = {"_translate", "_transform", "_tex", "_value", "_color", "_color_matrix",
+	"_texelOffset", "_texCoordMin", "_texCoordMax", "_weights[0]", "_texMask", "_func", "_p", "_v", "_stop_colors[0]", "_stop_positions[0]",
+	"_num_stops", "_dimensions"};
 
 enum class VertexAttribute { Position, Color0, TexCoord0, Count };
 static const char* const vertex_attribute_names[(size_t)VertexAttribute::Count] = {"inPosition", "inColor0", "inTexCoord0"};
+
+struct VertShaderDefinition {
+	VertShaderId id;
+	const char* name_str;
+	const char* code_str;
+};
+struct FragShaderDefinition {
+	FragShaderId id;
+	const char* name_str;
+	const char* code_str;
+};
+struct ProgramDefinition {
+	ProgramId id;
+	const char* name_str;
+	VertShaderId vert_shader;
+	FragShaderId frag_shader;
+};
+
+// clang-format off
+static const VertShaderDefinition vert_shader_definitions[] = {
+	{VertShaderId::Main,        "main",         shader_vert_main},
+	{VertShaderId::Passthrough, "passthrough",  shader_vert_passthrough},
+	{VertShaderId::Blur,        "blur",         shader_vert_blur},
+};
+static const FragShaderDefinition frag_shader_definitions[] = {
+	{FragShaderId::Color,       "color",        shader_frag_color},
+	{FragShaderId::Texture,     "texture",      shader_frag_texture},
+	{FragShaderId::Gradient,    "gradient",     shader_frag_gradient},
+	{FragShaderId::Creation,    "creation",     shader_frag_creation},
+	{FragShaderId::Passthrough, "passthrough",  shader_frag_passthrough},
+	{FragShaderId::ColorMatrix, "color_matrix", shader_frag_color_matrix},
+	{FragShaderId::DropShadow,  "drop_shadow",  shader_frag_drop_shadow},
+	{FragShaderId::BlendMask,   "blend_mask",   shader_frag_blend_mask},
+	{FragShaderId::Blur,        "blur",         shader_frag_blur},
+};
+static const ProgramDefinition program_definitions[] = {
+	{ProgramId::Color,       "color",        VertShaderId::Main,        FragShaderId::Color},
+	{ProgramId::Texture,     "texture",      VertShaderId::Main,        FragShaderId::Texture},
+	{ProgramId::Gradient,    "gradient",     VertShaderId::Main,        FragShaderId::Gradient},
+	{ProgramId::Creation,    "creation",     VertShaderId::Main,        FragShaderId::Creation},
+	{ProgramId::Passthrough, "passthrough",  VertShaderId::Passthrough, FragShaderId::Passthrough},
+	{ProgramId::ColorMatrix, "color_matrix", VertShaderId::Passthrough, FragShaderId::ColorMatrix},
+	{ProgramId::DropShadow,  "drop_shadow",  VertShaderId::Passthrough, FragShaderId::DropShadow},
+	{ProgramId::BlendMask,   "blend_mask",   VertShaderId::Passthrough, FragShaderId::BlendMask},
+	{ProgramId::Blur,        "blur",         VertShaderId::Blur,        FragShaderId::Blur},
+};
+// clang-format on
+
+template <typename T, typename Enum>
+class EnumArray {
+public:
+	const T& operator[](Enum id) const
+	{
+		RMLUI_ASSERT((size_t)id < (size_t)Enum::Count);
+		return ids[size_t(id)];
+	}
+	T& operator[](Enum id)
+	{
+		RMLUI_ASSERT((size_t)id < (size_t)Enum::Count);
+		return ids[size_t(id)];
+	}
+	auto begin() { return ids.begin(); }
+	auto end() { return ids.end(); }
+
+private:
+	Rml::Array<T, (size_t)Enum::Count> ids = {};
+};
+
+using Programs = EnumArray<GLuint, ProgramId>;
+using VertShaders = EnumArray<GLuint, VertShaderId>;
+using FragShaders = EnumArray<GLuint, FragShaderId>;
+
+class Uniforms {
+public:
+	GLint Get(ProgramId id, UniformId uniform) const
+	{
+		auto it = map.find(ToKey(id, uniform));
+		if (it != map.end())
+			return it->second;
+		return -1;
+	}
+	void Insert(ProgramId id, UniformId uniform, GLint location) { map[ToKey(id, uniform)] = location; }
+
+private:
+	using Key = std::uint64_t;
+	Key ToKey(ProgramId id, UniformId uniform) const { return (static_cast<Key>(id) << 32) | static_cast<Key>(uniform); }
+	Rml::UnorderedMap<Key, GLint> map;
+};
 
 struct CompiledGeometryData {
 	Rml::TextureHandle texture;
@@ -337,43 +457,6 @@ struct CompiledGeometryData {
 	GLuint vbo;
 	GLuint ibo;
 	GLsizei draw_count;
-};
-
-struct Shaders {
-	GLuint vert_main;
-	GLuint frag_main_color;
-	GLuint frag_main_texture;
-	GLuint frag_main_gradient;
-	GLuint frag_main_creation;
-
-	GLuint vert_passthrough;
-	GLuint frag_passthrough;
-	GLuint frag_color_matrix;
-	GLuint frag_dropshadow;
-
-	GLuint frag_blend_mask;
-
-	GLuint vert_blur;
-	GLuint frag_blur;
-};
-
-struct ProgramData {
-	GLuint id;
-	GLint uniform_locations[(size_t)ProgramUniform::Count];
-};
-struct Programs {
-	ProgramData main_color;
-	ProgramData main_texture;
-	ProgramData main_gradient;
-	ProgramData main_creation;
-
-	ProgramData passthrough;
-	ProgramData color_matrix;
-	ProgramData dropshadow;
-
-	ProgramData blend_mask;
-
-	ProgramData blur;
 };
 
 struct FramebufferData {
@@ -387,8 +470,10 @@ struct FramebufferData {
 
 enum class FramebufferAttachment { None, Depth, DepthStencil };
 
-static Shaders shaders = {};
-static Programs programs = {};
+static Programs programs;
+static VertShaders vert_shaders;
+static FragShaders frag_shaders;
+static Uniforms uniforms;
 static ProgramId active_program = ProgramId::None;
 static Rml::Matrix4f projection;
 
@@ -446,7 +531,7 @@ static bool CreateShader(GLuint& out_shader_id, GLenum shader_type, const char* 
 	return true;
 }
 
-static bool CreateProgram(ProgramData& out_program, GLuint vertex_shader, GLuint fragment_shader)
+static bool CreateProgram(GLuint& out_program, Uniforms& inout_uniform_map, ProgramId program_id, GLuint vertex_shader, GLuint fragment_shader)
 {
 	GLuint id = glCreateProgram();
 	RMLUI_ASSERT(id);
@@ -479,8 +564,7 @@ static bool CreateProgram(ProgramData& out_program, GLuint vertex_shader, GLuint
 		return false;
 	}
 
-	out_program = {};
-	out_program.id = id;
+	out_program = id;
 
 	// Make a lookup table for the uniform locations.
 	GLint num_active_uniforms = 0;
@@ -497,20 +581,20 @@ static bool CreateProgram(ProgramData& out_program, GLuint vertex_shader, GLuint
 		GLint location = glGetUniformLocation(id, name_buf);
 
 		// See if we have the name in our pre-defined name list.
-		ProgramUniform program_uniform = ProgramUniform::Count;
-		for (int i = 0; i < (int)ProgramUniform::Count; i++)
+		UniformId program_uniform = UniformId::Count;
+		for (int i = 0; i < (int)UniformId::Count; i++)
 		{
 			const char* uniform_name = program_uniform_names[i];
 			if (strcmp(name_buf, uniform_name) == 0)
 			{
-				program_uniform = (ProgramUniform)i;
+				program_uniform = (UniformId)i;
 				break;
 			}
 		}
 
-		if ((size_t)program_uniform < (size_t)ProgramUniform::Count)
+		if ((size_t)program_uniform < (size_t)UniformId::Count)
 		{
-			out_program.uniform_locations[(size_t)program_uniform] = location;
+			inout_uniform_map.Insert(program_id, program_uniform, location);
 		}
 		else
 		{
@@ -639,68 +723,36 @@ void BindTexture(const FramebufferData& fb)
 	glBindTexture(GL_TEXTURE_2D, fb.color_tex_buffer);
 }
 
-static bool CreateShaders(Shaders& out_shaders, Programs& out_programs)
+static bool CreateShaders()
 {
+	RMLUI_ASSERT(std::all_of(vert_shaders.begin(), vert_shaders.end(), [](auto&& value) { return value == 0; }));
+	RMLUI_ASSERT(std::all_of(frag_shaders.begin(), frag_shaders.end(), [](auto&& value) { return value == 0; }));
+	RMLUI_ASSERT(std::all_of(programs.begin(), programs.end(), [](auto&& value) { return value == 0; }));
 	auto ReportError = [](const char* type, const char* name) {
 		Rml::Log::Message(Rml::Log::LT_ERROR, "Could not create OpenGL %s: '%s'.", type, name);
 		return false;
 	};
 
-	out_shaders = {};
+	for (const VertShaderDefinition& def : vert_shader_definitions)
+	{
+		if (!CreateShader(vert_shaders[def.id], GL_VERTEX_SHADER, def.code_str))
+			return ReportError("vertex shader", def.name_str);
+	}
 
-	// Main shaders
-	if (!CreateShader(out_shaders.vert_main, GL_VERTEX_SHADER, shader_vert_main))
-		return ReportError("shader", "vert_main");
-	if (!CreateShader(out_shaders.frag_main_color, GL_FRAGMENT_SHADER, shader_frag_main_color))
-		return ReportError("shader", "frag_main_color");
-	if (!CreateShader(out_shaders.frag_main_texture, GL_FRAGMENT_SHADER, shader_frag_main_texture))
-		return ReportError("shader", "frag_main_texture");
-	if (!CreateShader(out_shaders.frag_main_gradient, GL_FRAGMENT_SHADER, shader_frag_main_gradient))
-		return ReportError("shader", "frag_main_gradient");
-	if (!CreateShader(out_shaders.frag_main_creation, GL_FRAGMENT_SHADER, shader_frag_main_creation))
-		return ReportError("shader", "frag_main_creation");
+	for (const FragShaderDefinition& def : frag_shader_definitions)
+	{
+		if (!CreateShader(frag_shaders[def.id], GL_FRAGMENT_SHADER, def.code_str))
+			return ReportError("fragment shader", def.name_str);
+	}
 
-	if (!CreateProgram(out_programs.main_color, out_shaders.vert_main, out_shaders.frag_main_color))
-		return ReportError("program", "main_color");
-	if (!CreateProgram(out_programs.main_texture, out_shaders.vert_main, out_shaders.frag_main_texture))
-		return ReportError("program", "main_texture");
-	if (!CreateProgram(out_programs.main_gradient, out_shaders.vert_main, out_shaders.frag_main_gradient))
-		return ReportError("program", "main_gradient");
-	if (!CreateProgram(out_programs.main_creation, out_shaders.vert_main, out_shaders.frag_main_creation))
-		return ReportError("program", "main_creation");
+	for (const ProgramDefinition& def : program_definitions)
+	{
+		if (!CreateProgram(programs[def.id], uniforms, def.id, vert_shaders[def.vert_shader], frag_shaders[def.frag_shader]))
+			return ReportError("program", def.name_str);
+	}
 
-	// Effects
-	if (!CreateShader(out_shaders.vert_passthrough, GL_VERTEX_SHADER, shader_vert_passthrough))
-		return ReportError("shader", "vert_passthrough");
-	if (!CreateShader(out_shaders.frag_passthrough, GL_FRAGMENT_SHADER, shader_frag_passthrough))
-		return ReportError("shader", "frag_passthrough");
-	if (!CreateShader(out_shaders.frag_color_matrix, GL_FRAGMENT_SHADER, shader_frag_color_matrix))
-		return ReportError("shader", "frag_color_matrix");
-	if (!CreateShader(out_shaders.frag_dropshadow, GL_FRAGMENT_SHADER, shader_frag_dropshadow))
-		return ReportError("shader", "frag_dropshadow");
-
-	if (!CreateProgram(out_programs.passthrough, out_shaders.vert_passthrough, out_shaders.frag_passthrough))
-		return ReportError("program", "passthrough");
-	if (!CreateProgram(out_programs.color_matrix, out_shaders.vert_passthrough, out_shaders.frag_color_matrix))
-		return ReportError("program", "color_matrix");
-	if (!CreateProgram(out_programs.dropshadow, out_shaders.vert_passthrough, out_shaders.frag_dropshadow))
-		return ReportError("program", "dropshadow");
-
-	// Blend mask
-	if (!CreateShader(out_shaders.frag_blend_mask, GL_FRAGMENT_SHADER, shader_frag_blend_mask))
-		return ReportError("shader", "frag_blend_mask");
-	if (!CreateProgram(out_programs.blend_mask, out_shaders.vert_passthrough, out_shaders.frag_blend_mask))
-		return ReportError("program", "blend_mask");
-	glUseProgram(Gfx::programs.blend_mask.id);
-	glUniform1i(Gfx::programs.blend_mask.uniform_locations[(int)Gfx::ProgramUniform::TexMask], 1);
-
-	// Blur
-	if (!CreateShader(out_shaders.vert_blur, GL_VERTEX_SHADER, vert_blur))
-		return ReportError("shader", "blur_vertex");
-	if (!CreateShader(out_shaders.frag_blur, GL_FRAGMENT_SHADER, frag_blur))
-		return ReportError("shader", "blur_fragment");
-	if (!CreateProgram(out_programs.blur, out_shaders.vert_blur, out_shaders.frag_blur))
-		return ReportError("program", "blur");
+	glUseProgram(programs[ProgramId::BlendMask]);
+	glUniform1i(uniforms.Get(ProgramId::BlendMask, UniformId::TexMask), 1);
 
 	glUseProgram(0);
 
@@ -709,32 +761,17 @@ static bool CreateShaders(Shaders& out_shaders, Programs& out_programs)
 
 static void DestroyShaders()
 {
-	glDeleteProgram(programs.main_color.id);
-	glDeleteProgram(programs.main_texture.id);
-	glDeleteProgram(programs.main_gradient.id);
-	glDeleteProgram(programs.main_creation.id);
-	glDeleteShader(shaders.vert_main);
-	glDeleteShader(shaders.frag_main_color);
-	glDeleteShader(shaders.frag_main_texture);
-	glDeleteShader(shaders.frag_main_gradient);
-	glDeleteShader(shaders.frag_main_creation);
+	for (auto&& id : programs)
+		glDeleteProgram(id);
 
-	glDeleteProgram(programs.passthrough.id);
-	glDeleteProgram(programs.color_matrix.id);
-	glDeleteProgram(programs.dropshadow.id);
-	glDeleteShader(shaders.vert_passthrough);
-	glDeleteShader(shaders.frag_passthrough);
-	glDeleteShader(shaders.frag_color_matrix);
-	glDeleteShader(shaders.frag_dropshadow);
+	for (auto&& id : vert_shaders)
+		glDeleteShader(id);
 
-	glDeleteProgram(programs.blend_mask.id);
-	glDeleteShader(shaders.frag_blend_mask);
+	for (auto&& id : frag_shaders)
+		glDeleteShader(id);
 
-	glDeleteProgram(programs.blur.id);
-	glDeleteShader(shaders.vert_blur);
-	glDeleteShader(shaders.frag_blur);
-
-	shaders = {};
+	vert_shaders = {};
+	frag_shaders = {};
 	programs = {};
 }
 
@@ -753,34 +790,12 @@ static void DrawFullscreenQuad(Rml::Vector2f uv_offset = {}, Rml::Vector2f uv_sc
 	render_interface->RenderGeometry(vertices, 4, indices, 6, RenderInterface_GL3::TexturePostprocess, {});
 }
 
-ProgramData* GetProgramData(ProgramId program_id)
-{
-	ProgramData* program = nullptr;
-	switch (program_id)
-	{
-	case ProgramId::Texture: program = &programs.main_texture; break;
-	case ProgramId::Color: program = &programs.main_color; break;
-	case ProgramId::Gradient: program = &programs.main_gradient; break;
-	case ProgramId::Creation: program = &programs.main_creation; break;
-	case ProgramId::Passthrough: program = &programs.passthrough; break;
-	case ProgramId::ColorMatrix: program = &programs.color_matrix; break;
-	case ProgramId::Blur: program = &programs.blur; break;
-	case ProgramId::Dropshadow: program = &programs.dropshadow; break;
-	case ProgramId::BlendMask: program = &programs.blend_mask; break;
-	case ProgramId::None:
-	case ProgramId::Count: break;
-	}
-	RMLUI_ASSERT(program);
-
-	return program;
-}
-
 void UseProgram(ProgramId program_id)
 {
 	if (active_program != program_id)
 	{
 		if (program_id != ProgramId::None)
-			glUseProgram(GetProgramData(program_id)->id);
+			glUseProgram(programs[program_id]);
 		active_program = program_id;
 	}
 }
@@ -1268,9 +1283,6 @@ enum class CompiledShaderType { Invalid = 0, Gradient, Creation };
 struct CompiledShader {
 	CompiledShaderType type;
 
-	// Common
-	Gfx::ProgramData* program;
-
 	// Gradient
 	ShaderGradientFunction gradient_function;
 	Rml::Vector2f p;
@@ -1337,7 +1349,6 @@ Rml::CompiledShaderHandle RenderInterface_GL3::CompileShader(const Rml::String& 
 		if (value == "creation")
 		{
 			shader.type = CompiledShaderType::Creation;
-			shader.program = &Gfx::programs.main_creation;
 			shader.dimensions = Rml::Get(parameters, "dimensions", Rml::Vector2f(0.f));
 		}
 	}
@@ -1349,12 +1360,12 @@ Rml::CompiledShaderHandle RenderInterface_GL3::CompileShader(const Rml::String& 
 	return {};
 }
 
-static void SetTexCoordLimits(const Gfx::ProgramData& program, Rml::Vector2i position, Rml::Vector2i size, Rml::Vector2i framebuffer_size)
+static void SetTexCoordLimits(ProgramId program, Rml::Vector2i position, Rml::Vector2i size, Rml::Vector2i framebuffer_size)
 {
 #ifdef RMLUI_DEBUG
-	GLint program_id = {};
-	glGetIntegerv(GL_CURRENT_PROGRAM, &program_id);
-	RMLUI_ASSERTMSG((GLuint)program_id == program.id, "Passed-in program must be currently active.");
+	GLint gl_id = {};
+	glGetIntegerv(GL_CURRENT_PROGRAM, &gl_id);
+	RMLUI_ASSERTMSG((GLuint)gl_id == Gfx::programs[program], "Passed-in program must be currently active.");
 #endif
 
 	// Offset by half-texel values so that texture lookups are clamped to fragment centers, thereby avoiding color bleeding from neighboring texels
@@ -1362,8 +1373,8 @@ static void SetTexCoordLimits(const Gfx::ProgramData& program, Rml::Vector2i pos
 	const Rml::Vector2f min = (Rml::Vector2f(position) + Rml::Vector2f(0.5f)) / Rml::Vector2f(framebuffer_size);
 	const Rml::Vector2f max = (Rml::Vector2f(position + size) - Rml::Vector2f(0.5f)) / Rml::Vector2f(framebuffer_size);
 
-	glUniform2f(program.uniform_locations[(int)Gfx::ProgramUniform::TexCoordMin], min.x, min.y);
-	glUniform2f(program.uniform_locations[(int)Gfx::ProgramUniform::TexCoordMax], max.x, max.y);
+	glUniform2f(Gfx::uniforms.Get(program, UniformId::TexCoordMin), min.x, min.y);
+	glUniform2f(Gfx::uniforms.Get(program, UniformId::TexCoordMax), max.x, max.y);
 }
 
 static void SigmaToParameters(const float desired_sigma, int& out_pass_level, float& out_sigma)
@@ -1391,14 +1402,14 @@ static void SetBlurWeights(float sigma)
 	for (int i = 0; i < num_weights; i++)
 		weights[i] /= normalization;
 
-	glUniform1fv(Gfx::programs.blur.uniform_locations[(int)Gfx::ProgramUniform::Weights], (GLsizei)num_weights, &weights[0]);
+	glUniform1fv(Gfx::uniforms.Get(ProgramId::Blur, UniformId::Weights), (GLsizei)num_weights, &weights[0]);
 }
 
 static void RenderBlurPass(const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp)
 {
 	auto SetTexelOffset = [](Rml::Vector2f blur_direction, int texture_dimension) {
 		const Rml::Vector2f texel_offset = blur_direction * (1.0f / float(texture_dimension));
-		glUniform2f(Gfx::programs.blur.uniform_locations[(int)Gfx::ProgramUniform::TexelOffset], texel_offset.x, texel_offset.y);
+		glUniform2f(Gfx::uniforms.Get(ProgramId::Blur, UniformId::TexelOffset), texel_offset.x, texel_offset.y);
 	};
 
 	// Vertical
@@ -1488,9 +1499,9 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	// Set up uniforms.
 	Gfx::UseProgram(ProgramId::Blur);
 	SetBlurWeights(sigma);
-	SetTexCoordLimits(Gfx::programs.blur, scissor_min, scissor_size, {source_destination.width, source_destination.height});
+	SetTexCoordLimits(ProgramId::Blur, scissor_min, scissor_size, {source_destination.width, source_destination.height});
 	const float blending_magnitude = 1.f;
-	glUniform1f(Gfx::programs.blur.uniform_locations[(int)Gfx::ProgramUniform::Value], blending_magnitude);
+	glUniform1f(Gfx::uniforms.Get(ProgramId::Blur, UniformId::Value), blending_magnitude);
 
 	// Now do the actual render pass.
 	RenderBlurPass(temp, source_destination);
@@ -1538,13 +1549,12 @@ void RenderInterface_GL3::RenderShader(Rml::CompiledShaderHandle shader_handle, 
 		const int num_stops = (int)shader.stop_positions.size();
 
 		Gfx::UseProgram(ProgramId::Gradient);
-		const auto& locations = Gfx::programs.main_gradient.uniform_locations;
-		glUniform1i(locations[(int)Gfx::ProgramUniform::Func], static_cast<int>(shader.gradient_function));
-		glUniform2fv(locations[(int)Gfx::ProgramUniform::P], 1, &shader.p.x);
-		glUniform2fv(locations[(int)Gfx::ProgramUniform::V], 1, &shader.v.x);
-		glUniform1i(locations[(int)Gfx::ProgramUniform::NumStops], num_stops);
-		glUniform1fv(locations[(int)Gfx::ProgramUniform::StopPositions], num_stops, shader.stop_positions.data());
-		glUniform4fv(locations[(int)Gfx::ProgramUniform::StopColors], num_stops, shader.stop_colors[0]);
+		glUniform1i(Gfx::uniforms.Get(ProgramId::Gradient, UniformId::Func), static_cast<int>(shader.gradient_function));
+		glUniform2fv(Gfx::uniforms.Get(ProgramId::Gradient, UniformId::P), 1, &shader.p.x);
+		glUniform2fv(Gfx::uniforms.Get(ProgramId::Gradient, UniformId::V), 1, &shader.v.x);
+		glUniform1i(Gfx::uniforms.Get(ProgramId::Gradient, UniformId::NumStops), num_stops);
+		glUniform1fv(Gfx::uniforms.Get(ProgramId::Gradient, UniformId::StopPositions), num_stops, shader.stop_positions.data());
+		glUniform4fv(Gfx::uniforms.Get(ProgramId::Gradient, UniformId::StopColors), num_stops, shader.stop_colors[0]);
 
 		SubmitTransformUniform(translation);
 		glBindVertexArray(geometry.vao);
@@ -1553,12 +1563,11 @@ void RenderInterface_GL3::RenderShader(Rml::CompiledShaderHandle shader_handle, 
 	break;
 	case CompiledShaderType::Creation:
 	{
-		const auto& locations = Gfx::programs.main_creation.uniform_locations;
 		const double time = Rml::GetSystemInterface()->GetElapsedTime();
 
 		Gfx::UseProgram(ProgramId::Creation);
-		glUniform1f(locations[(int)Gfx::ProgramUniform::Value], (float)time);
-		glUniform2fv(locations[(int)Gfx::ProgramUniform::Dimensions], 1, &shader.dimensions.x);
+		glUniform1f(Gfx::uniforms.Get(ProgramId::Creation, UniformId::Value), (float)time);
+		glUniform2fv(Gfx::uniforms.Get(ProgramId::Creation, UniformId::Dimensions), 1, &shader.dimensions.x);
 
 		SubmitTransformUniform(translation);
 		glBindVertexArray(geometry.vao);
@@ -1753,18 +1762,18 @@ void RenderInterface_GL3::RenderFilters()
 		case FilterType::DropShadow:
 		{
 			ScissorState original_scissor_state = scissor_state;
-			Gfx::UseProgram(ProgramId::Dropshadow);
+			Gfx::UseProgram(ProgramId::DropShadow);
 			glDisable(GL_BLEND);
 
 			Rml::Colourf color = ToPremultipliedAlpha(filter.color);
-			glUniform4fv(Gfx::programs.dropshadow.uniform_locations[(int)Gfx::ProgramUniform::Color], 1, &color[0]);
+			glUniform4fv(Gfx::uniforms.Get(ProgramId::DropShadow, UniformId::Color), 1, &color[0]);
 
 			const Gfx::FramebufferData& primary = render_state.GetPostprocessPrimary();
 			const Gfx::FramebufferData& secondary = render_state.GetPostprocessSecondary();
 			Gfx::BindTexture(primary);
 			glBindFramebuffer(GL_FRAMEBUFFER, secondary.framebuffer);
 
-			SetTexCoordLimits(Gfx::programs.dropshadow, {scissor_state.x, primary.height - (scissor_state.y + scissor_state.height)},
+			SetTexCoordLimits(ProgramId::DropShadow, {scissor_state.x, primary.height - (scissor_state.y + scissor_state.height)},
 				{scissor_state.width, scissor_state.height}, {primary.width, primary.height});
 
 			const Rml::Vector2f uv_offset = filter.offset / Rml::Vector2f(-(float)viewport_width, (float)viewport_height);
@@ -1811,7 +1820,7 @@ void RenderInterface_GL3::RenderFilters()
 			Gfx::UseProgram(ProgramId::ColorMatrix);
 			glDisable(GL_BLEND);
 
-			const GLint uniform_location = Gfx::programs.color_matrix.uniform_locations[(int)Gfx::ProgramUniform::ColorMatrix];
+			const GLint uniform_location = Gfx::uniforms.Get(ProgramId::ColorMatrix, UniformId::ColorMatrix);
 			constexpr bool transpose = std::is_same<decltype(filter.color_matrix), Rml::RowMajorMatrix4f>::value;
 			glUniformMatrix4fv(uniform_location, 1, transpose, filter.color_matrix.data());
 
@@ -1960,16 +1969,16 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 
 void RenderInterface_GL3::SubmitTransformUniform(Rml::Vector2f translation)
 {
-	Gfx::ProgramData* program = Gfx::GetProgramData(Gfx::active_program);
+	static_assert((size_t)ProgramId::Count < MaxNumPrograms, "Maximum number of programs exceeded.");
 	const size_t program_index = (size_t)Gfx::active_program;
 
 	if (program_transform_dirty.test(program_index))
 	{
-		glUniformMatrix4fv(program->uniform_locations[(int)Gfx::ProgramUniform::Transform], 1, false, transform.data());
+		glUniformMatrix4fv(Gfx::uniforms.Get(Gfx::active_program, UniformId::Transform), 1, false, transform.data());
 		program_transform_dirty.set(program_index, false);
 	}
 
-	glUniform2fv(program->uniform_locations[(int)Gfx::ProgramUniform::Translate], 1, &translation.x);
+	glUniform2fv(Gfx::uniforms.Get(Gfx::active_program, UniformId::Translate), 1, &translation.x);
 
 	Gfx::CheckGLError("SubmitTransformUniform");
 }
@@ -1990,7 +1999,7 @@ bool RmlGL3::Initialize()
 	Rml::Log::Message(Rml::Log::LT_INFO, "Loaded OpenGL %d.%d.", GLAD_VERSION_MAJOR(gl_version), GLAD_VERSION_MINOR(gl_version));
 #endif
 
-	if (!Gfx::CreateShaders(Gfx::shaders, Gfx::programs))
+	if (!Gfx::CreateShaders())
 		return false;
 
 	return true;
