@@ -33,7 +33,6 @@
 #include <bitset>
 
 struct CompiledFilter;
-enum class ProgramId { None, Texture, Color, Gradient, Creation, Passthrough, ColorMatrix, Blur, Dropshadow, BlendMask, Count };
 
 class RenderInterface_GL3 : public Rml::RenderInterface {
 public:
@@ -82,7 +81,9 @@ private:
 	void RenderFilters();
 
 	Rml::Matrix4f transform;
-	std::bitset<(size_t)ProgramId::Count> program_transform_dirty;
+
+	static constexpr size_t MaxNumPrograms = 32;
+	std::bitset<MaxNumPrograms> program_transform_dirty;
 
 	struct ScissorState {
 		bool enabled;
