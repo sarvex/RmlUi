@@ -30,6 +30,8 @@
 #define RMLUI_CORE_RENDERINTERFACE_H
 
 #include "Header.h"
+#include "RenderCommands.h"
+#include "RenderManager.h"
 #include "Texture.h"
 #include "Traits.h"
 #include "Types.h"
@@ -38,75 +40,6 @@
 namespace Rml {
 
 class Context;
-
-enum class ClipMaskOperation { Clip, ClipIntersect, ClipOut };
-enum class RenderClear { None, Clear, Clone };
-enum class RenderTarget { Layer, MaskImage, RenderTexture };
-enum class BlendMode { Blend, Replace };
-
-using RenderCommandUserData = uintptr_t;
-using FilterHandleList = Vector<CompiledFilterHandle>;
-
-struct RenderCommand {
-	enum class Type {
-		RenderGeometry,
-
-		EnableClipMask,
-		DisableClipMask,
-		RenderClipMask,
-
-		PushLayer,
-		PopLayer,
-
-		RenderShader,
-
-		AttachFilter,
-	};
-	Type type;
-
-	// -- Geometry, RenderClipMask, RenderShader
-	int vertices_offset;
-	int indices_offset;
-	int num_elements;
-
-	int translation_offset;
-	int transform_offset;
-
-	int scissor_offset;
-
-	TextureHandle texture; // Texture to attach to the geometry. PopLayer: Render texture target.
-
-	// -- RenderClipMask
-	ClipMaskOperation clip_mask_operation;
-
-	// -- RenderShader
-	CompiledShaderHandle shader;
-
-	// -- PushLayer
-	RenderClear clear_new_layer;
-
-	// -- PopLayer
-	RenderTarget render_target;
-	BlendMode blend_mode;
-	int filter_lists_offset;
-
-	// -- All
-	RenderCommandUserData user_data;
-};
-
-struct RenderCommandList {
-	Vector<Vertex> vertices;
-	Vector<int> indices;
-
-	Vector<Vector2f> translations;
-	Vector<Matrix4f> transforms;
-
-	Vector<Rectanglei> scissor_regions;
-
-	Vector<FilterHandleList> filter_lists;
-
-	Vector<RenderCommand> commands;
-};
 
 /**
     The abstract base class for application-specific rendering implementation. Your application must provide a concrete
@@ -154,6 +87,7 @@ public:
 
 	// -- DEPRECATED API (do nothing) --
 
+#if 1
 	/// Called by RmlUi when it wants to render geometry that the application does not wish to optimise. Note that
 	/// RmlUi renders everything as triangles.
 	/// @param[in] vertices The geometry's vertex data.
@@ -224,10 +158,14 @@ public:
 
 	/// Attach filter to be applied on the next call to PopLayer.
 	void AttachFilter(CompiledFilterHandle filter);
+#endif
+
+	// TODO: Remove
+	RenderManager manager = {};
 
 private:
 	Context* context;
-
+	
 	friend class Rml::Context;
 };
 

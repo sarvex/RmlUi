@@ -210,7 +210,9 @@ set(Core_PUB_HDR_FILES
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/PropertyParser.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/PropertySpecification.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Rectangle.h
+    ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/RenderCommands.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/RenderInterface.h
+    ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/RenderManager.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/RenderState.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/ScriptInterface.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Spritesheet.h
@@ -389,6 +391,7 @@ set(Core_SRC_FILES
     ${PROJECT_SOURCE_DIR}/Source/Core/PropertyParserTransform.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/PropertySpecification.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/RenderInterface.cpp
+    ${PROJECT_SOURCE_DIR}/Source/Core/RenderManager.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/RenderState.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Spritesheet.cpp
     ${PROJECT_SOURCE_DIR}/Source/Core/Stream.cpp

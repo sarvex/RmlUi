@@ -43,9 +43,11 @@ void RenderState::BeginRender()
 {
 	RMLUI_ASSERTMSG(stack.size() == 1, "Unbalanced render state push/pop detected.");
 
-	render_interface->EnableScissorRegion(false);
-	supports_clip_mask = render_interface->EnableClipMask(false);
-	render_interface->SetTransform(nullptr);
+	render_interface->manager.Reset();
+
+	// TODO
+	supports_clip_mask = true;
+	// supports_clip_mask = render_interface->EnableClipMask(false);
 
 	stack.back() = State{};
 }
@@ -66,15 +68,16 @@ void RenderState::SetScissorRegion(Rectanglei new_region)
 	const bool old_scissor_enable = state.scissor_region.Valid();
 	const bool new_scissor_enable = new_region.Valid();
 
-	if (new_scissor_enable != old_scissor_enable)
-		render_interface->EnableScissorRegion(new_scissor_enable);
-
 	if (new_scissor_enable)
 	{
 		new_region.Intersect(Rectanglei::FromSize(viewport_dimensions));
 
-		if (new_region != state.scissor_region)
-			render_interface->SetScissorRegion(new_region.Left(), new_region.Top(), new_region.Width(), new_region.Height());
+		if (!old_scissor_enable || new_region != state.scissor_region)
+			render_interface->manager.SetScissor(new_region);
+	}
+	else
+	{
+		render_interface->manager.DisableScissor();
 	}
 
 	state.scissor_region = new_region;
@@ -121,10 +124,15 @@ void RenderState::SetTransform(const Matrix4f* p_new_transform)
 		// Do a deep comparison as well to avoid submitting a new transform which is equal.
 		if (!p_active_transform || !p_new_transform || (active_transform != *p_new_transform))
 		{
-			render_interface->SetTransform(p_new_transform);
-
 			if (p_new_transform)
+			{
+				render_interface->manager.SetTransform(*p_new_transform);
 				active_transform = *p_new_transform;
+			}
+			else
+			{
+				render_interface->manager.DisableTransform();
+			}
 		}
 
 		p_active_transform = p_new_transform;
@@ -139,7 +147,8 @@ Rectanglei RenderState::GetScissorState() const
 void RenderState::ApplyClipMask(const ElementClipList& clip_elements)
 {
 	const bool clip_mask_enabled = !clip_elements.empty();
-	render_interface->EnableClipMask(clip_mask_enabled);
+	// TODO
+	// render_interface->EnableClipMask(clip_mask_enabled);
 
 	if (clip_mask_enabled)
 	{
@@ -184,7 +193,7 @@ void RenderState::Pop()
 void RenderState::Set(const State& next)
 {
 	SetScissorRegion(next.scissor_region);
-	
+
 	SetClipMask(next.clip_mask_elements);
 
 	// TODO: Is it safe to submit an old pointer here (e.g. in case of Pop())?

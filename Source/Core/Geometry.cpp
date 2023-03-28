@@ -70,9 +70,6 @@ void Geometry::MoveFrom(Geometry& other)
 	indices = std::move(other.indices);
 
 	texture = std::exchange(other.texture, nullptr);
-
-	compiled_geometry = std::exchange(other.compiled_geometry, 0);
-	compile_attempted = std::exchange(other.compile_attempted, false);
 }
 
 Geometry::~Geometry()
@@ -99,97 +96,42 @@ void Geometry::SetHostElement(Element* _host_element)
 
 void Geometry::Render(Vector2f translation)
 {
-	RenderInterface* const render_interface = GetRenderInterface();
-	if (!render_interface)
+	RenderInterface* render_interface = GetRenderInterface();
+	if (!render_interface || indices.empty())
 		return;
 
 	translation = translation.Round();
 
-	// Render our compiled geometry if possible.
-	if (compiled_geometry)
-	{
-		RMLUI_ZoneScopedN("RenderCompiled");
-		render_interface->RenderCompiledGeometry(compiled_geometry, translation);
-	}
-	// Otherwise, if we actually have geometry, try to compile it if we haven't already done so, otherwise render it in
-	// immediate mode.
-	else
-	{
-		if (vertices.empty() ||
-			indices.empty())
-			return;
-
-		RMLUI_ZoneScopedN("RenderGeometry");
-
-		if (!compile_attempted)
-		{
-			compile_attempted = true;
-			compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), texture ? texture->GetHandle(render_interface) : 0);
-
-			// If we managed to compile the geometry, we can clear the local copy of vertices and indices and
-			// immediately render the compiled version.
-			if (compiled_geometry)
-			{	
-				render_interface->RenderCompiledGeometry(compiled_geometry, translation);
-				return;
-			}
-		}
-
-		// Either we've attempted to compile before (and failed), or the compile we just attempted failed; either way,
-		// render the uncompiled version.
-		render_interface->RenderGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
-			texture ? texture->GetHandle(render_interface) : 0, translation);
-	}
+	render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
+		texture ? texture->GetHandle(render_interface) : 0, translation);
 }
 
 void Geometry::Render(CompiledShaderHandle shader_handle, Vector2f translation)
 {
 	RenderInterface* render_interface = GetRenderInterface();
-	if (!render_interface)
+	if (!render_interface || indices.empty())
 		return;
 
-	if (!compile_attempted)
-	{
-		if (vertices.empty() || indices.empty())
-			return;
+	translation = translation.Round();
+	RenderCommand& command = render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
+		texture ? texture->GetHandle(render_interface) : 0, translation);
 
-		RMLUI_ZoneScoped;
-
-		compile_attempted = true;
-		compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
-			texture ? texture->GetHandle(render_interface) : 0);
-	}
-
-	if (compiled_geometry)
-	{
-		translation = translation.Round();
-		render_interface->RenderShader(shader_handle, compiled_geometry, translation);
-	}
+	command.type = RenderCommandType::RenderShader;
+	command.shader = shader_handle;
 }
 
 void Geometry::RenderToClipMask(ClipMaskOperation clip_mask, Vector2f translation)
 {
 	RenderInterface* render_interface = GetRenderInterface();
-	if (!render_interface)
+	if (!render_interface || indices.empty())
 		return;
 
-	if (!compile_attempted)
-	{
-		if (vertices.empty() || indices.empty())
-			return;
+	translation = translation.Round();
+	RenderCommand& command = render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
+		texture ? texture->GetHandle(render_interface) : 0, translation);
 
-		RMLUI_ZoneScoped;
-
-		compile_attempted = true;
-		compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
-			texture ? texture->GetHandle(render_interface) : 0);
-	}
-
-	if (compiled_geometry)
-	{
-		translation = translation.Round();
-		render_interface->RenderToClipMask(clip_mask, compiled_geometry, translation);
-	}
+	command.type = RenderCommandType::RenderClipMask;
+	command.clip_mask_operation = clip_mask;
 }
 
 // Returns the geometry's vertices. If these are written to, Release() should be called to force a recompile.
@@ -219,14 +161,6 @@ void Geometry::SetTexture(const Texture* _texture)
 
 void Geometry::Release(bool clear_buffers)
 {
-	if (compiled_geometry)
-	{
-		GetRenderInterface()->ReleaseCompiledGeometry(compiled_geometry);
-		compiled_geometry = 0;
-	}
-
-	compile_attempted = false;
-
 	if (clear_buffers)
 	{
 		vertices.clear();

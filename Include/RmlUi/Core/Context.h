@@ -34,6 +34,7 @@
 #include "Traits.h"
 #include "Input.h"
 #include "RenderState.h"
+#include "RenderInterface.h"
 #include "ScriptInterface.h"
 
 namespace Rml {
@@ -88,6 +89,8 @@ public:
 	bool Update();
 	/// Renders all visible elements in the context's documents.
 	bool Render();
+
+	const RenderCommandList& GetRenderCommandList() { return GetRenderInterface()->manager.GetList(); }
 
 	/// Creates a new, empty document and places it into this context.
 	/// @param[in] instancer_name The name of the instancer used to create the document.

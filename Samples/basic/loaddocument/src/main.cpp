@@ -32,15 +32,6 @@
 
 Rml::Context* context = nullptr;
 
-void GameLoop()
-{
-	context->Update();
-
-	Shell::BeginFrame();
-	context->Render();
-	Shell::PresentFrame();
-}
-
 #if defined RMLUI_PLATFORM_WIN32
 	#include <RmlUi_Include_Windows.h>
 int APIENTRY WinMain(HINSTANCE /*instance_handle*/, HINSTANCE /*previous_instance_handle*/, char* /*command_line*/, int /*command_show*/)
@@ -78,7 +69,13 @@ int main(int /*argc*/, char** /*argv*/)
 	if (Rml::ElementDocument* document = context->LoadDocument("assets/demo.rml"))
 		document->Show();
 
-	Shell::EventLoop(GameLoop);
+	Shell::EventLoop([]() {
+		context->Update();
+
+		Shell::BeginFrame();
+		context->Render();
+		Shell::PresentFrame();
+	});
 
 	// Shutdown RmlUi.
 	Rml::Shutdown();

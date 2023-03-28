@@ -65,9 +65,6 @@
 	RMLUI_SHADER_HEADER_VERSION \
 	"#define RMLUI_PREMULTIPLIED_ALPHA " RMLUI_STRINGIFY(RMLUI_PREMULTIPLIED_ALPHA) "\n#define MAX_NUM_STOPS " RMLUI_STRINGIFY(MAX_NUM_STOPS) "\n"
 
-static int viewport_width = 0;
-static int viewport_height = 0;
-
 static constexpr int blur_size = BLUR_SIZE;
 static constexpr int num_weights = NUM_WEIGHTS;
 
@@ -775,21 +772,6 @@ static void DestroyShaders()
 	programs = {};
 }
 
-static void DrawFullscreenQuad(Rml::Vector2f uv_offset = {}, Rml::Vector2f uv_scaling = Rml::Vector2f(1.f))
-{
-	// Draw a fullscreen quad.
-	Rml::Vertex vertices[4];
-	int indices[6];
-	Rml::GeometryUtilities::GenerateQuad(vertices, indices, Rml::Vector2f(-1), Rml::Vector2f(2), {});
-	if (uv_offset != Rml::Vector2f() || uv_scaling != Rml::Vector2f(1.f))
-	{
-		for (Rml::Vertex& vertex : vertices)
-			vertex.tex_coord = (vertex.tex_coord * uv_scaling) + uv_offset;
-	}
-
-	render_interface->RenderGeometry(vertices, 4, indices, 6, RenderInterface_GL3::TexturePostprocess, {});
-}
-
 void UseProgram(ProgramId program_id)
 {
 	if (active_program != program_id)
@@ -810,15 +792,6 @@ RenderInterface_GL3::RenderInterface_GL3()
 RenderInterface_GL3::~RenderInterface_GL3()
 {
 	Gfx::render_interface = nullptr;
-}
-
-void RenderInterface_GL3::BeginFrame()
-{
-	Gfx::UseProgram(ProgramId::None);
-	has_mask = false;
-	program_transform_dirty.set();
-	SetTransform(nullptr);
-	scissor_state = {};
 }
 
 void RenderInterface_GL3::RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices, const Rml::TextureHandle texture,
@@ -933,6 +906,11 @@ void RenderInterface_GL3::SetScissorRegion(int x, int y, int width, int height)
 	scissor_state.width = width;
 	scissor_state.height = height;
 	Gfx::CheckGLError("SetScissorRegion");
+}
+
+void RenderInterface_GL3::SetScissorRegion(Rml::Rectanglei region)
+{
+	SetScissorRegion(region.Left(), region.Top(), region.Width(), region.Height());
 }
 
 bool RenderInterface_GL3::EnableClipMask(bool enable)
@@ -1141,6 +1119,21 @@ bool RenderInterface_GL3::GenerateTexture(Rml::TextureHandle& texture_handle, co
 	texture_handle = (Rml::TextureHandle)texture_id;
 
 	return true;
+}
+
+void RenderInterface_GL3::DrawFullscreenQuad(Rml::Vector2f uv_offset, Rml::Vector2f uv_scaling)
+{
+	// Draw a fullscreen quad.
+	Rml::Vertex vertices[4];
+	int indices[6];
+	Rml::GeometryUtilities::GenerateQuad(vertices, indices, Rml::Vector2f(-1), Rml::Vector2f(2), {});
+	if (uv_offset != Rml::Vector2f() || uv_scaling != Rml::Vector2f(1.f))
+	{
+		for (Rml::Vertex& vertex : vertices)
+			vertex.tex_coord = (vertex.tex_coord * uv_scaling) + uv_offset;
+	}
+
+	RenderGeometry(vertices, 4, indices, 6, RenderInterface_GL3::TexturePostprocess, {});
 }
 
 void RenderInterface_GL3::ReleaseTexture(Rml::TextureHandle texture_handle)
@@ -1405,7 +1398,7 @@ static void SetBlurWeights(float sigma)
 	glUniform1fv(Gfx::uniforms.Get(ProgramId::Blur, UniformId::Weights), (GLsizei)num_weights, &weights[0]);
 }
 
-static void RenderBlurPass(const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp)
+void RenderInterface_GL3::RenderBlurPass(const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp)
 {
 	auto SetTexelOffset = [](Rml::Vector2f blur_direction, int texture_dimension) {
 		const Rml::Vector2f texel_offset = blur_direction * (1.0f / float(texture_dimension));
@@ -1417,18 +1410,18 @@ static void RenderBlurPass(const Gfx::FramebufferData& source_destination, const
 	glBindFramebuffer(GL_FRAMEBUFFER, temp.framebuffer);
 
 	SetTexelOffset({0.f, 1.f}, source_destination.height);
-	Gfx::DrawFullscreenQuad();
+	DrawFullscreenQuad();
 
 	// Horizontal
 	Gfx::BindTexture(temp);
 	glBindFramebuffer(GL_FRAMEBUFFER, source_destination.framebuffer);
 
 	SetTexelOffset({1.f, 0.f}, temp.width);
-	Gfx::DrawFullscreenQuad();
+	DrawFullscreenQuad();
 }
 
-static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp, Rml::Vector2i position,
-	Rml::Vector2i size)
+void RenderInterface_GL3::RenderBlur(float sigma, const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp,
+	Rml::Vector2i position, Rml::Vector2i size)
 {
 	RMLUI_ASSERT(&source_destination != &temp && source_destination.width == temp.width && source_destination.height == temp.height);
 
@@ -1474,7 +1467,7 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 		glBindFramebuffer(GL_FRAMEBUFFER, (from_source ? temp : source_destination).framebuffer);
 		glScissor(scissor_min.x, scissor_min.y, scissor_size.x, scissor_size.y);
 
-		Gfx::DrawFullscreenQuad({}, uv_scaling);
+		DrawFullscreenQuad({}, uv_scaling);
 	}
 
 	glViewport(0, 0, source_destination.width, source_destination.height);
@@ -1483,7 +1476,7 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 	{
 		Gfx::BindTexture(source_destination);
 		glBindFramebuffer(GL_FRAMEBUFFER, temp.framebuffer);
-		Gfx::DrawFullscreenQuad();
+		DrawFullscreenQuad();
 	}
 
 #if 0
@@ -1777,7 +1770,7 @@ void RenderInterface_GL3::RenderFilters()
 				{scissor_state.width, scissor_state.height}, {primary.width, primary.height});
 
 			const Rml::Vector2f uv_offset = filter.offset / Rml::Vector2f(-(float)viewport_width, (float)viewport_height);
-			Gfx::DrawFullscreenQuad(uv_offset);
+			DrawFullscreenQuad(uv_offset);
 
 			if (filter.sigma >= 0.5f)
 			{
@@ -1793,7 +1786,7 @@ void RenderInterface_GL3::RenderFilters()
 			Gfx::UseProgram(ProgramId::Passthrough);
 			Gfx::BindTexture(primary);
 			glEnable(GL_BLEND);
-			Gfx::DrawFullscreenQuad();
+			DrawFullscreenQuad();
 
 			render_state.SwapPostprocessPrimarySecondary();
 		}
@@ -1809,7 +1802,7 @@ void RenderInterface_GL3::RenderFilters()
 			Gfx::BindTexture(source);
 			glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
 
-			Gfx::DrawFullscreenQuad();
+			DrawFullscreenQuad();
 
 			render_state.SwapPostprocessPrimarySecondary();
 			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -1829,7 +1822,7 @@ void RenderInterface_GL3::RenderFilters()
 			Gfx::BindTexture(source);
 			glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
 
-			Gfx::DrawFullscreenQuad();
+			DrawFullscreenQuad();
 
 			render_state.SwapPostprocessPrimarySecondary();
 			glEnable(GL_BLEND);
@@ -1915,7 +1908,7 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 		if (blend_mode == BlendMode::Replace)
 			glDisable(GL_BLEND);
 
-		Gfx::DrawFullscreenQuad();
+		DrawFullscreenQuad();
 
 		if (blend_mode == BlendMode::Replace)
 			glEnable(GL_BLEND);
@@ -1983,7 +1976,7 @@ void RenderInterface_GL3::SubmitTransformUniform(Rml::Vector2f translation)
 	Gfx::CheckGLError("SubmitTransformUniform");
 }
 
-bool RmlGL3::Initialize()
+bool RenderInterface_GL3::Initialize()
 {
 #if defined RMLUI_PLATFORM_EMSCRIPTEN
 	Rml::Log::Message(Rml::Log::LT_INFO, "Initializing Emscripten WebGL renderer.");
@@ -2005,7 +1998,7 @@ bool RmlGL3::Initialize()
 	return true;
 }
 
-void RmlGL3::Shutdown()
+void RenderInterface_GL3::Shutdown()
 {
 	render_state.Shutdown();
 
@@ -2019,13 +2012,13 @@ void RmlGL3::Shutdown()
 	viewport_height = 0;
 }
 
-void RmlGL3::SetViewport(int width, int height)
+void RenderInterface_GL3::SetViewport(int width, int height)
 {
 	viewport_width = width;
 	viewport_height = height;
 }
 
-void RmlGL3::BeginFrame()
+void RenderInterface_GL3::BeginFrame()
 {
 	RMLUI_ASSERT(viewport_width > 0 && viewport_height > 0);
 	glViewport(0, 0, viewport_width, viewport_height);
@@ -2057,13 +2050,120 @@ void RmlGL3::BeginFrame()
 
 	Gfx::projection = Rml::Matrix4f::ProjectOrtho(0, (float)viewport_width, (float)viewport_height, 0, -10000, 10000);
 
-	if (Gfx::render_interface)
-		Gfx::render_interface->BeginFrame();
+	Gfx::UseProgram(ProgramId::None);
+	has_mask = false;
+	program_transform_dirty.set();
+	SetTransform(nullptr);
+	scissor_state = {};
 
 	Gfx::CheckGLError("BeginFrame");
 }
 
-void RmlGL3::EndFrame()
+void RenderInterface_GL3::RenderFrame(const Rml::RenderCommandList& commands)
+{
+	const Rml::CompiledGeometryHandle geometry_handle = CompileGeometry((Rml::Vertex*)commands.vertices.data(), (int)commands.vertices.size(),
+		(int*)commands.indices.data(), (int)commands.indices.size(), {});
+	const Gfx::CompiledGeometryData* geometry = reinterpret_cast<Gfx::CompiledGeometryData*>(geometry_handle);
+
+	SetTransform(nullptr);
+	EnableScissorRegion(false);
+
+	int previous_scissor_offset = 0;
+	int previous_transform_offset = 0;
+
+	for (const Rml::RenderCommand& command : commands.commands)
+	{
+		using Type = Rml::RenderCommandType;
+
+		switch (command.type)
+		{
+		case Type::RenderGeometry:
+		{
+			if (command.scissor_offset != previous_scissor_offset)
+			{
+				if (command.scissor_offset)
+				{
+					if (!previous_scissor_offset)
+						EnableScissorRegion(true);
+
+					SetScissorRegion(commands.scissor_regions[command.scissor_offset]);
+				}
+				else
+				{
+					EnableScissorRegion(false);
+				}
+
+				previous_scissor_offset = command.scissor_offset;
+			}
+
+			if (command.transform_offset != previous_transform_offset)
+			{
+				if (command.transform_offset)
+					SetTransform(&commands.transforms[command.transform_offset]);
+				else
+					SetTransform(nullptr);
+
+				previous_transform_offset = command.transform_offset;
+			}
+
+			const Rml::Vector2f translation = commands.translations[command.translation_offset];
+			if (command.texture == TexturePostprocess)
+			{
+				// Do nothing.
+			}
+			else if (command.texture)
+			{
+				Gfx::UseProgram(ProgramId::Texture);
+				SubmitTransformUniform(translation);
+				if (command.texture != TextureIgnoreBinding)
+					glBindTexture(GL_TEXTURE_2D, (GLuint)command.texture);
+			}
+			else
+			{
+				Gfx::UseProgram(ProgramId::Color);
+				SubmitTransformUniform(translation);
+			}
+
+			glBindVertexArray(geometry->vao);
+			glDrawElementsBaseVertex(GL_TRIANGLES, command.num_elements, GL_UNSIGNED_INT, (const GLvoid*)(sizeof(int) * command.indices_offset),
+				(GLint)command.vertices_offset);
+		}
+		break;
+		case Type::EnableClipMask:
+		{
+		}
+		break;
+		case Type::DisableClipMask:
+		{
+		}
+		break;
+		case Type::RenderClipMask:
+		{
+		}
+		break;
+		case Type::PushLayer:
+		{
+		}
+		break;
+		case Type::PopLayer:
+		{
+		}
+		break;
+		case Type::RenderShader:
+		{
+		}
+		break;
+		case Type::AttachFilter:
+		{
+		}
+		break;
+		}
+	}
+
+	ReleaseCompiledGeometry(geometry_handle);
+}
+
+void RenderInterface_GL3::EndFrame()
 {
 	const Gfx::FramebufferData& fb_active = render_state.GetTopLayer();
 	const Gfx::FramebufferData& fb_postprocess = render_state.GetPostprocessPrimary();
@@ -2084,14 +2184,14 @@ void RmlGL3::EndFrame()
 	glActiveTexture(GL_TEXTURE0);
 	Gfx::BindTexture(fb_postprocess);
 	Gfx::UseProgram(ProgramId::Passthrough);
-	Gfx::DrawFullscreenQuad();
+	DrawFullscreenQuad();
 
 	render_state.EndFrame();
 
 	Gfx::CheckGLError("EndFrame");
 }
 
-void RmlGL3::Clear()
+void RenderInterface_GL3::Clear()
 {
 	glClearStencil(0);
 	glClearColor(0, 0, 0, 0);

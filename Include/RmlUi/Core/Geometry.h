@@ -116,9 +116,6 @@ private:
 	Vector< int > indices;
 	const Texture* texture = nullptr;
 
-	CompiledGeometryHandle compiled_geometry = 0;
-	bool compile_attempted = false;
-
 	GeometryDatabaseHandle database_handle;
 };
 

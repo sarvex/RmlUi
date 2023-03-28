@@ -33,53 +33,77 @@
 #include <bitset>
 
 struct CompiledFilter;
+namespace Gfx {
+struct FramebufferData;
+}
 
 class RenderInterface_GL3 : public Rml::RenderInterface {
 public:
 	RenderInterface_GL3();
 	~RenderInterface_GL3();
 
-	void BeginFrame();
-
-	void RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices, Rml::TextureHandle texture,
-		const Rml::Vector2f& translation) override;
-
-	Rml::CompiledGeometryHandle CompileGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices,
-		Rml::TextureHandle texture) override;
-	void RenderCompiledGeometry(Rml::CompiledGeometryHandle geometry, const Rml::Vector2f& translation) override;
-	void ReleaseCompiledGeometry(Rml::CompiledGeometryHandle geometry) override;
-
-	void EnableScissorRegion(bool enable) override;
-	void SetScissorRegion(int x, int y, int width, int height) override;
-
-	bool EnableClipMask(bool enable) override;
-	void RenderToClipMask(Rml::ClipMaskOperation mask_operation, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation) override;
+	// -- Inherited from Rml::Interface
 
 	bool LoadTexture(Rml::TextureHandle& texture_handle, Rml::Vector2i& texture_dimensions, const Rml::String& source) override;
 	bool GenerateTexture(Rml::TextureHandle& texture_handle, const Rml::byte* source, const Rml::Vector2i& source_dimensions) override;
 	void ReleaseTexture(Rml::TextureHandle texture_handle) override;
 
-	void SetTransform(const Rml::Matrix4f* transform) override;
-
 	Rml::CompiledShaderHandle CompileShader(const Rml::String& name, const Rml::Dictionary& parameters) override;
-	void RenderShader(Rml::CompiledShaderHandle shader, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation) override;
 	void ReleaseCompiledShader(Rml::CompiledShaderHandle shader) override;
 
 	Rml::CompiledFilterHandle CompileFilter(const Rml::String& name, const Rml::Dictionary& parameters) override;
-	void AttachFilter(Rml::CompiledFilterHandle filter) override;
 	void ReleaseCompiledFilter(Rml::CompiledFilterHandle filter) override;
 
-	void PushLayer(Rml::RenderClear clear_new_layer) override;
-	Rml::TextureHandle PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode) override;
+	// -- Public methods
 
+	void BeginFrame();
+	void RenderFrame(const Rml::RenderCommandList& commands);
+	void EndFrame();
+
+	bool Initialize();
+	void Shutdown();
+
+	void Clear();
+
+	void SetViewport(int width, int height);
+
+	// -- Constants
 	static const Rml::TextureHandle TextureIgnoreBinding = Rml::TextureHandle(-1);
 	static const Rml::TextureHandle TexturePostprocess = Rml::TextureHandle(-2);
 
 private:
+	// -- Render helpers
+	void RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices, Rml::TextureHandle texture,
+		const Rml::Vector2f& translation);
+
+	Rml::CompiledGeometryHandle CompileGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices, Rml::TextureHandle texture);
+	void RenderCompiledGeometry(Rml::CompiledGeometryHandle geometry, const Rml::Vector2f& translation);
+	void ReleaseCompiledGeometry(Rml::CompiledGeometryHandle geometry);
+
+	void EnableScissorRegion(bool enable);
+	void SetScissorRegion(int x, int y, int width, int height);
+	void SetScissorRegion(Rml::Rectanglei region);
+
+	bool EnableClipMask(bool enable);
+	void RenderToClipMask(Rml::ClipMaskOperation mask_operation, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation);
+	void SetTransform(const Rml::Matrix4f* transform);
+
+	void RenderShader(Rml::CompiledShaderHandle shader, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation);
+	void AttachFilter(Rml::CompiledFilterHandle filter);
+	void PushLayer(Rml::RenderClear clear_new_layer);
+	Rml::TextureHandle PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode);
+
 	void SubmitTransformUniform(Rml::Vector2f translation);
 
 	void RenderFilters();
 
+	void DrawFullscreenQuad(Rml::Vector2f uv_offset = {}, Rml::Vector2f uv_scaling = Rml::Vector2f(1.f));
+
+	void RenderBlurPass(const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp);
+	void RenderBlur(float sigma, const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp, Rml::Vector2i position,
+		Rml::Vector2i size);
+
+	// -- State
 	Rml::Matrix4f transform;
 
 	static constexpr size_t MaxNumPrograms = 32;
@@ -93,20 +117,9 @@ private:
 
 	Rml::Vector<CompiledFilter*> attached_filters;
 	bool has_mask = false;
+
+	int viewport_width = 0;
+	int viewport_height = 0;
 };
-
-namespace RmlGL3 {
-
-bool Initialize();
-void Shutdown();
-
-void SetViewport(int width, int height);
-
-void BeginFrame();
-void EndFrame();
-
-void Clear();
-
-} // namespace RmlGL3
 
 #endif
