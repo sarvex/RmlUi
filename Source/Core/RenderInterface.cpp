@@ -79,6 +79,11 @@ bool RenderInterface::GenerateTexture(TextureHandle& /*texture_handle*/, const b
 	return false;
 }
 
+bool RenderInterface::GenerateRenderTexture(TextureHandle& /*texture_handle*/, Vector2i /*dimensions*/)
+{
+	return false;
+}
+
 // Called by RmlUi when a loaded texture is no longer required.
 void RenderInterface::ReleaseTexture(TextureHandle /*texture*/)
 {
