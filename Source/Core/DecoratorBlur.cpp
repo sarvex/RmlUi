@@ -55,23 +55,23 @@ DecoratorDataHandle DecoratorBlur::GenerateElementData(Element* element) const
 	const float radius = element->ResolveLength(radius_value);
 	CompiledFilterHandle handle = render_interface->CompileFilter("blur", Dictionary{{"radius", Variant(radius)}});
 
-	BasicFilterElementData* element_data = GetBasicFilterElementDataPool().AllocateAndConstruct(render_interface, handle);
+	BasicFilterElementData* element_data = GetBasicFilterElementDataPool().AllocateAndConstruct(&render_interface->manager, handle);
 	return reinterpret_cast<DecoratorDataHandle>(element_data);
 }
 
 void DecoratorBlur::ReleaseElementData(DecoratorDataHandle handle) const
 {
 	BasicFilterElementData* element_data = reinterpret_cast<BasicFilterElementData*>(handle);
-	RMLUI_ASSERT(element_data && element_data->render_interface);
+	RMLUI_ASSERT(element_data && element_data->render_manager);
 
-	element_data->render_interface->ReleaseCompiledFilter(element_data->filter);
+	element_data->render_manager->QueueReleaseFilter(element_data->filter);
 	GetBasicFilterElementDataPool().DestroyAndDeallocate(element_data);
 }
 
 void DecoratorBlur::RenderElement(Element* /*element*/, DecoratorDataHandle handle) const
 {
 	BasicFilterElementData* element_data = reinterpret_cast<BasicFilterElementData*>(handle);
-	element_data->render_interface->AttachFilter(element_data->filter);
+	element_data->render_manager->AttachFilter(element_data->filter);
 }
 
 void DecoratorBlur::ModifyScissorRegion(Element* element, Rectanglef& scissor_region) const

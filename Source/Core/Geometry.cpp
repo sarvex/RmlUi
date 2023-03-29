@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -34,7 +34,6 @@
 #include "../../Include/RmlUi/Core/RenderInterface.h"
 #include "GeometryDatabase.h"
 #include <utility>
-
 
 namespace Rml {
 
@@ -102,10 +101,13 @@ void Geometry::Render(Vector2f translation)
 
 	translation = translation.Round();
 
+	// Note that Texture::GetHandle can invalidate command pointers due to callbacks.
+	TextureHandle texture_handle = (texture ? texture->GetHandle(render_interface) : 0);
+
 	RenderCommand& command =
 		render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
-	if (texture)
-		command.texture = texture->GetHandle(render_interface);
+	command.texture = texture_handle;
+	render_interface->manager.ApplyAttachedFilters(command);
 }
 
 void Geometry::Render(CompiledShaderHandle shader_handle, Vector2f translation)
@@ -115,13 +117,14 @@ void Geometry::Render(CompiledShaderHandle shader_handle, Vector2f translation)
 		return;
 
 	translation = translation.Round();
+	TextureHandle texture_handle = (texture ? texture->GetHandle(render_interface) : 0);
+
 	RenderCommand& command =
 		render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
 
 	command.type = RenderCommandType::RenderShader;
 	command.render_shader.handle = shader_handle;
-	if (texture)
-		command.texture = texture->GetHandle(render_interface);
+	command.texture = texture_handle;
 }
 
 void Geometry::RenderToClipMask(ClipMaskOperation clip_mask, Vector2f translation)
@@ -131,23 +134,23 @@ void Geometry::RenderToClipMask(ClipMaskOperation clip_mask, Vector2f translatio
 		return;
 
 	translation = translation.Round();
+	TextureHandle texture_handle = (texture ? texture->GetHandle(render_interface) : 0);
 	RenderCommand& command =
 		render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
 
 	command.type = RenderCommandType::RenderClipMask;
 	command.render_clip_mask.operation = clip_mask;
-	if (texture)
-		command.texture = texture->GetHandle(render_interface);
+	command.texture = texture_handle;
 }
 
 // Returns the geometry's vertices. If these are written to, Release() should be called to force a recompile.
-Vector< Vertex >& Geometry::GetVertices()
+Vector<Vertex>& Geometry::GetVertices()
 {
 	return vertices;
 }
 
 // Returns the geometry's indices. If these are written to, Release() should be called to force a recompile.
-Vector< int >& Geometry::GetIndices()
+Vector<int>& Geometry::GetIndices()
 {
 	return indices;
 }

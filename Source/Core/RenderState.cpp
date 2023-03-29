@@ -43,7 +43,7 @@ void RenderState::BeginRender()
 {
 	RMLUI_ASSERTMSG(stack.size() == 1, "Unbalanced render state push/pop detected.");
 
-	render_interface->manager.Reset();
+	render_interface->manager.Reset(render_interface);
 
 	// TODO
 	supports_clip_mask = true;

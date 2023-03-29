@@ -55,23 +55,23 @@ DecoratorDataHandle DecoratorBasicFilter::GenerateElementData(Element* element) 
 
 	CompiledFilterHandle handle = render_interface->CompileFilter(name, Dictionary{{"value", Variant(value)}});
 
-	BasicFilterElementData* element_data = GetBasicFilterElementDataPool().AllocateAndConstruct(render_interface, handle);
+	BasicFilterElementData* element_data = GetBasicFilterElementDataPool().AllocateAndConstruct(&render_interface->manager, handle);
 	return reinterpret_cast<DecoratorDataHandle>(element_data);
 }
 
 void DecoratorBasicFilter::ReleaseElementData(DecoratorDataHandle handle) const
 {
 	BasicFilterElementData* element_data = reinterpret_cast<BasicFilterElementData*>(handle);
-	RMLUI_ASSERT(element_data && element_data->render_interface);
+	RMLUI_ASSERT(element_data && element_data->render_manager);
 
-	element_data->render_interface->ReleaseCompiledFilter(element_data->filter);
+	element_data->render_manager->QueueReleaseFilter(element_data->filter);
 	GetBasicFilterElementDataPool().DestroyAndDeallocate(element_data);
 }
 
 void DecoratorBasicFilter::RenderElement(Element* /*element*/, DecoratorDataHandle handle) const
 {
 	BasicFilterElementData* element_data = reinterpret_cast<BasicFilterElementData*>(handle);
-	element_data->render_interface->AttachFilter(element_data->filter);
+	element_data->render_manager->AttachFilter(element_data->filter);
 }
 
 DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer(ValueType value_type, const char* default_value) :

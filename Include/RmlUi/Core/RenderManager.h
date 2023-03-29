@@ -34,9 +34,11 @@
 
 namespace Rml {
 
+class RenderInterface;
+
 class RenderManager {
 public:
-	RenderManager() { Reset(); }
+	RenderManager() { Reset(nullptr); }
 
 	RenderCommand& PushGeometry(const Vertex* vertices, int num_vertices, const int* indices, int num_indices, Vector2f translation)
 	{
@@ -75,22 +77,34 @@ public:
 	}
 	void DisableTransform() { active_transform = 0; }
 
-	void Reset()
+	void AttachFilter(CompiledFilterHandle handle) { attached_filters.push_back(handle); }
+	void ApplyAttachedFilters(RenderCommand& command)
 	{
-		// @performance Clear the vectors in the command list instead of re-initializing it, so that they retain their capacity buffers.
-		list = {};
-		active_transform = 0;
-		active_scissor = 0;
-
-		list.transforms.push_back(Matrix4f::Identity());
-		list.translations.push_back(Vector2f(0.f));
-		list.scissor_regions.push_back(Rectanglei::CreateInvalid());
+		RMLUI_ASSERT(command.type == RenderCommandType::RenderGeometry);
+		if (!attached_filters.empty())
+		{
+			command.render_geometry.filter_list_offset = (int)list.filter_lists.size();
+			list.filter_lists.push_back(std::move(attached_filters));
+			attached_filters.clear();
+		}
 	}
+
+	void QueueReleaseFilter(CompiledFilterHandle handle) { release_queue_filters.push_back(handle); }
+	void QueueReleaseShader(CompiledShaderHandle handle) { release_queue_shaders.push_back(handle); }
+	void QueueReleaseTexture(TextureHandle handle) { release_queue_textures.push_back(handle); }
+
+	void Reset(RenderInterface* render_interface);
 
 	RenderCommandList& GetList() { return list; }
 
 private:
 	RenderCommandList list;
+
+	Vector<CompiledFilterHandle> attached_filters;
+
+	Vector<CompiledFilterHandle> release_queue_filters;
+	Vector<CompiledShaderHandle> release_queue_shaders;
+	Vector<TextureHandle> release_queue_textures;
 
 	int active_scissor = 0;
 	int active_transform = 0;

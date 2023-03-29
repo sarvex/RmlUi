@@ -27,9 +27,40 @@
  */
 
 #include "../../Include/RmlUi/Core/RenderManager.h"
+#include "../../Include/RmlUi/Core/RenderInterface.h"
 
 namespace Rml {
 
+void RenderManager::Reset(RenderInterface* render_interface)
+{
+	// @performance Clear the vectors in the command list instead of re-initializing it, so that they retain their capacity buffers.
+	list = {};
+	active_transform = 0;
+	active_scissor = 0;
 
+	list.transforms.push_back(Matrix4f::Identity());
+	list.translations.push_back(Vector2f(0.f));
+	list.scissor_regions.push_back(Rectanglei::CreateInvalid());
+
+	attached_filters.clear();
+
+	if (render_interface)
+	{
+		for (CompiledFilterHandle handle : release_queue_filters)
+			render_interface->ReleaseCompiledFilter(handle);
+		for (CompiledShaderHandle handle : release_queue_shaders)
+			render_interface->ReleaseCompiledShader(handle);
+		for (TextureHandle handle : release_queue_textures)
+			render_interface->ReleaseTexture(handle);
+
+		release_queue_filters.clear();
+		release_queue_shaders.clear();
+		release_queue_textures.clear();
+	}
+	else
+	{
+		RMLUI_ASSERT(release_queue_filters.empty() && release_queue_shaders.empty() && release_queue_textures.empty());
+	}
+}
 
 } // namespace Rml

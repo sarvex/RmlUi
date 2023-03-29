@@ -64,23 +64,23 @@ DecoratorDataHandle DecoratorDropShadow::GenerateElementData(Element* element) c
 	CompiledFilterHandle handle =
 		render_interface->CompileFilter("drop-shadow", Dictionary{{"color", Variant(color)}, {"offset", Variant(offset)}, {"sigma", Variant(sigma)}});
 
-	BasicFilterElementData* element_data = GetBasicFilterElementDataPool().AllocateAndConstruct(render_interface, handle);
+	BasicFilterElementData* element_data = GetBasicFilterElementDataPool().AllocateAndConstruct(&render_interface->manager, handle);
 	return reinterpret_cast<DecoratorDataHandle>(element_data);
 }
 
 void DecoratorDropShadow::ReleaseElementData(DecoratorDataHandle handle) const
 {
 	BasicFilterElementData* element_data = reinterpret_cast<BasicFilterElementData*>(handle);
-	RMLUI_ASSERT(element_data && element_data->render_interface);
+	RMLUI_ASSERT(element_data && element_data->render_manager);
 
-	element_data->render_interface->ReleaseCompiledFilter(element_data->filter);
+	element_data->render_manager->QueueReleaseFilter(element_data->filter);
 	GetBasicFilterElementDataPool().DestroyAndDeallocate(element_data);
 }
 
 void DecoratorDropShadow::RenderElement(Element* /*element*/, DecoratorDataHandle handle) const
 {
 	BasicFilterElementData* element_data = reinterpret_cast<BasicFilterElementData*>(handle);
-	element_data->render_interface->AttachFilter(element_data->filter);
+	element_data->render_manager->AttachFilter(element_data->filter);
 }
 
 void DecoratorDropShadow::ModifyScissorRegion(Element* element, Rectanglef& scissor_region) const

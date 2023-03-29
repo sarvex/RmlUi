@@ -75,6 +75,10 @@ struct RenderCommand {
 	// -- Render commands: Texture to attach to the geometry. PopLayer: Render texture target.
 	TextureHandle texture;
 
+	struct RenderGeometry {
+		int filter_list_offset;
+	} render_geometry;
+
 	struct RenderClipMask {
 		ClipMaskOperation operation;
 	} render_clip_mask;
@@ -93,7 +97,6 @@ struct RenderCommand {
 		int filter_lists_offset;
 	} pop_layer;
 
-	// -- All
 	RenderCommandUserData user_data;
 };
 

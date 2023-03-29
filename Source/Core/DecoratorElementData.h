@@ -35,11 +35,11 @@
 
 namespace Rml {
 
-class RenderInterface;
+class RenderManager;
 
 struct BasicFilterElementData {
-	BasicFilterElementData(RenderInterface* render_interface, CompiledFilterHandle filter) : render_interface(render_interface), filter(filter) {}
-	RenderInterface* render_interface;
+	BasicFilterElementData(RenderManager* render_manager, CompiledFilterHandle filter) : render_manager(render_manager), filter(filter) {}
+	RenderManager* render_manager;
 	CompiledFilterHandle filter;
 };
 
