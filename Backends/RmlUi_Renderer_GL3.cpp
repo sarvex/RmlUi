@@ -913,71 +913,6 @@ void RenderInterface_GL3::SetScissorRegion(Rml::Rectanglei region)
 	SetScissorRegion(region.Left(), region.Top(), region.Width(), region.Height());
 }
 
-bool RenderInterface_GL3::EnableClipMask(bool enable)
-{
-	if (enable)
-	{
-		glEnable(GL_STENCIL_TEST);
-	}
-	else
-	{
-		glDisable(GL_STENCIL_TEST);
-	}
-
-	return true;
-}
-
-void RenderInterface_GL3::RenderToClipMask(Rml::ClipMaskOperation mask_operation, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation)
-{
-	using Rml::ClipMaskOperation;
-
-	EnableClipMask(true);
-
-	const bool clear_stencil = (mask_operation == ClipMaskOperation::Clip || mask_operation == ClipMaskOperation::ClipOut);
-	if (clear_stencil)
-	{
-		// @performance We can be smarter about this and increment the reference value instead of clearing each time.
-		glEnable(GL_STENCIL_TEST);
-		glClear(GL_STENCIL_BUFFER_BIT);
-	}
-
-	GLint stencil_test_value = 0;
-	glGetIntegerv(GL_STENCIL_REF, &stencil_test_value);
-
-	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-	glStencilFunc(GL_ALWAYS, GLint(1), GLuint(-1));
-
-	switch (mask_operation)
-	{
-	case ClipMaskOperation::Clip:
-	{
-		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-		stencil_test_value = 1;
-	}
-	break;
-	case ClipMaskOperation::ClipIntersect:
-	{
-		glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
-		stencil_test_value += 1;
-	}
-	break;
-	case ClipMaskOperation::ClipOut:
-	{
-		glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-		stencil_test_value = 0;
-	}
-	break;
-	}
-
-	RenderCompiledGeometry(geometry, translation);
-
-	// Restore state
-	// @performance Cache state so we don't toggle it unnecessarily.
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-	glStencilFunc(GL_EQUAL, stencil_test_value, GLuint(-1));
-}
-
 // Set to byte packing, or the compiler will expand our struct, which means it won't read correctly from file
 #pragma pack(1)
 struct TGAHeader {
@@ -1119,6 +1054,11 @@ bool RenderInterface_GL3::GenerateTexture(Rml::TextureHandle& texture_handle, co
 	texture_handle = (Rml::TextureHandle)texture_id;
 
 	return true;
+}
+
+bool RenderInterface_GL3::GenerateRenderTexture(Rml::TextureHandle& texture_handle, Rml::Vector2i dimensions)
+{
+	return GenerateTexture(texture_handle, nullptr, dimensions);
 }
 
 void RenderInterface_GL3::DrawFullscreenQuad(Rml::Vector2f uv_offset, Rml::Vector2f uv_scaling)
@@ -1526,13 +1466,10 @@ void RenderInterface_GL3::RenderBlur(float sigma, const Gfx::FramebufferData& so
 	Gfx::CheckGLError("Blur");
 }
 
-void RenderInterface_GL3::RenderShader(Rml::CompiledShaderHandle shader_handle, Rml::CompiledGeometryHandle geometry_handle,
-	Rml::Vector2f translation)
+void RenderInterface_GL3::SetCustomShader(Rml::CompiledShaderHandle shader_handle)
 {
-	RMLUI_ASSERT(geometry_handle);
 	const CompiledShader& shader = *reinterpret_cast<CompiledShader*>(shader_handle);
 	const CompiledShaderType type = shader.type;
-	const Gfx::CompiledGeometryData& geometry = *reinterpret_cast<Gfx::CompiledGeometryData*>(geometry_handle);
 
 	switch (type)
 	{
@@ -1548,10 +1485,6 @@ void RenderInterface_GL3::RenderShader(Rml::CompiledShaderHandle shader_handle, 
 		glUniform1i(Gfx::uniforms.Get(ProgramId::Gradient, UniformId::NumStops), num_stops);
 		glUniform1fv(Gfx::uniforms.Get(ProgramId::Gradient, UniformId::StopPositions), num_stops, shader.stop_positions.data());
 		glUniform4fv(Gfx::uniforms.Get(ProgramId::Gradient, UniformId::StopColors), num_stops, shader.stop_colors[0]);
-
-		SubmitTransformUniform(translation);
-		glBindVertexArray(geometry.vao);
-		glDrawElements(GL_TRIANGLES, geometry.draw_count, GL_UNSIGNED_INT, (const GLvoid*)0);
 	}
 	break;
 	case CompiledShaderType::Creation:
@@ -1561,10 +1494,6 @@ void RenderInterface_GL3::RenderShader(Rml::CompiledShaderHandle shader_handle, 
 		Gfx::UseProgram(ProgramId::Creation);
 		glUniform1f(Gfx::uniforms.Get(ProgramId::Creation, UniformId::Value), (float)time);
 		glUniform2fv(Gfx::uniforms.Get(ProgramId::Creation, UniformId::Dimensions), 1, &shader.dimensions.x);
-
-		SubmitTransformUniform(translation);
-		glBindVertexArray(geometry.vao);
-		glDrawElements(GL_TRIANGLES, geometry.draw_count, GL_UNSIGNED_INT, (const GLvoid*)0);
 	}
 	break;
 	case CompiledShaderType::Invalid:
@@ -1712,22 +1641,17 @@ Rml::CompiledFilterHandle RenderInterface_GL3::CompileFilter(const Rml::String& 
 	return {};
 }
 
-void RenderInterface_GL3::AttachFilter(Rml::CompiledFilterHandle filter)
-{
-	attached_filters.push_back(reinterpret_cast<CompiledFilter*>(filter));
-}
-
 void RenderInterface_GL3::ReleaseCompiledFilter(Rml::CompiledFilterHandle filter)
 {
-	RMLUI_ASSERT(attached_filters.empty());
+	//RMLUI_ASSERT(attached_filters.empty());
 	delete reinterpret_cast<CompiledFilter*>(filter);
 }
 
-void RenderInterface_GL3::RenderFilters()
+void RenderInterface_GL3::RenderFilters(const Rml::FilterHandleList& filter_list)
 {
-	for (const CompiledFilter* filter_ptr : attached_filters)
+	for (const Rml::CompiledFilterHandle filter_handle : filter_list)
 	{
-		const CompiledFilter& filter = *filter_ptr;
+		const CompiledFilter& filter = *reinterpret_cast<const CompiledFilter*>(filter_handle);
 		const FilterType type = filter.type;
 
 		switch (type)
@@ -1837,28 +1761,14 @@ void RenderInterface_GL3::RenderFilters()
 	}
 
 	Gfx::CheckGLError("RenderFilter");
-	attached_filters.clear();
 }
 
-void RenderInterface_GL3::PushLayer(Rml::RenderClear clear_new_layer)
-{
-	if (clear_new_layer == Rml::RenderClear::Clone)
-		render_state.PushLayerClone();
-	else
-		render_state.PushLayer();
-
-	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
-	if (clear_new_layer == Rml::RenderClear::Clear)
-		glClear(GL_COLOR_BUFFER_BIT);
-}
-
-Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode)
+void RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode, const Rml::FilterHandleList& filter_list,
+	Rml::TextureHandle render_texture_target)
 {
 	using Rml::BlendMode;
 	using Rml::RenderTarget;
 	RMLUI_ASSERT(!(has_mask && render_target == RenderTarget::MaskImage));
-
-	Rml::TextureHandle texture_handle_result = {};
 
 	{
 		// Blit stack to filter rendering buffer. Do this regardless of whether we actually have any filters to be applied, because we need to resolve
@@ -1875,7 +1785,7 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 	}
 
 	// Render the filters, the PostprocessPrimary framebuffer is used for both input and output.
-	RenderFilters();
+	RenderFilters(filter_list);
 
 	// Pop the active layer, thereby activating the beneath layer.
 	render_state.PopLayer();
@@ -1919,6 +1829,7 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 	break;
 	case RenderTarget::RenderTexture:
 	{
+		RMLUI_ASSERT(render_texture_target);
 		const bool scissor_initially_enabled = scissor_state.enabled;
 		EnableScissorRegion(false);
 
@@ -1938,9 +1849,9 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 			GL_COLOR_BUFFER_BIT, GL_NEAREST                 //
 		);
 
-		if (GenerateTexture(texture_handle_result, nullptr, bounds.Size()))
+		if (render_texture_target)
 		{
-			glBindTexture(GL_TEXTURE_2D, (GLuint)texture_handle_result);
+			glBindTexture(GL_TEXTURE_2D, (GLuint)render_texture_target);
 
 			const Gfx::FramebufferData& texture_source = destination;
 			glBindFramebuffer(GL_READ_FRAMEBUFFER, texture_source.framebuffer);
@@ -1956,8 +1867,6 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
 
 	Gfx::CheckGLError("PopLayer");
-
-	return texture_handle_result;
 }
 
 void RenderInterface_GL3::SubmitTransformUniform(Rml::Vector2f translation)
@@ -2067,9 +1976,63 @@ void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 
 	SetTransform(nullptr);
 	EnableScissorRegion(false);
+	glDisable(GL_STENCIL_TEST);
 
 	int previous_scissor_offset = 0;
 	int previous_transform_offset = 0;
+
+	auto RenderGeometry = [&](const Rml::RenderCommand::Geometry& geometry, Rml::TextureHandle texture, bool use_program = true) {
+		if (geometry.scissor_offset != previous_scissor_offset)
+		{
+			if (geometry.scissor_offset)
+			{
+				if (!previous_scissor_offset)
+					EnableScissorRegion(true);
+
+				SetScissorRegion(commands.scissor_regions[geometry.scissor_offset]);
+			}
+			else
+			{
+				EnableScissorRegion(false);
+			}
+
+			previous_scissor_offset = geometry.scissor_offset;
+		}
+
+		if (geometry.transform_offset != previous_transform_offset)
+		{
+			if (geometry.transform_offset)
+				SetTransform(&commands.transforms[geometry.transform_offset]);
+			else
+				SetTransform(nullptr);
+
+			previous_transform_offset = geometry.transform_offset;
+		}
+
+		const Rml::Vector2f translation = commands.translations[geometry.translation_offset];
+		if (texture == TexturePostprocess)
+		{
+			// Do nothing.
+		}
+		else if (texture)
+		{
+			if (use_program)
+				Gfx::UseProgram(ProgramId::Texture);
+			SubmitTransformUniform(translation);
+			if (texture != TextureIgnoreBinding)
+				glBindTexture(GL_TEXTURE_2D, (GLuint)texture);
+		}
+		else
+		{
+			if (use_program)
+				Gfx::UseProgram(ProgramId::Color);
+			SubmitTransformUniform(translation);
+		}
+
+		glBindVertexArray(global_geometry_vao);
+		glDrawElementsBaseVertex(GL_TRIANGLES, geometry.num_elements, GL_UNSIGNED_INT, (const GLvoid*)(sizeof(int) * geometry.indices_offset),
+			(GLint)geometry.vertices_offset);
+	};
 
 	for (const Rml::RenderCommand& command : commands.commands)
 	{
@@ -2079,83 +2042,94 @@ void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 		{
 		case Type::RenderGeometry:
 		{
-			const auto& geometry = command.geometry;
-			if (geometry.scissor_offset != previous_scissor_offset)
-			{
-				if (geometry.scissor_offset)
-				{
-					if (!previous_scissor_offset)
-						EnableScissorRegion(true);
-
-					SetScissorRegion(commands.scissor_regions[geometry.scissor_offset]);
-				}
-				else
-				{
-					EnableScissorRegion(false);
-				}
-
-				previous_scissor_offset = geometry.scissor_offset;
-			}
-
-			if (geometry.transform_offset != previous_transform_offset)
-			{
-				if (geometry.transform_offset)
-					SetTransform(&commands.transforms[geometry.transform_offset]);
-				else
-					SetTransform(nullptr);
-
-				previous_transform_offset = geometry.transform_offset;
-			}
-
-			const Rml::Vector2f translation = commands.translations[geometry.translation_offset];
-			if (command.texture == TexturePostprocess)
-			{
-				// Do nothing.
-			}
-			else if (command.texture)
-			{
-				Gfx::UseProgram(ProgramId::Texture);
-				SubmitTransformUniform(translation);
-				if (command.texture != TextureIgnoreBinding)
-					glBindTexture(GL_TEXTURE_2D, (GLuint)command.texture);
-			}
-			else
-			{
-				Gfx::UseProgram(ProgramId::Color);
-				SubmitTransformUniform(translation);
-			}
-
-			glBindVertexArray(global_geometry_vao);
-			glDrawElementsBaseVertex(GL_TRIANGLES, geometry.num_elements, GL_UNSIGNED_INT, (const GLvoid*)(sizeof(int) * geometry.indices_offset),
-				(GLint)geometry.vertices_offset);
+			// TODO: Attach any filters
+			RenderGeometry(command.geometry, command.texture);
 		}
 		break;
 		case Type::EnableClipMask:
 		{
+			glEnable(GL_STENCIL_TEST);
 		}
 		break;
 		case Type::DisableClipMask:
 		{
+			glDisable(GL_STENCIL_TEST);
 		}
 		break;
 		case Type::RenderClipMask:
 		{
+			using Rml::ClipMaskOperation;
+			ClipMaskOperation mask_operation = command.render_clip_mask.operation;
+
+			glEnable(GL_STENCIL_TEST);
+
+			const bool clear_stencil = (mask_operation == ClipMaskOperation::Clip || mask_operation == ClipMaskOperation::ClipOut);
+			if (clear_stencil)
+			{
+				// @performance We can be smarter about this and increment the reference value instead of clearing each time.
+				glEnable(GL_STENCIL_TEST);
+				glClear(GL_STENCIL_BUFFER_BIT);
+			}
+
+			GLint stencil_test_value = 0;
+			glGetIntegerv(GL_STENCIL_REF, &stencil_test_value);
+
+			glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+			glStencilFunc(GL_ALWAYS, GLint(1), GLuint(-1));
+
+			switch (mask_operation)
+			{
+			case ClipMaskOperation::Clip:
+			{
+				glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+				stencil_test_value = 1;
+			}
+			break;
+			case ClipMaskOperation::ClipIntersect:
+			{
+				glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
+				stencil_test_value += 1;
+			}
+			break;
+			case ClipMaskOperation::ClipOut:
+			{
+				glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+				stencil_test_value = 0;
+			}
+			break;
+			}
+
+			RenderGeometry(command.geometry, command.texture);
+
+			// Restore state
+			// @performance Cache state so we don't toggle it unnecessarily.
+			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+			glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+			glStencilFunc(GL_EQUAL, stencil_test_value, GLuint(-1));
 		}
 		break;
 		case Type::PushLayer:
 		{
+			if (command.push_layer.clear_new_layer == Rml::RenderClear::Clone)
+				render_state.PushLayerClone();
+			else
+				render_state.PushLayer();
+
+			glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
+			if (command.push_layer.clear_new_layer == Rml::RenderClear::Clear)
+				glClear(GL_COLOR_BUFFER_BIT);
 		}
 		break;
 		case Type::PopLayer:
 		{
+			PopLayer(command.pop_layer.render_target, command.pop_layer.blend_mode, commands.filter_lists[command.pop_layer.filter_lists_offset],
+				command.texture);
 		}
 		break;
 		case Type::RenderShader:
 		{
-		}
-		break;
-		case Type::AttachFilter:
-		{
+			SetCustomShader(command.render_shader.handle);
+			RenderGeometry(command.geometry, command.texture, false);
 		}
 		break;
 		}

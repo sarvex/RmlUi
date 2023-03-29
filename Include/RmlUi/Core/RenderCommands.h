@@ -53,8 +53,6 @@ enum class RenderCommandType {
 	PopLayer,
 
 	RenderShader,
-
-	AttachFilter,
 };
 
 struct RenderCommand {
@@ -76,7 +74,7 @@ struct RenderCommand {
 	TextureHandle texture;
 
 	struct RenderGeometry {
-		int filter_list_offset;
+		int filter_lists_offset;
 	} render_geometry;
 
 	struct RenderClipMask {

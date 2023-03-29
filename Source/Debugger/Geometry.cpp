@@ -61,7 +61,8 @@ void Geometry::RenderOutline(const Vector2f origin, const Vector2f dimensions, c
 	GeometryUtilities::GenerateQuad(vertices + 8, indices + 12, Vector2f(0, 0), Vector2f(width, dimensions.y), colour, 8);
 	GeometryUtilities::GenerateQuad(vertices + 12, indices + 18, Vector2f(dimensions.x - width, 0), Vector2f(width, dimensions.y), colour, 12);
 
-	render_interface->RenderGeometry(vertices, 4 * 4, indices, 6 * 4, 0, origin);
+	// TODO
+	//render_interface->RenderGeometry(vertices, 4 * 4, indices, 6 * 4, 0, origin);
 }
 
 // Renders a box.
@@ -77,7 +78,8 @@ void Geometry::RenderBox(const Vector2f origin, const Vector2f dimensions, const
 
 	GeometryUtilities::GenerateQuad(vertices, indices, Vector2f(0, 0), Vector2f(dimensions.x, dimensions.y), colour, 0);
 
-	render_interface->RenderGeometry(vertices, 4, indices, 6, 0, origin);
+	// TODO
+	//render_interface->RenderGeometry(vertices, 4, indices, 6, 0, origin);
 }
 
 // Renders a box with a hole in the middle.

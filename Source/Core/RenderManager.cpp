@@ -38,9 +38,11 @@ void RenderManager::Reset(RenderInterface* render_interface)
 	active_transform = 0;
 	active_scissor = 0;
 
-	list.transforms.push_back(Matrix4f::Identity());
 	list.translations.push_back(Vector2f(0.f));
+	list.transforms.push_back(Matrix4f::Identity());
+
 	list.scissor_regions.push_back(Rectanglei::CreateInvalid());
+	list.filter_lists.push_back(FilterHandleList{});
 
 	attached_filters.clear();
 

@@ -90,7 +90,7 @@ public:
 
 	// -- DEPRECATED API (do nothing) --
 
-#if 1
+#if 0
 	/// Called by RmlUi when it wants to render geometry that the application does not wish to optimise. Note that
 	/// RmlUi renders everything as triangles.
 	/// @param[in] vertices The geometry's vertex data.

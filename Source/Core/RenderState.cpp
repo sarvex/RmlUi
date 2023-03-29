@@ -147,8 +147,8 @@ Rectanglei RenderState::GetScissorState() const
 void RenderState::ApplyClipMask(const ElementClipList& clip_elements)
 {
 	const bool clip_mask_enabled = !clip_elements.empty();
-	// TODO
-	// render_interface->EnableClipMask(clip_mask_enabled);
+	
+	render_interface->manager.EnableClipMask(clip_mask_enabled);
 
 	if (clip_mask_enabled)
 	{

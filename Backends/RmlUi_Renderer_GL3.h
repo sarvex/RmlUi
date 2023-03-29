@@ -46,6 +46,7 @@ public:
 
 	bool LoadTexture(Rml::TextureHandle& texture_handle, Rml::Vector2i& texture_dimensions, const Rml::String& source) override;
 	bool GenerateTexture(Rml::TextureHandle& texture_handle, const Rml::byte* source, const Rml::Vector2i& source_dimensions) override;
+	bool GenerateRenderTexture(Rml::TextureHandle& texture_handle, Rml::Vector2i dimensions) override;
 	void ReleaseTexture(Rml::TextureHandle texture_handle) override;
 
 	Rml::CompiledShaderHandle CompileShader(const Rml::String& name, const Rml::Dictionary& parameters) override;
@@ -60,7 +61,7 @@ public:
 
 	void BeginFrame();
 	void EndFrame();
-	
+
 	bool Initialize();
 	void Shutdown();
 
@@ -85,18 +86,15 @@ private:
 	void SetScissorRegion(int x, int y, int width, int height);
 	void SetScissorRegion(Rml::Rectanglei region);
 
-	bool EnableClipMask(bool enable);
-	void RenderToClipMask(Rml::ClipMaskOperation mask_operation, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation);
 	void SetTransform(const Rml::Matrix4f* transform);
 
-	void RenderShader(Rml::CompiledShaderHandle shader, Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation);
-	void AttachFilter(Rml::CompiledFilterHandle filter);
-	void PushLayer(Rml::RenderClear clear_new_layer);
-	Rml::TextureHandle PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode);
+	void SetCustomShader(Rml::CompiledShaderHandle shader);
+	void PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode, const Rml::FilterHandleList& filter_list,
+		Rml::TextureHandle render_target_texture);
 
 	void SubmitTransformUniform(Rml::Vector2f translation);
 
-	void RenderFilters();
+	void RenderFilters(const Rml::FilterHandleList& filter_list);
 
 	void DrawFullscreenQuad(Rml::Vector2f uv_offset = {}, Rml::Vector2f uv_scaling = Rml::Vector2f(1.f));
 
@@ -116,7 +114,6 @@ private:
 	};
 	ScissorState scissor_state = {};
 
-	Rml::Vector<CompiledFilter*> attached_filters;
 	bool has_mask = false;
 
 	int viewport_width = 0;

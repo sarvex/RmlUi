@@ -214,6 +214,10 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, ShadowList sha
 		}
 		RMLUI_ASSERT(context->GetRenderInterface() == render_interface);
 
+		TextureHandle shadow_texture = {};
+		if (!render_interface->GenerateRenderTexture(shadow_texture, texture_dimensions))
+			return false;
+
 		Geometry geometry_padding(render_interface);        // Render geometry for inner box-shadow.
 		Geometry geometry_padding_border(render_interface); // Clipping mask for outer box-shadow.
 
@@ -244,7 +248,7 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, ShadowList sha
 		render_state.Reset();
 		render_state.SetScissorRegion(Rectanglei::FromSize(texture_dimensions));
 
-		render_interface->PushLayer(RenderClear::Clear);
+		render_interface->manager.PushLayer(RenderClear::Clear);
 
 		main_geometry.Render(element_offset_in_texture);
 
@@ -296,8 +300,8 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, ShadowList sha
 				blur = render_interface->CompileFilter("blur", Dictionary{{"radius", Variant(blur_radius)}});
 				if (blur)
 				{
-					render_interface->PushLayer(RenderClear::Clear);
-					render_interface->AttachFilter(blur);
+					render_interface->manager.PushLayer(RenderClear::Clear);
+					render_interface->manager.AttachFilter(blur);
 				}
 			}
 
@@ -321,12 +325,12 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, ShadowList sha
 
 			if (blur)
 			{
-				render_interface->PopLayer(RenderTarget::Layer, BlendMode::Blend);
+				render_interface->manager.PopLayer(RenderTarget::Layer, BlendMode::Blend);
 				render_interface->ReleaseCompiledFilter(blur);
 			}
 		}
 
-		TextureHandle shadow_texture = render_interface->PopLayer(RenderTarget::RenderTexture, BlendMode::Replace);
+		render_interface->manager.PopLayer(RenderTarget::RenderTexture, BlendMode::Replace, shadow_texture);
 
 		render_state.DisableScissorRegion();
 		render_state.DisableClipMask();

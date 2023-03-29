@@ -96,7 +96,8 @@ Context* RenderInterface::GetContext() const
 	return context;
 }
 
-#if 1
+#if 0
+
 // Called by RmlUi when it wants to compile geometry it believes will be static for the forseeable future.
 CompiledGeometryHandle RenderInterface::CompileGeometry(Vertex* /*vertices*/, int /*num_vertices*/, int* /*indices*/, int /*num_indices*/, TextureHandle /*texture*/)
 {

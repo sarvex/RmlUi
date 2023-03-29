@@ -42,10 +42,7 @@ public:
 
 	RenderCommand& PushGeometry(const Vertex* vertices, int num_vertices, const int* indices, int num_indices, Vector2f translation)
 	{
-		list.commands.push_back(RenderCommand{});
-		RenderCommand& command = list.commands.back();
-
-		command.type = RenderCommandType::RenderGeometry;
+		RenderCommand& command = PushCommand(RenderCommandType::RenderGeometry);
 
 		auto& geometry = command.geometry;
 		geometry.vertices_offset = (int)list.vertices.size();
@@ -80,13 +77,38 @@ public:
 	void AttachFilter(CompiledFilterHandle handle) { attached_filters.push_back(handle); }
 	void ApplyAttachedFilters(RenderCommand& command)
 	{
-		RMLUI_ASSERT(command.type == RenderCommandType::RenderGeometry);
+		RMLUI_ASSERT(command.type == RenderCommandType::RenderGeometry || command.type == RenderCommandType::PopLayer);
 		if (!attached_filters.empty())
 		{
-			command.render_geometry.filter_list_offset = (int)list.filter_lists.size();
+			const int filter_lists_offset = (int)list.filter_lists.size();
+			if (command.type == RenderCommandType::RenderGeometry)
+				command.render_geometry.filter_lists_offset = filter_lists_offset;
+			else if (command.type == RenderCommandType::PopLayer)
+				command.pop_layer.filter_lists_offset = filter_lists_offset;
+
 			list.filter_lists.push_back(std::move(attached_filters));
 			attached_filters.clear();
 		}
+	}
+
+	void PushLayer(RenderClear clear_new_layer)
+	{
+		RenderCommand& command = PushCommand(RenderCommandType::PushLayer);
+		command.push_layer.clear_new_layer = clear_new_layer;
+	}
+
+	void PopLayer(RenderTarget render_target, BlendMode blend_mode, TextureHandle render_texture_target = {})
+	{
+		RenderCommand& command = PushCommand(RenderCommandType::PopLayer);
+		command.pop_layer.render_target = render_target;
+		command.pop_layer.blend_mode = blend_mode;
+		command.texture = render_texture_target;
+		ApplyAttachedFilters(command);
+	}
+
+	void EnableClipMask(bool enable)
+	{
+		PushCommand(enable ? RenderCommandType::EnableClipMask : RenderCommandType::DisableClipMask);
 	}
 
 	void QueueReleaseFilter(CompiledFilterHandle handle) { release_queue_filters.push_back(handle); }
@@ -98,6 +120,14 @@ public:
 	RenderCommandList& GetList() { return list; }
 
 private:
+	RenderCommand& PushCommand(RenderCommandType command_type)
+	{
+		list.commands.push_back(RenderCommand{});
+		RenderCommand& command = list.commands.back();
+		command.type = command_type;
+		return command;
+	}
+
 	RenderCommandList list;
 
 	Vector<CompiledFilterHandle> attached_filters;
