@@ -221,6 +221,9 @@ bool Context::Render()
 		cursor_proxy->Render();
 	}
 
+	// TODO: Move manager to context
+	render_interface->Render(render_interface->manager.GetList());
+
 	render_state.Reset();
 	render_interface->context = nullptr;
 

@@ -81,6 +81,9 @@ public:
 	/// Called by RmlUi when...
 	virtual void ReleaseCompiledFilter(CompiledFilterHandle filter);
 
+	/// Called by RmlUi when...
+	virtual void Render(RenderCommandList& commands);
+
 	/// Get the context currently being rendered. This is only valid during RenderGeometry,
 	/// CompileGeometry, RenderCompiledGeometry, EnableScissorRegion and SetScissorRegion.
 	Context* GetContext() const;
@@ -160,7 +163,7 @@ public:
 	void AttachFilter(CompiledFilterHandle filter);
 #endif
 
-	// TODO: Remove
+	// TODO: Move to context
 	RenderManager manager = {};
 
 private:

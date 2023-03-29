@@ -119,19 +119,14 @@ void Backend::RequestExit()
 void Backend::BeginFrame()
 {
 	if (render_interface)
-	{
 		render_interface->BeginFrame();
-		render_interface->Clear();
-	}
 }
 
 void Backend::PresentFrame()
 {
-	if (render_interface && context)
-	{
-		render_interface->RenderFrame(context->GetRenderCommandList());
+	if (render_interface)
 		render_interface->EndFrame();
-	}
+
 	glfwSwapBuffers(window);
 }
 

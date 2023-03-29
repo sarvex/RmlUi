@@ -38,27 +38,26 @@ class RenderManager {
 public:
 	RenderManager() { Reset(); }
 
-	RenderCommand& PushGeometry(const Vertex* vertices, int num_vertices, const int* indices, int num_indices, TextureHandle texture,
-		Vector2f translation)
+	RenderCommand& PushGeometry(const Vertex* vertices, int num_vertices, const int* indices, int num_indices, Vector2f translation)
 	{
 		list.commands.push_back(RenderCommand{});
 		RenderCommand& command = list.commands.back();
 
 		command.type = RenderCommandType::RenderGeometry;
 
-		command.vertices_offset = (int)list.vertices.size();
+		auto& geometry = command.geometry;
+		geometry.vertices_offset = (int)list.vertices.size();
 		list.vertices.insert(list.vertices.end(), vertices, vertices + num_vertices);
-		command.indices_offset = (int)list.indices.size();
+		geometry.indices_offset = (int)list.indices.size();
 		list.indices.insert(list.indices.end(), indices, indices + num_indices);
-		command.num_elements = num_indices;
+		geometry.num_elements = num_indices;
 
-		command.translation_offset = (int)list.translations.size();
+		geometry.translation_offset = (int)list.translations.size();
 		list.translations.push_back(translation);
 
-		command.scissor_offset = active_scissor;
-		command.transform_offset = active_transform;
+		geometry.scissor_offset = active_scissor;
+		geometry.transform_offset = active_transform;
 
-		command.texture = texture;
 		return command;
 	}
 

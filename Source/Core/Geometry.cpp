@@ -102,8 +102,10 @@ void Geometry::Render(Vector2f translation)
 
 	translation = translation.Round();
 
-	render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
-		texture ? texture->GetHandle(render_interface) : 0, translation);
+	RenderCommand& command =
+		render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
+	if (texture)
+		command.texture = texture->GetHandle(render_interface);
 }
 
 void Geometry::Render(CompiledShaderHandle shader_handle, Vector2f translation)
@@ -113,11 +115,13 @@ void Geometry::Render(CompiledShaderHandle shader_handle, Vector2f translation)
 		return;
 
 	translation = translation.Round();
-	RenderCommand& command = render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
-		texture ? texture->GetHandle(render_interface) : 0, translation);
+	RenderCommand& command =
+		render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
 
 	command.type = RenderCommandType::RenderShader;
-	command.shader = shader_handle;
+	command.render_shader.handle = shader_handle;
+	if (texture)
+		command.texture = texture->GetHandle(render_interface);
 }
 
 void Geometry::RenderToClipMask(ClipMaskOperation clip_mask, Vector2f translation)
@@ -127,11 +131,13 @@ void Geometry::RenderToClipMask(ClipMaskOperation clip_mask, Vector2f translatio
 		return;
 
 	translation = translation.Round();
-	RenderCommand& command = render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
-		texture ? texture->GetHandle(render_interface) : 0, translation);
+	RenderCommand& command =
+		render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
 
 	command.type = RenderCommandType::RenderClipMask;
-	command.clip_mask_operation = clip_mask;
+	command.render_clip_mask.operation = clip_mask;
+	if (texture)
+		command.texture = texture->GetHandle(render_interface);
 }
 
 // Returns the geometry's vertices. If these are written to, Release() should be called to force a recompile.

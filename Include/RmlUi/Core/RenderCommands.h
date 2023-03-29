@@ -60,31 +60,38 @@ enum class RenderCommandType {
 struct RenderCommand {
 	RenderCommandType type;
 
-	// -- Geometry, RenderClipMask, RenderShader
-	int vertices_offset;
-	int indices_offset;
-	int num_elements;
+	// -- Geometry (RenderGeometry, RenderClipMask, RenderShader)
+	struct Geometry {
+		int vertices_offset;
+		int indices_offset;
+		int num_elements;
 
-	int translation_offset;
-	int transform_offset;
+		int translation_offset;
+		int transform_offset;
 
-	int scissor_offset;
+		int scissor_offset;
+	} geometry;
 
-	TextureHandle texture; // Texture to attach to the geometry. PopLayer: Render texture target.
+	// -- Render commands: Texture to attach to the geometry. PopLayer: Render texture target.
+	TextureHandle texture;
 
-	// -- RenderClipMask
-	ClipMaskOperation clip_mask_operation;
+	struct RenderClipMask {
+		ClipMaskOperation operation;
+	} render_clip_mask;
 
-	// -- RenderShader
-	CompiledShaderHandle shader;
+	struct RenderShader {
+		CompiledShaderHandle handle;
+	} render_shader;
 
-	// -- PushLayer
-	RenderClear clear_new_layer;
+	struct PushLayer {
+		RenderClear clear_new_layer;
+	} push_layer;
 
-	// -- PopLayer
-	RenderTarget render_target;
-	BlendMode blend_mode;
-	int filter_lists_offset;
+	struct PopLayer {
+		RenderTarget render_target;
+		BlendMode blend_mode;
+		int filter_lists_offset;
+	} pop_layer;
 
 	// -- All
 	RenderCommandUserData user_data;

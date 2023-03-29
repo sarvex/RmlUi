@@ -2059,11 +2059,11 @@ void RenderInterface_GL3::BeginFrame()
 	Gfx::CheckGLError("BeginFrame");
 }
 
-void RenderInterface_GL3::RenderFrame(const Rml::RenderCommandList& commands)
+void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 {
-	const Rml::CompiledGeometryHandle geometry_handle = CompileGeometry((Rml::Vertex*)commands.vertices.data(), (int)commands.vertices.size(),
+	const Rml::CompiledGeometryHandle global_geometry_handle = CompileGeometry((Rml::Vertex*)commands.vertices.data(), (int)commands.vertices.size(),
 		(int*)commands.indices.data(), (int)commands.indices.size(), {});
-	const Gfx::CompiledGeometryData* geometry = reinterpret_cast<Gfx::CompiledGeometryData*>(geometry_handle);
+	const GLuint global_geometry_vao = reinterpret_cast<Gfx::CompiledGeometryData*>(global_geometry_handle)->vao;
 
 	SetTransform(nullptr);
 	EnableScissorRegion(false);
@@ -2079,34 +2079,35 @@ void RenderInterface_GL3::RenderFrame(const Rml::RenderCommandList& commands)
 		{
 		case Type::RenderGeometry:
 		{
-			if (command.scissor_offset != previous_scissor_offset)
+			const auto& geometry = command.geometry;
+			if (geometry.scissor_offset != previous_scissor_offset)
 			{
-				if (command.scissor_offset)
+				if (geometry.scissor_offset)
 				{
 					if (!previous_scissor_offset)
 						EnableScissorRegion(true);
 
-					SetScissorRegion(commands.scissor_regions[command.scissor_offset]);
+					SetScissorRegion(commands.scissor_regions[geometry.scissor_offset]);
 				}
 				else
 				{
 					EnableScissorRegion(false);
 				}
 
-				previous_scissor_offset = command.scissor_offset;
+				previous_scissor_offset = geometry.scissor_offset;
 			}
 
-			if (command.transform_offset != previous_transform_offset)
+			if (geometry.transform_offset != previous_transform_offset)
 			{
-				if (command.transform_offset)
-					SetTransform(&commands.transforms[command.transform_offset]);
+				if (geometry.transform_offset)
+					SetTransform(&commands.transforms[geometry.transform_offset]);
 				else
 					SetTransform(nullptr);
 
-				previous_transform_offset = command.transform_offset;
+				previous_transform_offset = geometry.transform_offset;
 			}
 
-			const Rml::Vector2f translation = commands.translations[command.translation_offset];
+			const Rml::Vector2f translation = commands.translations[geometry.translation_offset];
 			if (command.texture == TexturePostprocess)
 			{
 				// Do nothing.
@@ -2124,9 +2125,9 @@ void RenderInterface_GL3::RenderFrame(const Rml::RenderCommandList& commands)
 				SubmitTransformUniform(translation);
 			}
 
-			glBindVertexArray(geometry->vao);
-			glDrawElementsBaseVertex(GL_TRIANGLES, command.num_elements, GL_UNSIGNED_INT, (const GLvoid*)(sizeof(int) * command.indices_offset),
-				(GLint)command.vertices_offset);
+			glBindVertexArray(global_geometry_vao);
+			glDrawElementsBaseVertex(GL_TRIANGLES, geometry.num_elements, GL_UNSIGNED_INT, (const GLvoid*)(sizeof(int) * geometry.indices_offset),
+				(GLint)geometry.vertices_offset);
 		}
 		break;
 		case Type::EnableClipMask:
@@ -2160,7 +2161,7 @@ void RenderInterface_GL3::RenderFrame(const Rml::RenderCommandList& commands)
 		}
 	}
 
-	ReleaseCompiledGeometry(geometry_handle);
+	ReleaseCompiledGeometry(global_geometry_handle);
 }
 
 void RenderInterface_GL3::EndFrame()

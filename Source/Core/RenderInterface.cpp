@@ -85,6 +85,10 @@ CompiledFilterHandle RenderInterface::CompileFilter(const String& /*name*/, cons
 
 void RenderInterface::ReleaseCompiledFilter(CompiledFilterHandle /*filter*/) {}
 
+void RenderInterface::Render(RenderCommandList& /*commands*/)
+{
+	// TODO: Render commands in a backward-compatible manner?
+}
 
 // Get the context currently being rendered.
 Context* RenderInterface::GetContext() const
