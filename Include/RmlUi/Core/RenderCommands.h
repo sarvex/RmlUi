@@ -67,7 +67,7 @@ struct RenderCommand {
 		int translation_offset;
 		int transform_offset;
 
-		int scissor_offset;
+		int scissor_offset; // TODO Also applies to PopLayer
 	} geometry;
 
 	// -- Render commands: Texture to attach to the geometry. PopLayer: Render texture target.

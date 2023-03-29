@@ -103,6 +103,7 @@ public:
 		command.pop_layer.render_target = render_target;
 		command.pop_layer.blend_mode = blend_mode;
 		command.texture = render_texture_target;
+		command.geometry.scissor_offset = active_scissor; // TODO
 		ApplyAttachedFilters(command);
 	}
 

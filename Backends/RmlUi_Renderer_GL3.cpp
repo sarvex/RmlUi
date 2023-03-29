@@ -1981,23 +1981,27 @@ void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 	int previous_scissor_offset = 0;
 	int previous_transform_offset = 0;
 
-	auto RenderGeometry = [&](const Rml::RenderCommand::Geometry& geometry, Rml::TextureHandle texture, bool use_program = true) {
-		if (geometry.scissor_offset != previous_scissor_offset)
+	auto UpdateScissorRegion = [&](int scissor_offset) {
+		if (scissor_offset != previous_scissor_offset)
 		{
-			if (geometry.scissor_offset)
+			if (scissor_offset)
 			{
 				if (!previous_scissor_offset)
 					EnableScissorRegion(true);
 
-				SetScissorRegion(commands.scissor_regions[geometry.scissor_offset]);
+				SetScissorRegion(commands.scissor_regions[scissor_offset]);
 			}
 			else
 			{
 				EnableScissorRegion(false);
 			}
 
-			previous_scissor_offset = geometry.scissor_offset;
+			previous_scissor_offset = scissor_offset;
 		}
+	};
+
+	auto RenderGeometry = [&](const Rml::RenderCommand::Geometry& geometry, Rml::TextureHandle texture, bool use_program = true) {
+		UpdateScissorRegion(geometry.scissor_offset);
 
 		if (geometry.transform_offset != previous_transform_offset)
 		{
@@ -2122,6 +2126,7 @@ void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 		break;
 		case Type::PopLayer:
 		{
+			UpdateScissorRegion(command.geometry.scissor_offset);
 			PopLayer(command.pop_layer.render_target, command.pop_layer.blend_mode, commands.filter_lists[command.pop_layer.filter_lists_offset],
 				command.texture);
 		}
@@ -2136,6 +2141,9 @@ void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 	}
 
 	ReleaseCompiledGeometry(global_geometry_handle);
+	SetTransform(nullptr);
+	EnableScissorRegion(false);
+	glDisable(GL_STENCIL_TEST);
 }
 
 void RenderInterface_GL3::EndFrame()
