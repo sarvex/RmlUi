@@ -40,6 +40,7 @@
 namespace Rml {
 
 class Context;
+class RenderManager; // TODO remove
 
 /**
     The abstract base class for application-specific rendering implementation. Your application must provide a concrete
@@ -73,23 +74,32 @@ public:
 
 	/// Called by RmlUi when...
 	virtual CompiledShaderHandle CompileShader(const String& name, const Dictionary& parameters);
-	/// Called by RmlUi when...
-	virtual void ReleaseCompiledShader(CompiledShaderHandle shader);
 
 	/// Called by RmlUi when...
 	virtual CompiledFilterHandle CompileFilter(const String& name, const Dictionary& parameters);
-	/// Called by RmlUi when...
-	virtual void ReleaseCompiledFilter(CompiledFilterHandle filter);
 
 	/// Called by RmlUi when...
 	virtual void Render(RenderCommandList& commands);
+
+	// TODO: Replace Release... methods with this
+	// virtual void ReleaseResources(const RenderResourceList& resources);
 
 	/// Get the context currently being rendered. This is only valid during RenderGeometry,
 	/// CompileGeometry, RenderCompiledGeometry, EnableScissorRegion and SetScissorRegion.
 	Context* GetContext() const;
 
-	// -- DEPRECATED API (do nothing) --
+	// TODO: Move to context
+	RenderManager manager = {};
 
+private:
+	/// Called by RmlUi when...
+	virtual void ReleaseCompiledShader(CompiledShaderHandle shader);
+	/// Called by RmlUi when...
+	virtual void ReleaseCompiledFilter(CompiledFilterHandle filter);
+
+	friend class Rml::RenderManager; // TODO Temporary, to gain access to release.
+
+	// -- DEPRECATED API (do nothing) --
 #if 0
 	/// Called by RmlUi when it wants to render geometry that the application does not wish to optimise. Note that
 	/// RmlUi renders everything as triangles.
@@ -163,12 +173,9 @@ public:
 	void AttachFilter(CompiledFilterHandle filter);
 #endif
 
-	// TODO: Move to context
-	RenderManager manager = {};
-
 private:
 	Context* context;
-	
+
 	friend class Rml::Context;
 };
 

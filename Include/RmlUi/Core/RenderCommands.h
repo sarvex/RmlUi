@@ -112,5 +112,11 @@ struct RenderCommandList {
 	Vector<RenderCommand> commands;
 };
 
+struct RenderResourceList {
+	Vector<CompiledFilterHandle> filters;
+	Vector<CompiledShaderHandle> shaders;
+	Vector<TextureHandle> textures;
+};
+
 } // namespace Rml
 #endif

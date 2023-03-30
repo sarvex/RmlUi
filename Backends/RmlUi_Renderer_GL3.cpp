@@ -2114,6 +2114,7 @@ void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 		break;
 		case Type::PushLayer:
 		{
+			UpdateScissorRegion(command.geometry.scissor_offset);
 			if (command.push_layer.clear_new_layer == Rml::RenderClear::Clone)
 				render_state.PushLayerClone();
 			else

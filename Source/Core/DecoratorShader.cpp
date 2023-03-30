@@ -79,7 +79,7 @@ void DecoratorShader::ReleaseElementData(DecoratorDataHandle handle) const
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
 	RenderInterface* render_interface = element_data->geometry.GetRenderInterface();
 
-	render_interface->ReleaseCompiledShader(element_data->effect);
+	render_interface->manager.QueueReleaseShader(element_data->effect);
 
 	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
 }

@@ -326,7 +326,7 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, ShadowList sha
 			if (blur)
 			{
 				render_interface->manager.PopLayer(RenderTarget::Layer, BlendMode::Blend);
-				render_interface->ReleaseCompiledFilter(blur);
+				render_interface->manager.QueueReleaseFilter(blur);
 			}
 		}
 

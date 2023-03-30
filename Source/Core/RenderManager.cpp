@@ -48,20 +48,20 @@ void RenderManager::Reset(RenderInterface* render_interface)
 
 	if (render_interface)
 	{
-		for (CompiledFilterHandle handle : release_queue_filters)
+		for (CompiledFilterHandle handle : release_queue.filters)
 			render_interface->ReleaseCompiledFilter(handle);
-		for (CompiledShaderHandle handle : release_queue_shaders)
+		for (CompiledShaderHandle handle : release_queue.shaders)
 			render_interface->ReleaseCompiledShader(handle);
-		for (TextureHandle handle : release_queue_textures)
+		for (TextureHandle handle : release_queue.textures)
 			render_interface->ReleaseTexture(handle);
 
-		release_queue_filters.clear();
-		release_queue_shaders.clear();
-		release_queue_textures.clear();
+		release_queue.filters.clear();
+		release_queue.shaders.clear();
+		release_queue.textures.clear();
 	}
 	else
 	{
-		RMLUI_ASSERT(release_queue_filters.empty() && release_queue_shaders.empty() && release_queue_textures.empty());
+		RMLUI_ASSERT(release_queue.filters.empty() && release_queue.shaders.empty() && release_queue.textures.empty());
 	}
 }
 

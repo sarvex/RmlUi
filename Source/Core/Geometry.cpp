@@ -107,7 +107,6 @@ void Geometry::Render(Vector2f translation)
 	RenderCommand& command =
 		render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
 	command.texture = texture_handle;
-	render_interface->manager.ApplyAttachedFilters(command);
 }
 
 void Geometry::Render(CompiledShaderHandle shader_handle, Vector2f translation)

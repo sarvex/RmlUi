@@ -75,26 +75,12 @@ public:
 	void DisableTransform() { active_transform = 0; }
 
 	void AttachFilter(CompiledFilterHandle handle) { attached_filters.push_back(handle); }
-	void ApplyAttachedFilters(RenderCommand& command)
-	{
-		RMLUI_ASSERT(command.type == RenderCommandType::RenderGeometry || command.type == RenderCommandType::PopLayer);
-		if (!attached_filters.empty())
-		{
-			const int filter_lists_offset = (int)list.filter_lists.size();
-			if (command.type == RenderCommandType::RenderGeometry)
-				command.render_geometry.filter_lists_offset = filter_lists_offset;
-			else if (command.type == RenderCommandType::PopLayer)
-				command.pop_layer.filter_lists_offset = filter_lists_offset;
-
-			list.filter_lists.push_back(std::move(attached_filters));
-			attached_filters.clear();
-		}
-	}
 
 	void PushLayer(RenderClear clear_new_layer)
 	{
 		RenderCommand& command = PushCommand(RenderCommandType::PushLayer);
 		command.push_layer.clear_new_layer = clear_new_layer;
+		command.geometry.scissor_offset = active_scissor; // TODO
 	}
 
 	void PopLayer(RenderTarget render_target, BlendMode blend_mode, TextureHandle render_texture_target = {})
@@ -107,14 +93,11 @@ public:
 		ApplyAttachedFilters(command);
 	}
 
-	void EnableClipMask(bool enable)
-	{
-		PushCommand(enable ? RenderCommandType::EnableClipMask : RenderCommandType::DisableClipMask);
-	}
+	void EnableClipMask(bool enable) { PushCommand(enable ? RenderCommandType::EnableClipMask : RenderCommandType::DisableClipMask); }
 
-	void QueueReleaseFilter(CompiledFilterHandle handle) { release_queue_filters.push_back(handle); }
-	void QueueReleaseShader(CompiledShaderHandle handle) { release_queue_shaders.push_back(handle); }
-	void QueueReleaseTexture(TextureHandle handle) { release_queue_textures.push_back(handle); }
+	void QueueReleaseFilter(CompiledFilterHandle handle) { release_queue.filters.push_back(handle); }
+	void QueueReleaseShader(CompiledShaderHandle handle) { release_queue.shaders.push_back(handle); }
+	void QueueReleaseTexture(TextureHandle handle) { release_queue.textures.push_back(handle); }
 
 	void Reset(RenderInterface* render_interface);
 
@@ -128,14 +111,22 @@ private:
 		command.type = command_type;
 		return command;
 	}
+	void ApplyAttachedFilters(RenderCommand& command)
+	{
+		RMLUI_ASSERT(command.type == RenderCommandType::PopLayer);
+		if (!attached_filters.empty())
+		{
+			command.pop_layer.filter_lists_offset = (int)list.filter_lists.size();
+			list.filter_lists.push_back(std::move(attached_filters));
+			attached_filters.clear();
+		}
+	}
 
 	RenderCommandList list;
 
-	Vector<CompiledFilterHandle> attached_filters;
+	RenderResourceList release_queue;
 
-	Vector<CompiledFilterHandle> release_queue_filters;
-	Vector<CompiledShaderHandle> release_queue_shaders;
-	Vector<TextureHandle> release_queue_textures;
+	Vector<CompiledFilterHandle> attached_filters;
 
 	int active_scissor = 0;
 	int active_transform = 0;

@@ -347,7 +347,7 @@ void DecoratorLinearGradient::ReleaseElementData(DecoratorDataHandle handle) con
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
 	RenderInterface* render_interface = element_data->geometry.GetRenderInterface();
-	render_interface->ReleaseCompiledShader(element_data->effect);
+	render_interface->manager.QueueReleaseShader(element_data->effect);
 
 	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
 }
@@ -529,7 +529,7 @@ void DecoratorRadialGradient::ReleaseElementData(DecoratorDataHandle handle) con
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
 	RenderInterface* render_interface = element_data->geometry.GetRenderInterface();
-	render_interface->ReleaseCompiledShader(element_data->effect);
+	render_interface->manager.QueueReleaseShader(element_data->effect);
 
 	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
 }
@@ -733,7 +733,7 @@ void DecoratorConicGradient::ReleaseElementData(DecoratorDataHandle handle) cons
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
 	RenderInterface* render_interface = element_data->geometry.GetRenderInterface();
-	render_interface->ReleaseCompiledShader(element_data->effect);
+	render_interface->manager.QueueReleaseShader(element_data->effect);
 
 	GetBasicEffectElementDataPool().DestroyAndDeallocate(element_data);
 }
