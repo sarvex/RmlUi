@@ -40,11 +40,9 @@ class RenderManager {
 public:
 	RenderManager() { Reset(nullptr); }
 
-	RenderCommand& PushGeometry(const Vertex* vertices, int num_vertices, const int* indices, int num_indices, Vector2f translation)
+	RenderCommand::Geometry PushGeometry(const Vertex* vertices, int num_vertices, const int* indices, int num_indices, Vector2f translation)
 	{
-		RenderCommand& command = PushCommand(RenderCommandType::RenderGeometry);
-
-		auto& geometry = command.geometry;
+		RenderCommand::Geometry geometry;
 		geometry.vertices_offset = (int)list.vertices.size();
 		list.vertices.insert(list.vertices.end(), vertices, vertices + num_vertices);
 		geometry.indices_offset = (int)list.indices.size();
@@ -54,10 +52,9 @@ public:
 		geometry.translation_offset = (int)list.translations.size();
 		list.translations.push_back(translation);
 
-		geometry.scissor_offset = active_scissor;
 		geometry.transform_offset = active_transform;
 
-		return command;
+		return geometry;
 	}
 
 	void SetScissor(Rectanglei scissor)
@@ -74,26 +71,44 @@ public:
 	}
 	void DisableTransform() { active_transform = 0; }
 
-	void AttachFilter(CompiledFilterHandle handle) { attached_filters.push_back(handle); }
-
 	void PushLayer(RenderClear clear_new_layer)
 	{
 		RenderCommand& command = PushCommand(RenderCommandType::PushLayer);
 		command.push_layer.clear_new_layer = clear_new_layer;
-		command.geometry.scissor_offset = active_scissor; // TODO
 	}
-
 	void PopLayer(RenderTarget render_target, BlendMode blend_mode, TextureHandle render_texture_target = {})
 	{
 		RenderCommand& command = PushCommand(RenderCommandType::PopLayer);
 		command.pop_layer.render_target = render_target;
 		command.pop_layer.blend_mode = blend_mode;
 		command.texture = render_texture_target;
-		command.geometry.scissor_offset = active_scissor; // TODO
 		ApplyAttachedFilters(command);
 	}
 
-	void EnableClipMask(bool enable) { PushCommand(enable ? RenderCommandType::EnableClipMask : RenderCommandType::DisableClipMask); }
+	void RenderGeometry(RenderCommand::Geometry geometry, TextureHandle texture_handle)
+	{
+		RenderCommand& command = PushCommand(RenderCommandType::RenderGeometry);
+		command.geometry = geometry;
+		command.texture = texture_handle;
+	}
+	void RenderClipMask(RenderCommand::Geometry geometry, TextureHandle texture_handle, ClipMaskOperation operation)
+	{
+		RenderCommand& command = PushCommand(RenderCommandType::RenderClipMask);
+		command.geometry = geometry;
+		command.render_clip_mask.operation = operation;
+		command.texture = texture_handle;
+	}
+	void DisableClipMask() { PushCommand(RenderCommandType::DisableClipMask); }
+
+	void RenderShader(RenderCommand::Geometry geometry, TextureHandle texture_handle, CompiledShaderHandle shader_handle)
+	{
+		RenderCommand& command = PushCommand(RenderCommandType::RenderShader);
+		command.geometry = geometry;
+		command.render_shader.handle = shader_handle;
+		command.texture = texture_handle;
+	}
+
+	void AttachFilter(CompiledFilterHandle handle) { attached_filters.push_back(handle); }
 
 	void QueueReleaseFilter(CompiledFilterHandle handle) { release_queue.filters.push_back(handle); }
 	void QueueReleaseShader(CompiledShaderHandle handle) { release_queue.shaders.push_back(handle); }
@@ -101,7 +116,7 @@ public:
 
 	void Reset(RenderInterface* render_interface);
 
-	RenderCommandList& GetList() { return list; }
+	RenderData& GetList() { return list; }
 
 private:
 	RenderCommand& PushCommand(RenderCommandType command_type)
@@ -109,6 +124,7 @@ private:
 		list.commands.push_back(RenderCommand{});
 		RenderCommand& command = list.commands.back();
 		command.type = command_type;
+		command.scissor_offset = active_scissor;
 		return command;
 	}
 	void ApplyAttachedFilters(RenderCommand& command)
@@ -122,7 +138,7 @@ private:
 		}
 	}
 
-	RenderCommandList list;
+	RenderData list;
 
 	RenderResourceList release_queue;
 

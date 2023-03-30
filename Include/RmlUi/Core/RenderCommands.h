@@ -45,20 +45,19 @@ using FilterHandleList = Vector<CompiledFilterHandle>;
 enum class RenderCommandType {
 	RenderGeometry,
 
-	EnableClipMask,
-	DisableClipMask,
+	RenderShader,
+
 	RenderClipMask,
+	DisableClipMask,
 
 	PushLayer,
 	PopLayer,
-
-	RenderShader,
 };
 
 struct RenderCommand {
 	RenderCommandType type;
 
-	// -- Geometry (RenderGeometry, RenderClipMask, RenderShader)
+	// -- Geometry (RenderGeometry, RenderShader, RenderClipMask)
 	struct Geometry {
 		int vertices_offset;
 		int indices_offset;
@@ -66,24 +65,20 @@ struct RenderCommand {
 
 		int translation_offset;
 		int transform_offset;
-
-		int scissor_offset; // TODO Also applies to PopLayer
 	} geometry;
 
-	// -- Render commands: Texture to attach to the geometry. PopLayer: Render texture target.
+	// Texture to attach to the geometry (RenderGeometry, RenderShader, RenderClipMask). Render texture target (PopLayer).
 	TextureHandle texture;
-
-	struct RenderGeometry {
-		int filter_lists_offset;
-	} render_geometry;
-
-	struct RenderClipMask {
-		ClipMaskOperation operation;
-	} render_clip_mask;
+	// Scissor offset (RenderGeometry, RenderShader, RenderClipMask, PushLayer, PopLayer)
+	int scissor_offset;
 
 	struct RenderShader {
 		CompiledShaderHandle handle;
 	} render_shader;
+
+	struct RenderClipMask {
+		ClipMaskOperation operation;
+	} render_clip_mask;
 
 	struct PushLayer {
 		RenderClear clear_new_layer;
@@ -98,7 +93,7 @@ struct RenderCommand {
 	RenderCommandUserData user_data;
 };
 
-struct RenderCommandList {
+struct RenderData {
 	Vector<Vertex> vertices;
 	Vector<int> indices;
 

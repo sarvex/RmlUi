@@ -104,9 +104,8 @@ void Geometry::Render(Vector2f translation)
 	// Note that Texture::GetHandle can invalidate command pointers due to callbacks.
 	TextureHandle texture_handle = (texture ? texture->GetHandle(render_interface) : 0);
 
-	RenderCommand& command =
-		render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
-	command.texture = texture_handle;
+	auto geometry = render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
+	render_interface->manager.RenderGeometry(geometry, texture_handle);
 }
 
 void Geometry::Render(CompiledShaderHandle shader_handle, Vector2f translation)
@@ -118,12 +117,8 @@ void Geometry::Render(CompiledShaderHandle shader_handle, Vector2f translation)
 	translation = translation.Round();
 	TextureHandle texture_handle = (texture ? texture->GetHandle(render_interface) : 0);
 
-	RenderCommand& command =
-		render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
-
-	command.type = RenderCommandType::RenderShader;
-	command.render_shader.handle = shader_handle;
-	command.texture = texture_handle;
+	auto geometry = render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
+	render_interface->manager.RenderShader(geometry, texture_handle, shader_handle);
 }
 
 void Geometry::RenderToClipMask(ClipMaskOperation clip_mask, Vector2f translation)
@@ -134,12 +129,9 @@ void Geometry::RenderToClipMask(ClipMaskOperation clip_mask, Vector2f translatio
 
 	translation = translation.Round();
 	TextureHandle texture_handle = (texture ? texture->GetHandle(render_interface) : 0);
-	RenderCommand& command =
-		render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
 
-	command.type = RenderCommandType::RenderClipMask;
-	command.render_clip_mask.operation = clip_mask;
-	command.texture = texture_handle;
+	auto geometry = render_interface->manager.PushGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), translation);
+	render_interface->manager.RenderClipMask(geometry, texture_handle, clip_mask);
 }
 
 // Returns the geometry's vertices. If these are written to, Release() should be called to force a recompile.

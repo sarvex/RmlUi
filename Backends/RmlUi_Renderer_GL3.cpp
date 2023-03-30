@@ -1643,7 +1643,7 @@ Rml::CompiledFilterHandle RenderInterface_GL3::CompileFilter(const Rml::String& 
 
 void RenderInterface_GL3::ReleaseCompiledFilter(Rml::CompiledFilterHandle filter)
 {
-	//RMLUI_ASSERT(attached_filters.empty());
+	// RMLUI_ASSERT(attached_filters.empty());
 	delete reinterpret_cast<CompiledFilter*>(filter);
 }
 
@@ -1968,10 +1968,10 @@ void RenderInterface_GL3::BeginFrame()
 	Gfx::CheckGLError("BeginFrame");
 }
 
-void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
+void RenderInterface_GL3::Render(Rml::RenderData& data)
 {
-	const Rml::CompiledGeometryHandle global_geometry_handle = CompileGeometry((Rml::Vertex*)commands.vertices.data(), (int)commands.vertices.size(),
-		(int*)commands.indices.data(), (int)commands.indices.size(), {});
+	const Rml::CompiledGeometryHandle global_geometry_handle =
+		CompileGeometry((Rml::Vertex*)data.vertices.data(), (int)data.vertices.size(), (int*)data.indices.data(), (int)data.indices.size(), {});
 	const GLuint global_geometry_vao = reinterpret_cast<Gfx::CompiledGeometryData*>(global_geometry_handle)->vao;
 
 	SetTransform(nullptr);
@@ -1989,7 +1989,7 @@ void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 				if (!previous_scissor_offset)
 					EnableScissorRegion(true);
 
-				SetScissorRegion(commands.scissor_regions[scissor_offset]);
+				SetScissorRegion(data.scissor_regions[scissor_offset]);
 			}
 			else
 			{
@@ -2001,19 +2001,17 @@ void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 	};
 
 	auto RenderGeometry = [&](const Rml::RenderCommand::Geometry& geometry, Rml::TextureHandle texture, bool use_program = true) {
-		UpdateScissorRegion(geometry.scissor_offset);
-
 		if (geometry.transform_offset != previous_transform_offset)
 		{
 			if (geometry.transform_offset)
-				SetTransform(&commands.transforms[geometry.transform_offset]);
+				SetTransform(&data.transforms[geometry.transform_offset]);
 			else
 				SetTransform(nullptr);
 
 			previous_transform_offset = geometry.transform_offset;
 		}
 
-		const Rml::Vector2f translation = commands.translations[geometry.translation_offset];
+		const Rml::Vector2f translation = data.translations[geometry.translation_offset];
 		if (texture == TexturePostprocess)
 		{
 			// Do nothing.
@@ -2038,9 +2036,11 @@ void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 			(GLint)geometry.vertices_offset);
 	};
 
-	for (const Rml::RenderCommand& command : commands.commands)
+	for (const Rml::RenderCommand& command : data.commands)
 	{
 		using Type = Rml::RenderCommandType;
+
+		UpdateScissorRegion(command.scissor_offset);
 
 		switch (command.type)
 		{
@@ -2048,16 +2048,6 @@ void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 		{
 			// TODO: Attach any filters
 			RenderGeometry(command.geometry, command.texture);
-		}
-		break;
-		case Type::EnableClipMask:
-		{
-			glEnable(GL_STENCIL_TEST);
-		}
-		break;
-		case Type::DisableClipMask:
-		{
-			glDisable(GL_STENCIL_TEST);
 		}
 		break;
 		case Type::RenderClipMask:
@@ -2112,9 +2102,13 @@ void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 			glStencilFunc(GL_EQUAL, stencil_test_value, GLuint(-1));
 		}
 		break;
+		case Type::DisableClipMask:
+		{
+			glDisable(GL_STENCIL_TEST);
+		}
+		break;
 		case Type::PushLayer:
 		{
-			UpdateScissorRegion(command.geometry.scissor_offset);
 			if (command.push_layer.clear_new_layer == Rml::RenderClear::Clone)
 				render_state.PushLayerClone();
 			else
@@ -2127,8 +2121,7 @@ void RenderInterface_GL3::Render(Rml::RenderCommandList& commands)
 		break;
 		case Type::PopLayer:
 		{
-			UpdateScissorRegion(command.geometry.scissor_offset);
-			PopLayer(command.pop_layer.render_target, command.pop_layer.blend_mode, commands.filter_lists[command.pop_layer.filter_lists_offset],
+			PopLayer(command.pop_layer.render_target, command.pop_layer.blend_mode, data.filter_lists[command.pop_layer.filter_lists_offset],
 				command.texture);
 		}
 		break;

@@ -61,7 +61,7 @@ void RenderManager::Reset(RenderInterface* render_interface)
 	}
 	else
 	{
-		RMLUI_ASSERT(release_queue.filters.empty() && release_queue.shaders.empty() && release_queue.textures.empty());
+		RMLUI_ASSERTMSG(release_queue.filters.empty() && release_queue.shaders.empty() && release_queue.textures.empty(), "Render resources leaked.");
 	}
 }
 

@@ -147,8 +147,6 @@ Rectanglei RenderState::GetScissorState() const
 void RenderState::ApplyClipMask(const ElementClipList& clip_elements)
 {
 	const bool clip_mask_enabled = !clip_elements.empty();
-	
-	render_interface->manager.EnableClipMask(clip_mask_enabled);
 
 	if (clip_mask_enabled)
 	{
@@ -163,6 +161,10 @@ void RenderState::ApplyClipMask(const ElementClipList& clip_elements)
 		// Apply the initially set transform in case it was changed.
 		// TODO: Is it safe to dereference this old pointer?
 		SetTransform(initial_transform);
+	}
+	else
+	{
+		render_interface->manager.DisableClipMask();
 	}
 }
 

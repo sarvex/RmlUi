@@ -15,7 +15,7 @@
  *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -46,7 +46,6 @@ RenderInterface::~RenderInterface()
 		"destroyed and a subsequent call has been made to Rml::ReleaseTextures before the render interface is destroyed.");
 }
 
-
 // Called by RmlUi when a texture is required by the library.
 bool RenderInterface::LoadTexture(TextureHandle& /*texture_handle*/, Vector2i& /*texture_dimensions*/, const String& /*source*/)
 {
@@ -65,15 +64,12 @@ bool RenderInterface::GenerateRenderTexture(TextureHandle& /*texture_handle*/, V
 }
 
 // Called by RmlUi when a loaded texture is no longer required.
-void RenderInterface::ReleaseTexture(TextureHandle /*texture*/)
-{
-}
+void RenderInterface::ReleaseTexture(TextureHandle /*texture*/) {}
 
 CompiledShaderHandle RenderInterface::CompileShader(const String& /*name*/, const Dictionary& /*parameters*/)
 {
 	return CompiledShaderHandle{};
 }
-
 
 void RenderInterface::ReleaseCompiledShader(CompiledShaderHandle /*shader*/) {}
 
@@ -82,10 +78,9 @@ CompiledFilterHandle RenderInterface::CompileFilter(const String& /*name*/, cons
 	return {};
 }
 
-
 void RenderInterface::ReleaseCompiledFilter(CompiledFilterHandle /*filter*/) {}
 
-void RenderInterface::Render(RenderCommandList& /*commands*/)
+void RenderInterface::Render(RenderData& /*commands*/)
 {
 	// TODO: Render commands in a backward-compatible manner?
 }
@@ -95,42 +90,5 @@ Context* RenderInterface::GetContext() const
 {
 	return context;
 }
-
-#if 0
-
-// Called by RmlUi when it wants to compile geometry it believes will be static for the forseeable future.
-CompiledGeometryHandle RenderInterface::CompileGeometry(Vertex* /*vertices*/, int /*num_vertices*/, int* /*indices*/, int /*num_indices*/, TextureHandle /*texture*/)
-{
-	return 0;
-}
-
-// Called by RmlUi when it wants to render application-compiled geometry.
-void RenderInterface::RenderCompiledGeometry(CompiledGeometryHandle /*geometry*/, const Vector2f& /*translation*/)
-{
-}
-
-// Called by RmlUi when it wants to release application-compiled geometry.
-void RenderInterface::ReleaseCompiledGeometry(CompiledGeometryHandle /*geometry*/) {}
-
-bool RenderInterface::EnableClipMask(bool /*enable*/)
-{
-	return false;
-}
-
-void RenderInterface::RenderToClipMask(ClipMaskOperation /*mask_operation*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/) {}
-
-// Called by RmlUi when it wants to change the current transform matrix to a new matrix.
-void RenderInterface::SetTransform(const Matrix4f* /*transform*/)
-{
-}
-void RenderInterface::RenderShader(CompiledShaderHandle /*shader*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/) {}
-void RenderInterface::AttachFilter(CompiledFilterHandle /*filter*/) {}
-void RenderInterface::PushLayer(RenderClear /*clear_new_layer*/) {}
-
-TextureHandle RenderInterface::PopLayer(RenderTarget /*render_target*/, BlendMode /*blend_mode*/)
-{
-	return {};
-}
-#endif
 
 } // namespace Rml

@@ -55,7 +55,7 @@ public:
 	Rml::CompiledFilterHandle CompileFilter(const Rml::String& name, const Rml::Dictionary& parameters) override;
 	void ReleaseCompiledFilter(Rml::CompiledFilterHandle filter) override;
 
-	void Render(Rml::RenderCommandList& commands) override;
+	void Render(Rml::RenderData& render_data) override;
 
 	// -- Public methods
 
