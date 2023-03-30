@@ -210,7 +210,7 @@ set(Core_PUB_HDR_FILES
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/PropertyParser.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/PropertySpecification.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/Rectangle.h
-    ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/RenderCommands.h
+    ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/RenderData.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/RenderInterface.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/RenderManager.h
     ${PROJECT_SOURCE_DIR}/Include/RmlUi/Core/RenderState.h

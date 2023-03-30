@@ -2000,7 +2000,7 @@ void RenderInterface_GL3::Render(Rml::RenderData& data)
 		}
 	};
 
-	auto RenderGeometry = [&](const Rml::RenderCommand::Geometry& geometry, Rml::TextureHandle texture, bool use_program = true) {
+	auto RenderGeometry = [&](const Rml::RenderCommandGeometry& geometry, Rml::TextureHandle texture, bool use_program = true) {
 		if (geometry.transform_offset != previous_transform_offset)
 		{
 			if (geometry.transform_offset)
@@ -2046,8 +2046,13 @@ void RenderInterface_GL3::Render(Rml::RenderData& data)
 		{
 		case Type::RenderGeometry:
 		{
-			// TODO: Attach any filters
-			RenderGeometry(command.geometry, command.texture);
+			RenderGeometry(command.render_geometry.geometry, command.render_geometry.texture);
+		}
+		break;
+		case Type::RenderShader:
+		{
+			SetCustomShader(command.render_shader.handle);
+			RenderGeometry(command.render_shader.geometry, command.render_shader.texture, false);
 		}
 		break;
 		case Type::RenderClipMask:
@@ -2093,7 +2098,7 @@ void RenderInterface_GL3::Render(Rml::RenderData& data)
 			break;
 			}
 
-			RenderGeometry(command.geometry, command.texture);
+			RenderGeometry(command.render_clip_mask.geometry, command.render_clip_mask.texture);
 
 			// Restore state
 			// @performance Cache state so we don't toggle it unnecessarily.
@@ -2122,13 +2127,7 @@ void RenderInterface_GL3::Render(Rml::RenderData& data)
 		case Type::PopLayer:
 		{
 			PopLayer(command.pop_layer.render_target, command.pop_layer.blend_mode, data.filter_lists[command.pop_layer.filter_lists_offset],
-				command.texture);
-		}
-		break;
-		case Type::RenderShader:
-		{
-			SetCustomShader(command.render_shader.handle);
-			RenderGeometry(command.geometry, command.texture, false);
+				command.pop_layer.render_texture);
 		}
 		break;
 		}

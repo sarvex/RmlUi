@@ -30,7 +30,7 @@
 #define RMLUI_CORE_RENDERINTERFACE_H
 
 #include "Header.h"
-#include "RenderCommands.h"
+#include "RenderData.h"
 #include "RenderManager.h"
 #include "Texture.h"
 #include "Traits.h"
@@ -74,7 +74,7 @@ public:
 	/// Called by RmlUi when...
 	virtual CompiledFilterHandle CompileFilter(const String& name, const Dictionary& parameters);
 
-	/// Called by RmlUi when...
+	/// Called by RmlUi when a context wants its contents to be rendered.
 	virtual void Render(RenderData& render_data);
 
 	// TODO: Replace Release... methods with this

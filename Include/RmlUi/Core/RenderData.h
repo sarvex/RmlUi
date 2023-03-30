@@ -26,8 +26,8 @@
  *
  */
 
-#ifndef RMLUI_CORE_RENDERCOMMANDS_H
-#define RMLUI_CORE_RENDERCOMMANDS_H
+#ifndef RMLUI_CORE_RENDERDATA_H
+#define RMLUI_CORE_RENDERDATA_H
 
 #include "Types.h"
 #include "Vertex.h"
@@ -54,41 +54,52 @@ enum class RenderCommandType {
 	PopLayer,
 };
 
+struct RenderCommandGeometry {
+	int vertices_offset;
+	int indices_offset;
+	int num_elements;
+
+	int translation_offset;
+	int transform_offset;
+};
+
 struct RenderCommand {
 	RenderCommandType type;
 
-	// -- Geometry (RenderGeometry, RenderShader, RenderClipMask)
-	struct Geometry {
-		int vertices_offset;
-		int indices_offset;
-		int num_elements;
-
-		int translation_offset;
-		int transform_offset;
-	} geometry;
-
-	// Texture to attach to the geometry (RenderGeometry, RenderShader, RenderClipMask). Render texture target (PopLayer).
-	TextureHandle texture;
-	// Scissor offset (RenderGeometry, RenderShader, RenderClipMask, PushLayer, PopLayer)
 	int scissor_offset;
 
-	struct RenderShader {
-		CompiledShaderHandle handle;
-	} render_shader;
+	union {
+		struct RenderGeometry {
+			RenderCommandGeometry geometry;
+			TextureHandle texture;
+		} render_geometry;
 
-	struct RenderClipMask {
-		ClipMaskOperation operation;
-	} render_clip_mask;
+		struct RenderShader {
+			RenderCommandGeometry geometry;
+			TextureHandle texture;
+			CompiledShaderHandle handle;
+		} render_shader;
 
-	struct PushLayer {
-		RenderClear clear_new_layer;
-	} push_layer;
+		struct RenderClipMask {
+			RenderCommandGeometry geometry;
+			TextureHandle texture;
+			ClipMaskOperation operation;
+		} render_clip_mask;
 
-	struct PopLayer {
-		RenderTarget render_target;
-		BlendMode blend_mode;
-		int filter_lists_offset;
-	} pop_layer;
+		struct DisableClipMask {
+		} disable_clip_mask;
+
+		struct PushLayer {
+			RenderClear clear_new_layer;
+		} push_layer;
+
+		struct PopLayer {
+			RenderTarget render_target;
+			BlendMode blend_mode;
+			int filter_lists_offset;
+			TextureHandle render_texture;
+		} pop_layer;
+	};
 
 	RenderCommandUserData user_data;
 };

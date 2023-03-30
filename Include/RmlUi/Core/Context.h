@@ -90,8 +90,6 @@ public:
 	/// Renders all visible elements in the context's documents.
 	bool Render();
 
-	const RenderData& GetRenderCommandList() { return GetRenderInterface()->manager.GetList(); }
-
 	/// Creates a new, empty document and places it into this context.
 	/// @param[in] instancer_name The name of the instancer used to create the document.
 	/// @return The new document, or nullptr if no document could be created.

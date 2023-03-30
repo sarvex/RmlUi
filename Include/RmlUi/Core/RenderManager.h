@@ -30,7 +30,7 @@
 #define RMLUI_CORE_RENDERMANAGER_H
 
 #include "Header.h"
-#include "RenderCommands.h"
+#include "RenderData.h"
 
 namespace Rml {
 
@@ -40,9 +40,9 @@ class RenderManager {
 public:
 	RenderManager() { Reset(nullptr); }
 
-	RenderCommand::Geometry PushGeometry(const Vertex* vertices, int num_vertices, const int* indices, int num_indices, Vector2f translation)
+	RenderCommandGeometry PushGeometry(const Vertex* vertices, int num_vertices, const int* indices, int num_indices, Vector2f translation)
 	{
-		RenderCommand::Geometry geometry;
+		RenderCommandGeometry geometry;
 		geometry.vertices_offset = (int)list.vertices.size();
 		list.vertices.insert(list.vertices.end(), vertices, vertices + num_vertices);
 		geometry.indices_offset = (int)list.indices.size();
@@ -76,36 +76,41 @@ public:
 		RenderCommand& command = PushCommand(RenderCommandType::PushLayer);
 		command.push_layer.clear_new_layer = clear_new_layer;
 	}
-	void PopLayer(RenderTarget render_target, BlendMode blend_mode, TextureHandle render_texture_target = {})
+	void PopLayer(RenderTarget render_target, BlendMode blend_mode, TextureHandle render_texture = {})
 	{
 		RenderCommand& command = PushCommand(RenderCommandType::PopLayer);
 		command.pop_layer.render_target = render_target;
 		command.pop_layer.blend_mode = blend_mode;
-		command.texture = render_texture_target;
-		ApplyAttachedFilters(command);
+		command.pop_layer.render_texture = render_texture;
+		if (!attached_filters.empty())
+		{
+			command.pop_layer.filter_lists_offset = (int)list.filter_lists.size();
+			list.filter_lists.push_back(std::move(attached_filters));
+			attached_filters.clear();
+		}
 	}
 
-	void RenderGeometry(RenderCommand::Geometry geometry, TextureHandle texture_handle)
+	void RenderGeometry(RenderCommandGeometry geometry, TextureHandle texture_handle)
 	{
 		RenderCommand& command = PushCommand(RenderCommandType::RenderGeometry);
-		command.geometry = geometry;
-		command.texture = texture_handle;
+		command.render_geometry.geometry = geometry;
+		command.render_geometry.texture = texture_handle;
 	}
-	void RenderClipMask(RenderCommand::Geometry geometry, TextureHandle texture_handle, ClipMaskOperation operation)
+	void RenderClipMask(RenderCommandGeometry geometry, TextureHandle texture_handle, ClipMaskOperation operation)
 	{
 		RenderCommand& command = PushCommand(RenderCommandType::RenderClipMask);
-		command.geometry = geometry;
+		command.render_clip_mask.geometry = geometry;
+		command.render_clip_mask.texture = texture_handle;
 		command.render_clip_mask.operation = operation;
-		command.texture = texture_handle;
 	}
 	void DisableClipMask() { PushCommand(RenderCommandType::DisableClipMask); }
 
-	void RenderShader(RenderCommand::Geometry geometry, TextureHandle texture_handle, CompiledShaderHandle shader_handle)
+	void RenderShader(RenderCommandGeometry geometry, TextureHandle texture_handle, CompiledShaderHandle shader_handle)
 	{
 		RenderCommand& command = PushCommand(RenderCommandType::RenderShader);
-		command.geometry = geometry;
+		command.render_shader.geometry = geometry;
+		command.render_shader.texture = texture_handle;
 		command.render_shader.handle = shader_handle;
-		command.texture = texture_handle;
 	}
 
 	void AttachFilter(CompiledFilterHandle handle) { attached_filters.push_back(handle); }
@@ -126,16 +131,6 @@ private:
 		command.type = command_type;
 		command.scissor_offset = active_scissor;
 		return command;
-	}
-	void ApplyAttachedFilters(RenderCommand& command)
-	{
-		RMLUI_ASSERT(command.type == RenderCommandType::PopLayer);
-		if (!attached_filters.empty())
-		{
-			command.pop_layer.filter_lists_offset = (int)list.filter_lists.size();
-			list.filter_lists.push_back(std::move(attached_filters));
-			attached_filters.clear();
-		}
 	}
 
 	RenderData list;
