@@ -82,7 +82,7 @@ private:
 	void RenderCompiledGeometry(Rml::CompiledGeometryHandle geometry, const Rml::Vector2f& translation);
 	void ReleaseCompiledGeometry(Rml::CompiledGeometryHandle geometry);
 
-	void SetScissor(Rml::Rectanglei region);
+	void SetScissor(Rml::Rectanglei region, bool vertically_flip = false);
 	void DisableScissor();
 
 	void SetTransform(const Rml::Matrix4f* transform);
@@ -98,8 +98,7 @@ private:
 	void DrawFullscreenQuad(Rml::Vector2f uv_offset = {}, Rml::Vector2f uv_scaling = Rml::Vector2f(1.f));
 
 	void RenderBlurPass(const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp);
-	void RenderBlur(float sigma, const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp, Rml::Vector2i position,
-		Rml::Vector2i size);
+	void RenderBlur(float sigma, const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp, Rml::Rectanglei window);
 
 	// -- State
 	Rml::Matrix4f transform;

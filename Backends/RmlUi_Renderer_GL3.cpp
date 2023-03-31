@@ -889,7 +889,19 @@ void RenderInterface_GL3::ReleaseCompiledGeometry(Rml::CompiledGeometryHandle ha
 	delete geometry;
 }
 
-void RenderInterface_GL3::SetScissor(Rml::Rectanglei region)
+/// Flip vertical axis of the rectangle, and move its origin to the vertically opposite side of the viewport.
+/// @note Changes coordinate system from RmlUi to OpenGL, or equivalently in reverse.
+/// @note The Rectangle::Top and Rectangle::Bottom members will have reverse meaning in the returned rectangle.
+static Rml::Rectanglei VerticallyFlipped(Rml::Rectanglei rect, int viewport_height)
+{
+	RMLUI_ASSERT(rect.Valid());
+	Rml::Rectanglei flipped_rect = rect;
+	flipped_rect.p0.y = viewport_height - rect.p1.y;
+	flipped_rect.p1.y = viewport_height - rect.p0.y;
+	return flipped_rect;
+}
+
+void RenderInterface_GL3::SetScissor(Rml::Rectanglei region, bool vertically_flip)
 {
 	if (region.Valid() != scissor_state.Valid())
 	{
@@ -898,6 +910,9 @@ void RenderInterface_GL3::SetScissor(Rml::Rectanglei region)
 		else
 			glDisable(GL_SCISSOR_TEST);
 	}
+
+	if (region.Valid() && vertically_flip)
+		region = VerticallyFlipped(region, viewport_height);
 
 	if (region.Valid() && region != scissor_state)
 		glScissor(region.Left(), viewport_height - region.Bottom(), region.Width(), region.Height());
@@ -1290,7 +1305,7 @@ Rml::CompiledShaderHandle RenderInterface_GL3::CompileShader(const Rml::String& 
 	return {};
 }
 
-static void SetTexCoordLimits(ProgramId program, Rml::Vector2i position, Rml::Vector2i size, Rml::Vector2i framebuffer_size)
+static void SetTexCoordLimits(ProgramId program, Rml::Rectanglei rectangle_flipped, Rml::Vector2i framebuffer_size)
 {
 #ifdef RMLUI_DEBUG
 	GLint gl_id = {};
@@ -1298,10 +1313,10 @@ static void SetTexCoordLimits(ProgramId program, Rml::Vector2i position, Rml::Ve
 	RMLUI_ASSERTMSG((GLuint)gl_id == Gfx::programs[program], "Passed-in program must be currently active.");
 #endif
 
-	// Offset by half-texel values so that texture lookups are clamped to fragment centers, thereby avoiding color bleeding from neighboring texels
-	// due to bilinear interpolation.
-	const Rml::Vector2f min = (Rml::Vector2f(position) + Rml::Vector2f(0.5f)) / Rml::Vector2f(framebuffer_size);
-	const Rml::Vector2f max = (Rml::Vector2f(position + size) - Rml::Vector2f(0.5f)) / Rml::Vector2f(framebuffer_size);
+	// Offset by half-texel values so that texture lookups are clamped to fragment centers, thereby avoiding color
+	// bleeding from neighboring texels due to bilinear interpolation.
+	const Rml::Vector2f min = (Rml::Vector2f(rectangle_flipped.p0) + Rml::Vector2f(0.5f)) / Rml::Vector2f(framebuffer_size);
+	const Rml::Vector2f max = (Rml::Vector2f(rectangle_flipped.p1) - Rml::Vector2f(0.5f)) / Rml::Vector2f(framebuffer_size);
 
 	glUniform2f(Gfx::uniforms.Get(program, UniformId::TexCoordMin), min.x, min.y);
 	glUniform2f(Gfx::uniforms.Get(program, UniformId::TexCoordMax), max.x, max.y);
@@ -1358,16 +1373,19 @@ void RenderInterface_GL3::RenderBlurPass(const Gfx::FramebufferData& source_dest
 }
 
 void RenderInterface_GL3::RenderBlur(float sigma, const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp,
-	Rml::Vector2i position, Rml::Vector2i size)
+	const Rml::Rectanglei window_flipped)
 {
 	RMLUI_ASSERT(&source_destination != &temp && source_destination.width == temp.width && source_destination.height == temp.height);
+	RMLUI_ASSERT(window_flipped.Valid());
 
 	int pass_level = 0;
 	SigmaToParameters(sigma, pass_level, sigma);
 
+	const Rml::Rectanglei original_scissor = scissor_state;
+
 #if 0
 	// Debug coloring
-	Gfx::render_interface->EnableScissorRegion(false);
+	DisableScissor();
 	glClearColor(1, 0, 0, 1);
 	glBindFramebuffer(GL_FRAMEBUFFER, temp.framebuffer);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -1375,13 +1393,10 @@ void RenderInterface_GL3::RenderBlur(float sigma, const Gfx::FramebufferData& so
 #endif
 
 	// Begin by downscale so that the blur pass can be done at a reduced resolution for large sigma.
-	Rml::Vector2i scissor_min = position;
-	Rml::Vector2i scissor_max = position + size;
-	Rml::Vector2i scissor_size = size;
+	Rml::Rectanglei scissor = window_flipped;
 
 	Gfx::UseProgram(ProgramId::Passthrough);
-	glEnable(GL_SCISSOR_TEST);
-	glScissor(scissor_min.x, scissor_min.y, scissor_size.x, scissor_size.y);
+	SetScissor(scissor, true);
 
 	// Downscale by iterative half-scaling with bilinear filtering, to reduce aliasing.
 	glViewport(0, 0, source_destination.width / 2, source_destination.height / 2);
@@ -1396,13 +1411,12 @@ void RenderInterface_GL3::RenderBlur(float sigma, const Gfx::FramebufferData& so
 
 	for (int i = 0; i < pass_level; i++)
 	{
-		scissor_min = (scissor_min + Rml::Vector2i(1)) / 2;
-		scissor_max = Rml::Math::Max(scissor_max / 2, scissor_min);
-		scissor_size = scissor_max - scissor_min;
+		scissor.p0 = (scissor.p0 + Rml::Vector2i(1)) / 2;
+		scissor.p1 = Rml::Math::Max(scissor.p1 / 2, scissor.p0);
 		const bool from_source = (i % 2 == 0);
 		Gfx::BindTexture(from_source ? source_destination : temp);
 		glBindFramebuffer(GL_FRAMEBUFFER, (from_source ? temp : source_destination).framebuffer);
-		glScissor(scissor_min.x, scissor_min.y, scissor_size.x, scissor_size.y);
+		SetScissor(scissor, true);
 
 		DrawFullscreenQuad({}, uv_scaling);
 	}
@@ -1429,7 +1443,7 @@ void RenderInterface_GL3::RenderBlur(float sigma, const Gfx::FramebufferData& so
 	// Set up uniforms.
 	Gfx::UseProgram(ProgramId::Blur);
 	SetBlurWeights(sigma);
-	SetTexCoordLimits(ProgramId::Blur, scissor_min, scissor_size, {source_destination.width, source_destination.height});
+	SetTexCoordLimits(ProgramId::Blur, scissor, {source_destination.width, source_destination.height});
 	const float blending_magnitude = 1.f;
 	glUniform1f(Gfx::uniforms.Get(ProgramId::Blur, UniformId::Value), blending_magnitude);
 
@@ -1437,14 +1451,14 @@ void RenderInterface_GL3::RenderBlur(float sigma, const Gfx::FramebufferData& so
 	RenderBlurPass(temp, source_destination);
 
 	// Blit the blurred image to the scissor region with upscaling.
-	glScissor(position.x, position.y, size.x, size.y);
+	SetScissor(window_flipped, true);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, temp.framebuffer);
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, source_destination.framebuffer);
 
-	const Rml::Vector2i src_min = scissor_min;
-	const Rml::Vector2i src_max = scissor_max;
-	const Rml::Vector2i dst_min = position;
-	const Rml::Vector2i dst_max = position + size;
+	const Rml::Vector2i src_min = scissor.p0;
+	const Rml::Vector2i src_max = scissor.p1;
+	const Rml::Vector2i dst_min = window_flipped.p0;
+	const Rml::Vector2i dst_max = window_flipped.p1;
 	glBlitFramebuffer(src_min.x, src_min.y, src_max.x, src_max.y, dst_min.x, dst_min.y, dst_max.x, dst_max.y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
 	// The above upscale blit might be jittery at low resolutions (large pass levels). This is especially noticable when moving an element with
@@ -1459,6 +1473,9 @@ void RenderInterface_GL3::RenderBlur(float sigma, const Gfx::FramebufferData& so
 		glBlitFramebuffer(src_min.x, src_min.y, src_max.x, src_max.y, target_min.x, target_min.y, target_max.x, target_max.y, GL_COLOR_BUFFER_BIT,
 			GL_LINEAR);
 	}
+
+	// Restore render state.
+	SetScissor(original_scissor);
 
 	Gfx::CheckGLError("Blur");
 }
@@ -1640,7 +1657,6 @@ Rml::CompiledFilterHandle RenderInterface_GL3::CompileFilter(const Rml::String& 
 
 void RenderInterface_GL3::ReleaseCompiledFilter(Rml::CompiledFilterHandle filter)
 {
-	// RMLUI_ASSERT(attached_filters.empty());
 	delete reinterpret_cast<CompiledFilter*>(filter);
 }
 
@@ -1655,26 +1671,20 @@ void RenderInterface_GL3::RenderFilters(const Rml::FilterHandleList& filter_list
 		{
 		case FilterType::Blur:
 		{
-			Rml::Rectanglei original_scissor_state = scissor_state;
 			glDisable(GL_BLEND);
 
 			const Gfx::FramebufferData& source_destination = render_state.GetPostprocessPrimary();
 			const Gfx::FramebufferData& temp = render_state.GetPostprocessSecondary();
 
-			// Draw the blur
-			const Rml::Vector2i position = {scissor_state.Left(), source_destination.height - scissor_state.Bottom()};
-			const Rml::Vector2i size = {scissor_state.Width(), scissor_state.Height()};
-
-			RenderBlur(filter.sigma, source_destination, temp, position, size);
+			const Rml::Rectanglei window_flipped = VerticallyFlipped(scissor_state, viewport_height);
+			RenderBlur(filter.sigma, source_destination, temp, window_flipped);
 
 			// Restore state
 			glEnable(GL_BLEND);
-			SetScissor(original_scissor_state);
 		}
 		break;
 		case FilterType::DropShadow:
 		{
-			Rml::Rectanglei original_scissor_state = scissor_state;
 			Gfx::UseProgram(ProgramId::DropShadow);
 			glDisable(GL_BLEND);
 
@@ -1686,8 +1696,8 @@ void RenderInterface_GL3::RenderFilters(const Rml::FilterHandleList& filter_list
 			Gfx::BindTexture(primary);
 			glBindFramebuffer(GL_FRAMEBUFFER, secondary.framebuffer);
 
-			SetTexCoordLimits(ProgramId::DropShadow, {scissor_state.Left(), primary.height - scissor_state.Bottom()},
-				{scissor_state.Width(), scissor_state.Height()}, {primary.width, primary.height});
+			const Rml::Rectanglei window_flipped = VerticallyFlipped(scissor_state, viewport_height);
+			SetTexCoordLimits(ProgramId::DropShadow, window_flipped, {primary.width, primary.height});
 
 			const Rml::Vector2f uv_offset = filter.offset / Rml::Vector2f(-(float)viewport_width, (float)viewport_height);
 			DrawFullscreenQuad(uv_offset);
@@ -1695,13 +1705,9 @@ void RenderInterface_GL3::RenderFilters(const Rml::FilterHandleList& filter_list
 			if (filter.sigma >= 0.5f)
 			{
 				const Gfx::FramebufferData& tertiary = render_state.GetPostprocessTertiary();
-
-				const Rml::Vector2i position = {scissor_state.Left(), primary.height - scissor_state.Bottom()};
-				const Rml::Vector2i size = {scissor_state.Width(), scissor_state.Height()};
-				RenderBlur(filter.sigma, secondary, tertiary, position, size);
+				RenderBlur(filter.sigma, secondary, tertiary, window_flipped);
 			}
 
-			SetScissor(original_scissor_state);
 			Gfx::UseProgram(ProgramId::Passthrough);
 			Gfx::BindTexture(primary);
 			glEnable(GL_BLEND);
