@@ -113,10 +113,11 @@ public:
 		return Rectangle<U>::FromCorners(static_cast<Vector2<U>>(p0), static_cast<Vector2<U>>(p1));
 	}
 
+	Vector2Type p0; // Minimum coordinates for a valid rectangle.
+	Vector2Type p1; // Maximum coordinates for a valid rectangle.
+
 private:
 	Rectangle(Vector2Type p0, Vector2Type p1) : p0(p0), p1(p1) {}
-
-	Vector2Type p0, p1;
 };
 
 } // namespace Rml
