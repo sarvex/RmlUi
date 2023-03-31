@@ -889,28 +889,25 @@ void RenderInterface_GL3::ReleaseCompiledGeometry(Rml::CompiledGeometryHandle ha
 	delete geometry;
 }
 
-void RenderInterface_GL3::EnableScissorRegion(bool enable)
+void RenderInterface_GL3::SetScissor(Rml::Rectanglei region)
 {
-	if (enable)
-		glEnable(GL_SCISSOR_TEST);
-	else
-		glDisable(GL_SCISSOR_TEST);
-	scissor_state.enabled = enable;
-}
+	if (region.Valid() != scissor_state.Valid())
+	{
+		if (region.Valid())
+			glEnable(GL_SCISSOR_TEST);
+		else
+			glDisable(GL_SCISSOR_TEST);
+	}
 
-void RenderInterface_GL3::SetScissorRegion(int x, int y, int width, int height)
-{
-	glScissor(x, viewport_height - (y + height), width, height);
-	scissor_state.x = x;
-	scissor_state.y = y;
-	scissor_state.width = width;
-	scissor_state.height = height;
+	if (region.Valid() && region != scissor_state)
+		glScissor(region.Left(), viewport_height - region.Bottom(), region.Width(), region.Height());
+
 	Gfx::CheckGLError("SetScissorRegion");
+	scissor_state = region;
 }
-
-void RenderInterface_GL3::SetScissorRegion(Rml::Rectanglei region)
+void RenderInterface_GL3::DisableScissor()
 {
-	SetScissorRegion(region.Left(), region.Top(), region.Width(), region.Height());
+	SetScissor(Rml::Rectanglei::CreateInvalid());
 }
 
 // Set to byte packing, or the compiler will expand our struct, which means it won't read correctly from file
@@ -1658,27 +1655,26 @@ void RenderInterface_GL3::RenderFilters(const Rml::FilterHandleList& filter_list
 		{
 		case FilterType::Blur:
 		{
-			ScissorState original_scissor_state = scissor_state;
+			Rml::Rectanglei original_scissor_state = scissor_state;
 			glDisable(GL_BLEND);
 
 			const Gfx::FramebufferData& source_destination = render_state.GetPostprocessPrimary();
 			const Gfx::FramebufferData& temp = render_state.GetPostprocessSecondary();
 
 			// Draw the blur
-			const Rml::Vector2i position = {scissor_state.x, source_destination.height - (scissor_state.y + scissor_state.height)};
-			const Rml::Vector2i size = {scissor_state.width, scissor_state.height};
+			const Rml::Vector2i position = {scissor_state.Left(), source_destination.height - scissor_state.Bottom()};
+			const Rml::Vector2i size = {scissor_state.Width(), scissor_state.Height()};
 
 			RenderBlur(filter.sigma, source_destination, temp, position, size);
 
 			// Restore state
 			glEnable(GL_BLEND);
-			EnableScissorRegion(original_scissor_state.enabled);
-			SetScissorRegion(original_scissor_state.x, original_scissor_state.y, original_scissor_state.width, original_scissor_state.height);
+			SetScissor(original_scissor_state);
 		}
 		break;
 		case FilterType::DropShadow:
 		{
-			ScissorState original_scissor_state = scissor_state;
+			Rml::Rectanglei original_scissor_state = scissor_state;
 			Gfx::UseProgram(ProgramId::DropShadow);
 			glDisable(GL_BLEND);
 
@@ -1690,8 +1686,8 @@ void RenderInterface_GL3::RenderFilters(const Rml::FilterHandleList& filter_list
 			Gfx::BindTexture(primary);
 			glBindFramebuffer(GL_FRAMEBUFFER, secondary.framebuffer);
 
-			SetTexCoordLimits(ProgramId::DropShadow, {scissor_state.x, primary.height - (scissor_state.y + scissor_state.height)},
-				{scissor_state.width, scissor_state.height}, {primary.width, primary.height});
+			SetTexCoordLimits(ProgramId::DropShadow, {scissor_state.Left(), primary.height - scissor_state.Bottom()},
+				{scissor_state.Width(), scissor_state.Height()}, {primary.width, primary.height});
 
 			const Rml::Vector2f uv_offset = filter.offset / Rml::Vector2f(-(float)viewport_width, (float)viewport_height);
 			DrawFullscreenQuad(uv_offset);
@@ -1700,13 +1696,12 @@ void RenderInterface_GL3::RenderFilters(const Rml::FilterHandleList& filter_list
 			{
 				const Gfx::FramebufferData& tertiary = render_state.GetPostprocessTertiary();
 
-				const Rml::Vector2i position = {scissor_state.x, primary.height - (scissor_state.y + scissor_state.height)};
-				const Rml::Vector2i size = {scissor_state.width, scissor_state.height};
+				const Rml::Vector2i position = {scissor_state.Left(), primary.height - scissor_state.Bottom()};
+				const Rml::Vector2i size = {scissor_state.Width(), scissor_state.Height()};
 				RenderBlur(filter.sigma, secondary, tertiary, position, size);
 			}
 
-			EnableScissorRegion(original_scissor_state.enabled);
-			SetScissorRegion(original_scissor_state.x, original_scissor_state.y, original_scissor_state.width, original_scissor_state.height);
+			SetScissor(original_scissor_state);
 			Gfx::UseProgram(ProgramId::Passthrough);
 			Gfx::BindTexture(primary);
 			glEnable(GL_BLEND);
@@ -1830,15 +1825,16 @@ void RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target, Rml::BlendMo
 	case RenderTarget::RenderTexture:
 	{
 		RMLUI_ASSERT(render_texture_target);
-		const bool scissor_initially_enabled = scissor_state.enabled;
-		EnableScissorRegion(false);
+		RMLUI_ASSERT(scissor_state.Valid());
+		const Rml::Rectanglei initial_scissor_state = scissor_state;
+		DisableScissor();
 
 		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
 		const Gfx::FramebufferData& destination = render_state.GetPostprocessSecondary();
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
 
-		Rml::Rectanglei bounds = Rml::Rectanglei::FromPositionSize({scissor_state.x, scissor_state.y}, {scissor_state.width, scissor_state.height});
+		Rml::Rectanglei bounds = initial_scissor_state;
 
 		// Flip the image vertically, as that convention is used for textures, and move to origin.
 		glBlitFramebuffer(                                  //
@@ -1858,7 +1854,7 @@ void RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target, Rml::BlendMo
 			glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, bounds.Width(), bounds.Height());
 		}
 
-		EnableScissorRegion(scissor_initially_enabled);
+		SetScissor(initial_scissor_state);
 	}
 	break;
 	default: break;
@@ -1963,7 +1959,7 @@ void RenderInterface_GL3::BeginFrame()
 	has_mask = false;
 	program_transform_dirty.set();
 	SetTransform(nullptr);
-	scissor_state = {};
+	scissor_state = Rml::Rectanglei::CreateInvalid();
 
 	Gfx::CheckGLError("BeginFrame");
 }
@@ -1975,32 +1971,11 @@ void RenderInterface_GL3::Render(Rml::RenderData& data)
 	const GLuint global_geometry_vao = reinterpret_cast<Gfx::CompiledGeometryData*>(global_geometry_handle)->vao;
 
 	SetTransform(nullptr);
-	EnableScissorRegion(false);
+	DisableScissor();
 	glDisable(GL_STENCIL_TEST);
 
-	int previous_scissor_offset = 0;
-	int previous_transform_offset = 0;
-
-	auto UpdateScissorRegion = [&](int scissor_offset) {
-		if (scissor_offset != previous_scissor_offset)
-		{
-			if (scissor_offset)
-			{
-				if (!previous_scissor_offset)
-					EnableScissorRegion(true);
-
-				SetScissorRegion(data.scissor_regions[scissor_offset]);
-			}
-			else
-			{
-				EnableScissorRegion(false);
-			}
-
-			previous_scissor_offset = scissor_offset;
-		}
-	};
-
-	auto RenderGeometry = [&](const Rml::RenderCommandGeometry& geometry, Rml::TextureHandle texture, bool use_program = true) {
+	auto RenderGeometry = [this, &data, global_geometry_vao, previous_transform_offset = 0](const Rml::RenderCommandGeometry& geometry,
+							  Rml::TextureHandle texture, bool use_program = true) mutable {
 		if (geometry.transform_offset != previous_transform_offset)
 		{
 			if (geometry.transform_offset)
@@ -2040,7 +2015,10 @@ void RenderInterface_GL3::Render(Rml::RenderData& data)
 	{
 		using Type = Rml::RenderCommandType;
 
-		UpdateScissorRegion(command.scissor_offset);
+		if (command.scissor_offset)
+			SetScissor(data.scissor_regions[command.scissor_offset]);
+		else
+			DisableScissor();
 
 		switch (command.type)
 		{
@@ -2135,7 +2113,7 @@ void RenderInterface_GL3::Render(Rml::RenderData& data)
 
 	ReleaseCompiledGeometry(global_geometry_handle);
 	SetTransform(nullptr);
-	EnableScissorRegion(false);
+	DisableScissor();
 	glDisable(GL_STENCIL_TEST);
 }
 

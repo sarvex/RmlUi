@@ -82,9 +82,8 @@ private:
 	void RenderCompiledGeometry(Rml::CompiledGeometryHandle geometry, const Rml::Vector2f& translation);
 	void ReleaseCompiledGeometry(Rml::CompiledGeometryHandle geometry);
 
-	void EnableScissorRegion(bool enable);
-	void SetScissorRegion(int x, int y, int width, int height);
-	void SetScissorRegion(Rml::Rectanglei region);
+	void SetScissor(Rml::Rectanglei region);
+	void DisableScissor();
 
 	void SetTransform(const Rml::Matrix4f* transform);
 
@@ -108,11 +107,7 @@ private:
 	static constexpr size_t MaxNumPrograms = 32;
 	std::bitset<MaxNumPrograms> program_transform_dirty;
 
-	struct ScissorState {
-		bool enabled;
-		int x, y, width, height;
-	};
-	ScissorState scissor_state = {};
+	Rml::Rectanglei scissor_state;
 
 	bool has_mask = false;
 
