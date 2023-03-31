@@ -215,7 +215,10 @@ ComparisonResult CompareScreenToPreviousCapture(Rml::RenderInterface* render_int
 void RenderTextureGeometry(Rml::RenderInterface* render_interface, TextureGeometry& geometry)
 {
 	if (geometry.texture_handle)
-		render_interface->RenderGeometry(geometry.vertices, 4, geometry.indices, 6, geometry.texture_handle, Rml::Vector2f(0, 0));
+	{
+		Rml::RenderCommandGeometry command_geometry = render_interface->manager.PushGeometry(geometry.vertices, 4, geometry.indices, 6, {});
+		render_interface->manager.RenderGeometry(command_geometry, geometry.texture_handle);
+	}
 }
 
 void ReleaseTextureGeometry(Rml::RenderInterface* render_interface, TextureGeometry& geometry)

@@ -111,8 +111,9 @@ void TestNavigator::Render()
 {
 	if (show_reference && reference_geometry.texture_handle)
 	{
-		render_interface->RenderGeometry(reference_geometry.vertices, 4, reference_geometry.indices, 6, reference_geometry.texture_handle,
-			Rml::Vector2f(0, 0));
+		Rml::RenderCommandGeometry command_geometry =
+			render_interface->manager.PushGeometry(reference_geometry.vertices, 4, reference_geometry.indices, 6, {});
+		render_interface->manager.RenderGeometry(command_geometry, reference_geometry.texture_handle);
 	}
 }
 
