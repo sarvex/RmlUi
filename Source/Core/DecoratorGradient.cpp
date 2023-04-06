@@ -355,7 +355,7 @@ void DecoratorLinearGradient::ReleaseElementData(DecoratorDataHandle handle) con
 void DecoratorLinearGradient::RenderElement(Element* element, DecoratorDataHandle handle) const
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
-	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
+	element_data->geometry.RenderWithShader(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
 }
 
 // Returns the point along the input line ('line_point', 'line_vector') closest to the input 'point'.
@@ -537,7 +537,7 @@ void DecoratorRadialGradient::ReleaseElementData(DecoratorDataHandle handle) con
 void DecoratorRadialGradient::RenderElement(Element* element, DecoratorDataHandle handle) const
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
-	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
+	element_data->geometry.RenderWithShader(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
 }
 
 DecoratorRadialGradient::RadialGradientShape DecoratorRadialGradient::CalculateRadialGradientShape(Element* element, Vector2f dimensions) const
@@ -741,7 +741,7 @@ void DecoratorConicGradient::ReleaseElementData(DecoratorDataHandle handle) cons
 void DecoratorConicGradient::RenderElement(Element* element, DecoratorDataHandle handle) const
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
-	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
+	element_data->geometry.RenderWithShader(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
 }
 
 /**

@@ -47,13 +47,13 @@ RenderInterface::~RenderInterface()
 }
 
 // Called by RmlUi when it wants to compile geometry it believes will be static for the forseeable future.
-CompiledGeometryHandle RenderInterface::CompileGeometry(Vertex* /*vertices*/, int /*num_vertices*/, int* /*indices*/, int /*num_indices*/, TextureHandle /*texture*/)
+CompiledGeometryHandle RenderInterface::CompileGeometry(Vertex* /*vertices*/, int /*num_vertices*/, int* /*indices*/, int /*num_indices*/)
 {
 	return 0;
 }
 
 // Called by RmlUi when it wants to render application-compiled geometry.
-void RenderInterface::RenderCompiledGeometry(CompiledGeometryHandle /*geometry*/, const Vector2f& /*translation*/)
+void RenderInterface::RenderCompiledGeometry(CompiledGeometryHandle /*geometry*/, const Vector2f& /*translation*/, TextureHandle /*texture*/)
 {
 }
 
@@ -94,7 +94,9 @@ CompiledShaderHandle RenderInterface::CompileShader(const String& /*name*/, cons
 	return CompiledShaderHandle{};
 }
 
-void RenderInterface::RenderShader(CompiledShaderHandle /*shader*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/) {}
+void RenderInterface::RenderShader(CompiledShaderHandle /*shader*/, CompiledGeometryHandle /*geometry*/, Vector2f /*translation*/,
+	TextureHandle /*texture*/)
+{}
 
 void RenderInterface::ReleaseCompiledShader(CompiledShaderHandle /*shader*/) {}
 

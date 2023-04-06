@@ -77,12 +77,12 @@ public:
 	/// @param[in] num_indices The number of indices passed to the function. This will always be a multiple of three.
 	/// @param[in] texture The texture to be applied to the geometry. This may be nullptr, in which case the geometry is untextured.
 	/// @return The application-specific compiled geometry. Compiled geometry will be stored and rendered using RenderCompiledGeometry() in future calls, and released with ReleaseCompiledGeometry() when it is no longer needed.
-	virtual CompiledGeometryHandle CompileGeometry(Vertex* vertices, int num_vertices, int* indices, int num_indices, TextureHandle texture);
+	virtual CompiledGeometryHandle CompileGeometry(Vertex* vertices, int num_vertices, int* indices, int num_indices);
 	/// Called by RmlUi when it wants to render application-compiled geometry.
 	/// @param[in] geometry The application-specific compiled geometry to render.
 	/// @param[in] translation The translation to apply to the geometry.
 	/// @note Affected by transform: Yes. Affected by scissor: Yes. Affected by clip mask: Yes.
-	virtual void RenderCompiledGeometry(CompiledGeometryHandle geometry, const Vector2f& translation);
+	virtual void RenderCompiledGeometry(CompiledGeometryHandle geometry, const Vector2f& translation, TextureHandle texture);
 	/// Called by RmlUi when it wants to release application-compiled geometry.
 	/// @param[in] geometry The application-specific compiled geometry to release.
 	virtual void ReleaseCompiledGeometry(CompiledGeometryHandle geometry);
@@ -138,7 +138,7 @@ public:
 	/// Called by RmlUi when...
 	virtual CompiledShaderHandle CompileShader(const String& name, const Dictionary& parameters);
 	/// Render geometry with the given shader.
-	virtual void RenderShader(CompiledShaderHandle shader, CompiledGeometryHandle geometry, Vector2f translation);
+	virtual void RenderShader(CompiledShaderHandle shader, CompiledGeometryHandle geometry, Vector2f translation, TextureHandle texture);
 	/// Called by RmlUi when...
 	virtual void ReleaseCompiledShader(CompiledShaderHandle shader);
 

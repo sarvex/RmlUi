@@ -75,7 +75,7 @@ public:
 	/// Render the geometry with an applied effect. Requires that the geometry can be compiled.
 	/// @param[in] shader The shader to use for rendering the geometry.
 	/// @param[in] translation The translation of the geometry.
-	void Render(CompiledShaderHandle shader, Vector2f translation);
+	void RenderWithShader(CompiledShaderHandle shader, Vector2f translation);
 
 	/// Use the geometry to set the clip mask through the render interface. Requires that the geometry can be compiled.
 	/// @param[in] clip_mask The clip mask to apply.

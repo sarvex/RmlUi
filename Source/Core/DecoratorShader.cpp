@@ -87,7 +87,7 @@ void DecoratorShader::ReleaseElementData(DecoratorDataHandle handle) const
 void DecoratorShader::RenderElement(Element* element, DecoratorDataHandle handle) const
 {
 	BasicEffectElementData* element_data = reinterpret_cast<BasicEffectElementData*>(handle);
-	element_data->geometry.Render(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
+	element_data->geometry.RenderWithShader(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
 }
 
 DecoratorShaderInstancer::DecoratorShaderInstancer() : DecoratorInstancer(DecoratorClass::Image), ids{}

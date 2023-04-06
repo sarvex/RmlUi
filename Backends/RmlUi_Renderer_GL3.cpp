@@ -452,7 +452,6 @@ private:
 };
 
 struct CompiledGeometryData {
-	Rml::TextureHandle texture;
 	GLuint vao;
 	GLuint vbo;
 	GLuint ibo;
@@ -824,17 +823,16 @@ void RenderInterface_GL3::BeginFrame()
 void RenderInterface_GL3::RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices, const Rml::TextureHandle texture,
 	const Rml::Vector2f& translation)
 {
-	Rml::CompiledGeometryHandle geometry = CompileGeometry(vertices, num_vertices, indices, num_indices, texture);
+	Rml::CompiledGeometryHandle geometry = CompileGeometry(vertices, num_vertices, indices, num_indices);
 
 	if (geometry)
 	{
-		RenderCompiledGeometry(geometry, translation);
+		RenderCompiledGeometry(geometry, translation, texture);
 		ReleaseCompiledGeometry(geometry);
 	}
 }
 
-Rml::CompiledGeometryHandle RenderInterface_GL3::CompileGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices,
-	Rml::TextureHandle texture)
+Rml::CompiledGeometryHandle RenderInterface_GL3::CompileGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices)
 {
 	constexpr GLenum draw_usage = GL_STATIC_DRAW;
 
@@ -869,7 +867,6 @@ Rml::CompiledGeometryHandle RenderInterface_GL3::CompileGeometry(Rml::Vertex* ve
 	Gfx::CheckGLError("CompileGeometry");
 
 	Gfx::CompiledGeometryData* geometry = new Gfx::CompiledGeometryData;
-	geometry->texture = texture;
 	geometry->vao = vao;
 	geometry->vbo = vbo;
 	geometry->ibo = ibo;
@@ -878,20 +875,20 @@ Rml::CompiledGeometryHandle RenderInterface_GL3::CompileGeometry(Rml::Vertex* ve
 	return (Rml::CompiledGeometryHandle)geometry;
 }
 
-void RenderInterface_GL3::RenderCompiledGeometry(Rml::CompiledGeometryHandle handle, const Rml::Vector2f& translation)
+void RenderInterface_GL3::RenderCompiledGeometry(Rml::CompiledGeometryHandle handle, const Rml::Vector2f& translation, Rml::TextureHandle texture)
 {
 	Gfx::CompiledGeometryData* geometry = (Gfx::CompiledGeometryData*)handle;
 
-	if (geometry->texture == TexturePostprocess)
+	if (texture == TexturePostprocess)
 	{
 		// Do nothing.
 	}
-	else if (geometry->texture)
+	else if (texture)
 	{
 		Gfx::UseProgram(ProgramId::Texture);
 		SubmitTransformUniform(translation);
-		if (geometry->texture != TextureIgnoreBinding)
-			glBindTexture(GL_TEXTURE_2D, (GLuint)geometry->texture);
+		if (texture != TextureIgnoreBinding)
+			glBindTexture(GL_TEXTURE_2D, (GLuint)texture);
 	}
 	else
 	{
@@ -991,7 +988,7 @@ void RenderInterface_GL3::RenderToClipMask(Rml::ClipMaskOperation mask_operation
 	break;
 	}
 
-	RenderCompiledGeometry(geometry, translation);
+	RenderCompiledGeometry(geometry, translation, {});
 
 	// Restore state
 	// @performance Cache state so we don't toggle it unnecessarily.
@@ -1534,7 +1531,7 @@ static void RenderBlur(float sigma, const Gfx::FramebufferData& source_destinati
 }
 
 void RenderInterface_GL3::RenderShader(Rml::CompiledShaderHandle shader_handle, Rml::CompiledGeometryHandle geometry_handle,
-	Rml::Vector2f translation)
+	Rml::Vector2f translation, Rml::TextureHandle /*texture*/)
 {
 	RMLUI_ASSERT(geometry_handle);
 	const CompiledShader& shader = *reinterpret_cast<CompiledShader*>(shader_handle);

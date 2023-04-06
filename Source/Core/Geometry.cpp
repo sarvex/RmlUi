@@ -109,7 +109,7 @@ void Geometry::Render(Vector2f translation)
 	if (compiled_geometry)
 	{
 		RMLUI_ZoneScopedN("RenderCompiled");
-		render_interface->RenderCompiledGeometry(compiled_geometry, translation);
+		render_interface->RenderCompiledGeometry(compiled_geometry, translation, texture ? texture->GetHandle(render_interface) : 0);
 	}
 	// Otherwise, if we actually have geometry, try to compile it if we haven't already done so, otherwise render it in
 	// immediate mode.
@@ -124,13 +124,13 @@ void Geometry::Render(Vector2f translation)
 		if (!compile_attempted)
 		{
 			compile_attempted = true;
-			compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(), texture ? texture->GetHandle(render_interface) : 0);
+			compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size());
 
 			// If we managed to compile the geometry, we can clear the local copy of vertices and indices and
 			// immediately render the compiled version.
 			if (compiled_geometry)
 			{	
-				render_interface->RenderCompiledGeometry(compiled_geometry, translation);
+				render_interface->RenderCompiledGeometry(compiled_geometry, translation, texture ? texture->GetHandle(render_interface) : 0);
 				return;
 			}
 		}
@@ -142,7 +142,7 @@ void Geometry::Render(Vector2f translation)
 	}
 }
 
-void Geometry::Render(CompiledShaderHandle shader_handle, Vector2f translation)
+void Geometry::RenderWithShader(CompiledShaderHandle shader_handle, Vector2f translation)
 {
 	RenderInterface* render_interface = GetRenderInterface();
 	if (!render_interface)
@@ -156,14 +156,13 @@ void Geometry::Render(CompiledShaderHandle shader_handle, Vector2f translation)
 		RMLUI_ZoneScoped;
 
 		compile_attempted = true;
-		compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
-			texture ? texture->GetHandle(render_interface) : 0);
+		compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size());
 	}
 
 	if (compiled_geometry)
 	{
 		translation = translation.Round();
-		render_interface->RenderShader(shader_handle, compiled_geometry, translation);
+		render_interface->RenderShader(shader_handle, compiled_geometry, translation, texture ? texture->GetHandle(render_interface) : 0);
 	}
 }
 
@@ -181,8 +180,7 @@ void Geometry::RenderToClipMask(ClipMaskOperation clip_mask, Vector2f translatio
 		RMLUI_ZoneScoped;
 
 		compile_attempted = true;
-		compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size(),
-			texture ? texture->GetHandle(render_interface) : 0);
+		compiled_geometry = render_interface->CompileGeometry(&vertices[0], (int)vertices.size(), &indices[0], (int)indices.size());
 	}
 
 	if (compiled_geometry)
