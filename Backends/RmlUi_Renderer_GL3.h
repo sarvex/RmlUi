@@ -33,13 +33,16 @@
 #include <bitset>
 
 struct CompiledFilter;
+namespace Gfx {
+struct FramebufferData;
+}
 
 class RenderInterface_GL3 : public Rml::RenderInterface {
 public:
 	RenderInterface_GL3();
 	~RenderInterface_GL3();
 
-	void BeginFrame();
+	// -- Inherited from Rml::Interface
 
 	void RenderGeometry(Rml::Vertex* vertices, int num_vertices, int* indices, int num_indices, Rml::TextureHandle texture,
 		const Rml::Vector2f& translation) override;
@@ -72,41 +75,45 @@ public:
 	void PushLayer(Rml::RenderClear clear_new_layer) override;
 	Rml::TextureHandle PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode) override;
 
-	static const Rml::TextureHandle TextureIgnoreBinding = Rml::TextureHandle(-1);
-	static const Rml::TextureHandle TexturePostprocess = Rml::TextureHandle(-2);
+	// -- Public methods
+
+	bool Initialize();
+	void Shutdown();
+
+	void SetViewport(int width, int height);
+
+	void BeginFrame();
+	void EndFrame();
+
+	void Clear();
+
+	// -- Constants
+	static constexpr Rml::TextureHandle TextureIgnoreBinding = Rml::TextureHandle(-1);
+	static constexpr Rml::TextureHandle TexturePostprocess = Rml::TextureHandle(-2);
 
 private:
 	void SubmitTransformUniform(Rml::Vector2f translation);
 
 	void RenderFilters();
 
+	void SetScissor(Rml::Rectanglei region, bool vertically_flip = false);
+
+	void DrawFullscreenQuad(Rml::Vector2f uv_offset = {}, Rml::Vector2f uv_scaling = Rml::Vector2f(1.f));
+	void RenderBlurPass(const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp);
+	void RenderBlur(float sigma, const Gfx::FramebufferData& source_destination, const Gfx::FramebufferData& temp, Rml::Rectanglei window_flipped);
+
 	Rml::Matrix4f transform;
 
 	static constexpr size_t MaxNumPrograms = 32;
 	std::bitset<MaxNumPrograms> program_transform_dirty;
 
-	struct ScissorState {
-		bool enabled;
-		int x, y, width, height;
-	};
-	ScissorState scissor_state = {};
+	Rml::Rectanglei scissor_state;
 
 	Rml::Vector<CompiledFilter*> attached_filters;
 	bool has_mask = false;
+
+	int viewport_width = 0;
+	int viewport_height = 0;
 };
-
-namespace RmlGL3 {
-
-bool Initialize();
-void Shutdown();
-
-void SetViewport(int width, int height);
-
-void BeginFrame();
-void EndFrame();
-
-void Clear();
-
-} // namespace RmlGL3
 
 #endif

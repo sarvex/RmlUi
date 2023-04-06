@@ -79,12 +79,12 @@ bool Backend::OpenWindow(const char* name, int width, int height, bool allow_res
 	glfwMakeContextCurrent(window);
 	glfwSwapInterval(1);
 
-	if (!RmlGL3::Initialize())
+	if (!render_interface->Initialize())
 	{
 		RmlGLFW::CloseWindow();
 		return false;
 	}
-	RmlGL3::SetViewport(width, height);
+	render_interface->SetViewport(width, height);
 
 	SetupBackendCallbacks();
 
@@ -93,7 +93,8 @@ bool Backend::OpenWindow(const char* name, int width, int height, bool allow_res
 
 void Backend::CloseWindow()
 {
-	RmlGL3::Shutdown();
+	if (render_interface)
+		render_interface->Shutdown();
 
 	RmlGLFW::CloseWindow();
 	RmlGLFW::Shutdown();
@@ -117,13 +118,17 @@ void Backend::RequestExit()
 
 void Backend::BeginFrame()
 {
-	RmlGL3::BeginFrame();
-	RmlGL3::Clear();
+	if (render_interface)
+	{
+		render_interface->BeginFrame();
+		render_interface->Clear();
+	}
 }
 
 void Backend::PresentFrame()
 {
-	RmlGL3::EndFrame();
+	if (render_interface)
+		render_interface->EndFrame();
 	glfwSwapBuffers(window);
 }
 
@@ -153,7 +158,8 @@ static void SetupBackendCallbacks()
 
 	// Override the framebuffer size callback, so that we can set the OpenGL viewport as well.
 	glfwSetFramebufferSizeCallback(window, [](GLFWwindow* /*window*/, int width, int height) {
-		RmlGL3::SetViewport(width, height);
+		if (render_interface)
+			render_interface->SetViewport(width, height);
 		RmlGLFW::ProcessFramebufferSizeCallback(width, height);
 	});
 }
