@@ -37,6 +37,16 @@ namespace Rml {
 
 using Vector2Numeric = Vector2<NumericValue>;
 
+/**
+    Straight gradient.
+
+    Usage in CSS:
+    decorator: horizontal-gradient( start-color stop-color );
+    decorator: vertical-gradient( start-color stop-color );
+
+    start-color: #ff00ff;
+    stop-color: #00ff00;
+ */
 class DecoratorStraightGradient : public Decorator {
 public:
 	enum class Direction { Horizontal, Vertical };
@@ -71,6 +81,9 @@ private:
 	GradientPropertyIds ids;
 };
 
+/**
+    Linear gradient.
+ */
 class DecoratorLinearGradient : public Decorator {
 public:
 	enum class Corner { TopRight, BottomRight, BottomLeft, TopLeft, None, Count = None };
@@ -127,6 +140,9 @@ private:
 	GradientPropertyIds ids;
 };
 
+/**
+    Radial gradient.
+ */
 class DecoratorRadialGradient : public Decorator {
 public:
 	enum class Shape { Circle, Ellipse, Unspecified };
@@ -175,6 +191,9 @@ private:
 	GradientPropertyIds ids;
 };
 
+/**
+    Conic gradient.
+ */
 class DecoratorConicGradient : public Decorator {
 public:
 	DecoratorConicGradient();

@@ -169,16 +169,6 @@ static Vector2Numeric ComputePosition(const Property* p_position[2])
 	return position;
 }
 
-/**
-    Straight gradient.
-
-    Usage in CSS:
-    decorator: horizontal-gradient( start-color stop-color );
-    decorator: vertical-gradient( start-color stop-color );
-
-    start-color: #ff00ff;
-    stop-color: #00ff00;
- */
 DecoratorStraightGradient::DecoratorStraightGradient() {}
 
 DecoratorStraightGradient::~DecoratorStraightGradient() {}
@@ -243,9 +233,6 @@ void DecoratorStraightGradient::RenderElement(Element* element, DecoratorDataHan
 	data->Render(element->GetAbsoluteOffset(BoxArea::Border));
 }
 
-/**
-    Straight gradient instancer.
- */
 DecoratorStraightGradientInstancer::DecoratorStraightGradientInstancer() : DecoratorInstancer(DecoratorClass::Image)
 {
 	ids.direction = RegisterProperty("direction", "horizontal").AddParser("keyword", "horizontal, vertical").GetId();
@@ -285,9 +272,6 @@ SharedPtr<Decorator> DecoratorStraightGradientInstancer::InstanceDecorator(const
 	return nullptr;
 }
 
-/**
-    Linear gradient.
- */
 DecoratorLinearGradient::DecoratorLinearGradient() {}
 
 DecoratorLinearGradient::~DecoratorLinearGradient() {}
@@ -398,9 +382,6 @@ DecoratorLinearGradient::LinearGradientShape DecoratorLinearGradient::CalculateS
 	return LinearGradientShape{starting_point, ending_point, length};
 }
 
-/**
-    Linear gradient instancer.
- */
 DecoratorLinearGradientInstancer::DecoratorLinearGradientInstancer() : DecoratorInstancer(DecoratorClass::Image)
 {
 	ids.angle = RegisterProperty("angle", "180deg").AddParser("angle").GetId();
@@ -466,9 +447,6 @@ SharedPtr<Decorator> DecoratorLinearGradientInstancer::InstanceDecorator(const S
 	return nullptr;
 }
 
-/**
-    Radial gradient.
- */
 DecoratorRadialGradient::DecoratorRadialGradient() {}
 
 DecoratorRadialGradient::~DecoratorRadialGradient() {}
@@ -599,9 +577,6 @@ DecoratorRadialGradient::RadialGradientShape DecoratorRadialGradient::CalculateR
 	return result;
 }
 
-/**
-    Radial gradient instancer.
- */
 DecoratorRadialGradientInstancer::DecoratorRadialGradientInstancer() : DecoratorInstancer(DecoratorClass::Image)
 {
 	ids.ending_shape = RegisterProperty("ending-shape", "unspecified").AddParser("keyword", "circle, ellipse, unspecified").GetId();
@@ -675,9 +650,6 @@ SharedPtr<Decorator> DecoratorRadialGradientInstancer::InstanceDecorator(const S
 	return nullptr;
 }
 
-/**
-    Conic gradient.
- */
 DecoratorConicGradient::DecoratorConicGradient() {}
 
 DecoratorConicGradient::~DecoratorConicGradient() {}
@@ -744,9 +716,6 @@ void DecoratorConicGradient::RenderElement(Element* element, DecoratorDataHandle
 	element_data->geometry.RenderWithShader(element_data->effect, element->GetAbsoluteOffset(BoxArea::Border));
 }
 
-/**
-    Conic gradient instancer.
- */
 DecoratorConicGradientInstancer::DecoratorConicGradientInstancer() : DecoratorInstancer(DecoratorClass::Image)
 {
 	RegisterProperty("from", "from").AddParser("keyword", "from");
