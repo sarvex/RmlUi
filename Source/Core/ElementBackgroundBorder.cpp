@@ -239,10 +239,6 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, ShadowList sha
 				GeometryUtilities::GenerateBackground(&geometry_padding_border, box, offset, border_radius, Colourb(255), BoxArea::Border);
 		}
 
-		TextureHandle shadow_texture = render_interface->GenerateRenderTexture(texture_dimensions);
-		if (!shadow_texture)
-			return false;
-
 		RenderState& render_state = context->GetRenderState();
 		RenderStateSession render_state_session(render_state);
 		render_state.Reset();
@@ -322,12 +318,16 @@ void ElementBackgroundBorder::GenerateBoxShadow(Element* element, ShadowList sha
 
 			if (blur)
 			{
-				render_interface->PopLayer(RenderTarget::Layer, BlendMode::Blend, {}, {blur});
+				render_interface->PopLayer(BlendMode::Blend, {blur});
 				render_interface->ReleaseCompiledFilter(blur);
 			}
 		}
 
-		render_interface->PopLayer(RenderTarget::RenderTexture, BlendMode::Replace, shadow_texture, {});
+		TextureHandle shadow_texture = render_interface->SaveLayerAsTexture(texture_dimensions);
+		if (!shadow_texture)
+			return false;
+
+		render_interface->PopLayer(BlendMode::Discard, {});
 
 		render_state.DisableScissorRegion();
 		render_state.DisableClipMask();

@@ -1129,13 +1129,6 @@ bool RenderInterface_GL3::GenerateTexture(Rml::TextureHandle& texture_handle, co
 	return true;
 }
 
-Rml::TextureHandle RenderInterface_GL3::GenerateRenderTexture(Rml::Vector2i texture_dimensions)
-{
-	Rml::TextureHandle texture_handle_result = {};
-	GenerateTexture(texture_handle_result, nullptr, texture_dimensions);
-	return texture_handle_result;
-}
-
 void RenderInterface_GL3::DrawFullscreenQuad(Rml::Vector2f uv_offset, Rml::Vector2f uv_scaling)
 {
 	// Draw a fullscreen quad.
@@ -1734,6 +1727,17 @@ void RenderInterface_GL3::ReleaseCompiledFilter(Rml::CompiledFilterHandle filter
 	delete reinterpret_cast<CompiledFilter*>(filter);
 }
 
+void RenderInterface_GL3::BlitTopLayerToPostprocessPrimary()
+{
+	const Gfx::FramebufferData& source = render_state.GetTopLayer();
+	const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
+
+	// Blit and resolve MSAA. Any active scissor state will restrict the size of the blit region.
+	glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, destination.width, destination.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+}
+
 void RenderInterface_GL3::RenderFilters(const Rml::FilterHandleList& filter_handles)
 {
 	for (const Rml::CompiledFilterHandle filter_handle : filter_handles)
@@ -1849,26 +1853,22 @@ void RenderInterface_GL3::PushLayer(Rml::RenderClear clear_new_layer)
 		glClear(GL_COLOR_BUFFER_BIT);
 }
 
-void RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode, Rml::TextureHandle render_texture,
-	const Rml::FilterHandleList& filters)
+void RenderInterface_GL3::PopLayer(Rml::BlendMode blend_mode, const Rml::FilterHandleList& filters)
 {
 	using Rml::BlendMode;
-	using Rml::RenderTarget;
-	RMLUI_ASSERT(!(has_mask && render_target == RenderTarget::MaskImage));
 
+	if (blend_mode == BlendMode::Discard)
 	{
-		// Blit stack to filter rendering buffer. Do this regardless of whether we actually have any filters to be applied, because we need to resolve
-		// the multi-sampled framebuffer in any case.
-		// @performance If we have BlendMode::Replace and no filters or mask then we can just blit directly to the destination. This is particularly
-		// common when compositing to the mask layer. Alternatively, make the mask layer into R8 texture, then we need to do this step first anyway.
-		const Gfx::FramebufferData& source = render_state.GetTopLayer();
-		const Gfx::FramebufferData& destination = render_state.GetPostprocessPrimary();
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
-
-		// Any active scissor state will restrict the size of the blit region.
-		glBlitFramebuffer(0, 0, source.width, source.height, 0, 0, destination.width, destination.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		RMLUI_ASSERT(filters.empty());
+		render_state.PopLayer();
+		glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
+		return;
 	}
+
+	// Blit stack to filter rendering buffer. Do this regardless of whether we actually have any filters to be applied,
+	// because we need to resolve the multi-sampled framebuffer in any case.
+	// @performance If we have BlendMode::Replace and no filters or mask then we can just blit directly to the destination.
+	BlitTopLayerToPostprocessPrimary();
 
 	// Render the filters, the PostprocessPrimary framebuffer is used for both input and output.
 	RenderFilters(filters);
@@ -1876,80 +1876,98 @@ void RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target, Rml::BlendMo
 	// Pop the active layer, thereby activating the beneath layer.
 	render_state.PopLayer();
 
-	switch (render_target)
-	{
-	case RenderTarget::Layer:
-	case RenderTarget::MaskImage:
-	{
-		// Blit filter back to stack. Apply any mask if active.
-		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
-		const Gfx::FramebufferData& destination = (render_target == RenderTarget::Layer ? render_state.GetTopLayer() : render_state.GetMask());
-
-		glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
-		Gfx::BindTexture(source);
-		if (has_mask)
-		{
-			has_mask = false;
-			Gfx::UseProgram(ProgramId::BlendMask);
-
-			glActiveTexture(GL_TEXTURE1);
-			Gfx::BindTexture(render_state.GetMask());
-			glActiveTexture(GL_TEXTURE0);
-		}
-		else
-		{
-			Gfx::UseProgram(ProgramId::Passthrough);
-		}
-
-		if (blend_mode == BlendMode::Replace)
-			glDisable(GL_BLEND);
-
-		DrawFullscreenQuad();
-
-		if (blend_mode == BlendMode::Replace)
-			glEnable(GL_BLEND);
-
-		if (render_target == RenderTarget::MaskImage)
-			has_mask = true;
-	}
-	break;
-	case RenderTarget::RenderTexture:
-	{
-		RMLUI_ASSERT(scissor_state.Valid() && render_texture);
-		const Rml::Rectanglei initial_scissor_state = scissor_state;
-		EnableScissorRegion(false);
-
-		const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
-		const Gfx::FramebufferData& destination = render_state.GetPostprocessSecondary();
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
-
-		Rml::Rectanglei bounds = initial_scissor_state;
-
-		// Flip the image vertically, as that convention is used for textures, and move to origin.
-		glBlitFramebuffer(                                  //
-			bounds.Left(), source.height - bounds.Bottom(), // src0
-			bounds.Right(), source.height - bounds.Top(),   // src1
-			0, bounds.Height(),                             // dst0
-			bounds.Width(), 0,                              // dst1
-			GL_COLOR_BUFFER_BIT, GL_NEAREST                 //
-		);
-
-		glBindTexture(GL_TEXTURE_2D, (GLuint)render_texture);
-
-		const Gfx::FramebufferData& texture_source = destination;
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, texture_source.framebuffer);
-		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, bounds.Width(), bounds.Height());
-
-		SetScissor(initial_scissor_state);
-	}
-	break;
-	default: break;
-	}
-
+	// Render to the activated layer. Apply any mask if active.
 	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
+	Gfx::BindTexture(render_state.GetPostprocessPrimary());
+	if (has_mask)
+	{
+		Gfx::UseProgram(ProgramId::BlendMask);
+
+		glActiveTexture(GL_TEXTURE1);
+		Gfx::BindTexture(render_state.GetMask());
+		glActiveTexture(GL_TEXTURE0);
+	}
+	else
+	{
+		Gfx::UseProgram(ProgramId::Passthrough);
+	}
+
+	if (blend_mode == BlendMode::Replace)
+		glDisable(GL_BLEND);
+
+	DrawFullscreenQuad();
+
+	if (blend_mode == BlendMode::Replace)
+		glEnable(GL_BLEND);
 
 	Gfx::CheckGLError("PopLayer");
+}
+
+Rml::TextureHandle RenderInterface_GL3::SaveLayerAsTexture(Rml::Vector2i dimensions)
+{
+	Rml::TextureHandle render_texture = {};
+	if (!GenerateTexture(render_texture, nullptr, dimensions))
+		return {};
+
+	BlitTopLayerToPostprocessPrimary();
+
+	RMLUI_ASSERT(scissor_state.Valid() && render_texture);
+	const Rml::Rectanglei initial_scissor_state = scissor_state;
+	EnableScissorRegion(false);
+
+	const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
+	const Gfx::FramebufferData& destination = render_state.GetPostprocessSecondary();
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, source.framebuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination.framebuffer);
+
+	Rml::Rectanglei bounds = initial_scissor_state;
+
+	// Flip the image vertically, as that convention is used for textures, and move to origin.
+	glBlitFramebuffer(                                  //
+		bounds.Left(), source.height - bounds.Bottom(), // src0
+		bounds.Right(), source.height - bounds.Top(),   // src1
+		0, bounds.Height(),                             // dst0
+		bounds.Width(), 0,                              // dst1
+		GL_COLOR_BUFFER_BIT, GL_NEAREST                 //
+	);
+
+	glBindTexture(GL_TEXTURE_2D, (GLuint)render_texture);
+
+	const Gfx::FramebufferData& texture_source = destination;
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, texture_source.framebuffer);
+	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, bounds.Width(), bounds.Height());
+
+	SetScissor(initial_scissor_state);
+	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
+	Gfx::CheckGLError("SaveLayerAsTexture");
+
+	return render_texture;
+}
+
+void RenderInterface_GL3::SaveLayerAsMaskImage()
+{
+	BlitTopLayerToPostprocessPrimary();
+
+	const Gfx::FramebufferData& source = render_state.GetPostprocessPrimary();
+	const Gfx::FramebufferData& destination = render_state.GetMask();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, destination.framebuffer);
+	Gfx::BindTexture(source);
+	Gfx::UseProgram(ProgramId::Passthrough);
+	glDisable(GL_BLEND);
+
+	DrawFullscreenQuad();
+
+	glEnable(GL_BLEND);
+	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
+	Gfx::CheckGLError("SaveLayerAsMaskImage");
+
+	has_mask = true;
+}
+
+void RenderInterface_GL3::ClearMaskImage()
+{
+	has_mask = false;
 }
 
 void RenderInterface_GL3::SubmitTransformUniform(Rml::Vector2f translation)

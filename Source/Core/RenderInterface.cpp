@@ -79,11 +79,6 @@ bool RenderInterface::GenerateTexture(TextureHandle& /*texture_handle*/, const b
 	return false;
 }
 
-TextureHandle RenderInterface::GenerateRenderTexture(Vector2i /*dimensions*/)
-{
-	return TextureHandle{};
-}
-
 // Called by RmlUi when a loaded texture is no longer required.
 void RenderInterface::ReleaseTexture(TextureHandle /*texture*/)
 {
@@ -114,11 +109,17 @@ void RenderInterface::ReleaseCompiledFilter(CompiledFilterHandle /*filter*/) {}
 
 void RenderInterface::PushLayer(RenderClear /*clear_new_layer*/) {}
 
-void RenderInterface::PopLayer(RenderTarget /*render_target*/, BlendMode /*blend_mode*/, TextureHandle /*render_texture*/,
-	const FilterHandleList& /*filters*/)
-{}
+void RenderInterface::PopLayer(BlendMode /*blend_mode*/, const FilterHandleList& /*filters*/) {}
 
-// Get the context currently being rendered.
+TextureHandle RenderInterface::SaveLayerAsTexture(Vector2i /*dimensions*/)
+{
+	return TextureHandle{};
+}
+
+void RenderInterface::SaveLayerAsMaskImage() {}
+
+void RenderInterface::ClearMaskImage() {}
+
 Context* RenderInterface::GetContext() const
 {
 	return context;

@@ -219,7 +219,7 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				filter_handles[i] = decorator.decorator->GetFilterHandle(element, decorator.decorator_data);
 			}
 
-			render_interface->PopLayer(RenderTarget::Layer, BlendMode::Replace, {}, filter_handles);
+			render_interface->PopLayer(BlendMode::Replace, filter_handles);
 		}
 	}
 
@@ -244,7 +244,8 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 					decorator.decorator->RenderElement(element, decorator.decorator_data);
 				}
 
-				render_interface->PopLayer(RenderTarget::MaskImage, BlendMode::Replace, {}, {});
+				render_interface->SaveLayerAsMaskImage();
+				render_interface->PopLayer(BlendMode::Discard, {});
 			}
 
 			// Find the region being affected by the active filters and apply it as a scissor.
@@ -268,7 +269,10 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 				filter_handles[i] = decorator.decorator->GetFilterHandle(element, decorator.decorator_data);
 			}
 
-			render_interface->PopLayer(RenderTarget::Layer, BlendMode::Blend, {}, filter_handles);
+			render_interface->PopLayer(BlendMode::Blend, filter_handles);
+			
+			if (num_mask_images > 0)
+				render_interface->ClearMaskImage();
 		}
 	}
 }

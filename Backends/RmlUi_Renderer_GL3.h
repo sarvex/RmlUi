@@ -59,7 +59,6 @@ public:
 
 	bool LoadTexture(Rml::TextureHandle& texture_handle, Rml::Vector2i& texture_dimensions, const Rml::String& source) override;
 	bool GenerateTexture(Rml::TextureHandle& texture_handle, const Rml::byte* source, const Rml::Vector2i& source_dimensions) override;
-	Rml::TextureHandle GenerateRenderTexture(Rml::Vector2i texture_dimensions) override;
 	void ReleaseTexture(Rml::TextureHandle texture_handle) override;
 
 	void SetTransform(const Rml::Matrix4f* transform) override;
@@ -73,8 +72,13 @@ public:
 	void ReleaseCompiledFilter(Rml::CompiledFilterHandle filter) override;
 
 	void PushLayer(Rml::RenderClear clear_new_layer) override;
-	void PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode, Rml::TextureHandle render_texture,
-		const Rml::FilterHandleList& filters) override;
+	void PopLayer(Rml::BlendMode blend_mode, const Rml::FilterHandleList& filters) override;
+		
+	Rml::TextureHandle SaveLayerAsTexture(Rml::Vector2i dimensions) override;
+
+	void SaveLayerAsMaskImage() override;
+	void ClearMaskImage() override;
+
 
 	// -- Public methods
 
@@ -95,6 +99,7 @@ public:
 private:
 	void SubmitTransformUniform(Rml::Vector2f translation);
 
+	void BlitTopLayerToPostprocessPrimary();
 	void RenderFilters(const Rml::FilterHandleList& filter_handles);
 
 	void SetScissor(Rml::Rectanglei region, bool vertically_flip = false);

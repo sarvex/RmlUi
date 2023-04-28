@@ -41,8 +41,7 @@ class Context;
 
 enum class ClipMaskOperation { Clip, ClipIntersect, ClipOut };
 enum class RenderClear { None, Clear, Clone };
-enum class RenderTarget { Layer, MaskImage, RenderTexture };
-enum class BlendMode { Blend, Replace };
+enum class BlendMode { Blend, Replace, Discard };
 
 using FilterHandleList = Vector<CompiledFilterHandle>;
 
@@ -116,8 +115,6 @@ public:
 	/// @param[in] source_dimensions The dimensions, in pixels, of the source data.
 	/// @return True if the texture generation succeeded and the handle is valid, false if not.
 	virtual bool GenerateTexture(TextureHandle& texture_handle, const byte* source, const Vector2i& source_dimensions);
-	/// Called by RmlUi when it wants to create a render texture it can use as a render target, and subsequently render as a normal texture.
-	virtual TextureHandle GenerateRenderTexture(Vector2i dimensions);
 	/// Called by RmlUi when a loaded texture is no longer required.
 	/// @param texture The texture handle to release.
 	virtual void ReleaseTexture(TextureHandle texture);
@@ -134,10 +131,18 @@ public:
 	/// Called by RmlUi when...
 	/// @return A handle to the resulting render texture, or zero if the render target is not a render texture.
 	/// @note Should render the current layer to the target specified using the given blend mode.
-	/// @note Should apply attached filters and mask image, and then clear these attachments.
+	/// @note Should apply mask image, and then clear these attachments.
 	/// @note Render texture targets should be extracted from the bounds of the active scissor.
 	/// @note Affected by transform: No. Affected by scissor: Yes. Affected by clip mask: Yes.
-	virtual void PopLayer(RenderTarget render_target, BlendMode blend_mode, TextureHandle render_texture, const FilterHandleList& filters);
+	virtual void PopLayer(BlendMode blend_mode, const FilterHandleList& filters);
+	
+	/// Called by RmlUi when it wants to store the current layer as a new texture to be rendered later with geometry.
+	virtual TextureHandle SaveLayerAsTexture(Vector2i dimensions);
+
+	/// Called by RmlUi when...
+	virtual void SaveLayerAsMaskImage();
+	/// Called by RmlUi when...
+	virtual void ClearMaskImage();
 
 	/// Called by RmlUi when...
 	virtual CompiledShaderHandle CompileShader(const String& name, const Dictionary& parameters);
