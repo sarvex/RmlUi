@@ -212,13 +212,14 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			render_interface->PushLayer(RenderClear::Clone);
 
 			const int i0 = num_backgrounds;
-			for (int i = i0; i < i0 + num_backdrop_filters; i++)
+			FilterHandleList filter_handles(num_backdrop_filters);
+			for (int i = 0; i < num_backdrop_filters; i++)
 			{
-				DecoratorHandle& decorator = decorators[i];
-				decorator.decorator->RenderElement(element, decorator.decorator_data);
+				DecoratorHandle& decorator = decorators[i + i0];
+				filter_handles[i] = decorator.decorator->GetFilterHandle(element, decorator.decorator_data);
 			}
 
-			render_interface->PopLayer(RenderTarget::Layer, BlendMode::Replace);
+			render_interface->PopLayer(RenderTarget::Layer, BlendMode::Replace, {}, filter_handles);
 		}
 	}
 
@@ -243,16 +244,16 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 					decorator.decorator->RenderElement(element, decorator.decorator_data);
 				}
 
-				render_interface->PopLayer(RenderTarget::MaskImage, BlendMode::Replace);
+				render_interface->PopLayer(RenderTarget::MaskImage, BlendMode::Replace, {}, {});
 			}
-			
+
 			// Find the region being affected by the active filters and apply it as a scissor.
 			Rectanglef filter_region = Rectanglef::CreateInvalid();
 			ElementUtilities::GetBoundingBox(filter_region, element, BoxArea::Auto);
 
 			const int i0 = num_backgrounds + num_backdrop_filters;
 			for (int i = i0; i < i0 + num_filters; i++)
-				decorators[i].decorator->ModifyScissorRegion(element, filter_region);
+				decorators[i].decorator->ExtendInkOverflow(element, filter_region);
 
 			Math::ExpandToPixelGrid(filter_region);
 
@@ -260,13 +261,14 @@ void ElementDecoration::RenderDecorators(RenderStage render_stage)
 			scissor_region.IntersectValid(Rectanglei(filter_region));
 			render_state.SetScissorRegion(scissor_region);
 
-			for (int i = i0; i < i0 + num_filters; i++)
+			FilterHandleList filter_handles(num_filters);
+			for (int i = 0; i < num_filters; i++)
 			{
-				DecoratorHandle& decorator = decorators[i];
-				decorator.decorator->RenderElement(element, decorator.decorator_data);
+				DecoratorHandle& decorator = decorators[i + i0];
+				filter_handles[i] = decorator.decorator->GetFilterHandle(element, decorator.decorator_data);
 			}
 
-			render_interface->PopLayer(RenderTarget::Layer, BlendMode::Blend);
+			render_interface->PopLayer(RenderTarget::Layer, BlendMode::Blend, {}, filter_handles);
 		}
 	}
 }

@@ -59,6 +59,7 @@ public:
 
 	bool LoadTexture(Rml::TextureHandle& texture_handle, Rml::Vector2i& texture_dimensions, const Rml::String& source) override;
 	bool GenerateTexture(Rml::TextureHandle& texture_handle, const Rml::byte* source, const Rml::Vector2i& source_dimensions) override;
+	Rml::TextureHandle GenerateRenderTexture(Rml::Vector2i texture_dimensions) override;
 	void ReleaseTexture(Rml::TextureHandle texture_handle) override;
 
 	void SetTransform(const Rml::Matrix4f* transform) override;
@@ -69,11 +70,11 @@ public:
 	void ReleaseCompiledShader(Rml::CompiledShaderHandle shader) override;
 
 	Rml::CompiledFilterHandle CompileFilter(const Rml::String& name, const Rml::Dictionary& parameters) override;
-	void AttachFilter(Rml::CompiledFilterHandle filter) override;
 	void ReleaseCompiledFilter(Rml::CompiledFilterHandle filter) override;
 
 	void PushLayer(Rml::RenderClear clear_new_layer) override;
-	Rml::TextureHandle PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode) override;
+	void PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode, Rml::TextureHandle render_texture,
+		const Rml::FilterHandleList& filters) override;
 
 	// -- Public methods
 
@@ -94,7 +95,7 @@ public:
 private:
 	void SubmitTransformUniform(Rml::Vector2f translation);
 
-	void RenderFilters();
+	void RenderFilters(const Rml::FilterHandleList& filter_handles);
 
 	void SetScissor(Rml::Rectanglei region, bool vertically_flip = false);
 
@@ -109,7 +110,6 @@ private:
 
 	Rml::Rectanglei scissor_state;
 
-	Rml::Vector<CompiledFilter*> attached_filters;
 	bool has_mask = false;
 
 	int viewport_width = 0;

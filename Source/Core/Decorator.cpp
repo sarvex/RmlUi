@@ -50,7 +50,14 @@ DecoratorDataHandle Decorator::GenerateElementData(Element* /*element*/) const
 	return INVALID_DECORATORDATAHANDLE;
 }
 
-void Decorator::ModifyScissorRegion(Element* /*element*/, Rectanglef& /*scissor_region*/) const {}
+void Decorator::ExtendInkOverflow(Element* /*element*/, Rectanglef& /*scissor_region*/) const {}
+
+void Decorator::RenderElement(Element* /*element*/, DecoratorDataHandle /*element_data*/) const {}
+
+CompiledFilterHandle Decorator::GetFilterHandle(Element* /*element*/, DecoratorDataHandle /*element_data*/) const
+{
+	return CompiledFilterHandle{};
+}
 
 int Decorator::AddTexture(const Texture& texture)
 {

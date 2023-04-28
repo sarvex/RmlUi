@@ -44,6 +44,8 @@ enum class RenderClear { None, Clear, Clone };
 enum class RenderTarget { Layer, MaskImage, RenderTexture };
 enum class BlendMode { Blend, Replace };
 
+using FilterHandleList = Vector<CompiledFilterHandle>;
+
 /**
 	The abstract base class for application-specific rendering implementation. Your application must provide a concrete
 	implementation of this class and install it through Rml::SetRenderInterface() in order for anything to be rendered.
@@ -114,6 +116,8 @@ public:
 	/// @param[in] source_dimensions The dimensions, in pixels, of the source data.
 	/// @return True if the texture generation succeeded and the handle is valid, false if not.
 	virtual bool GenerateTexture(TextureHandle& texture_handle, const byte* source, const Vector2i& source_dimensions);
+	/// Called by RmlUi when it wants to create a render texture it can use as a render target, and subsequently render as a normal texture.
+	virtual TextureHandle GenerateRenderTexture(Vector2i dimensions);
 	/// Called by RmlUi when a loaded texture is no longer required.
 	/// @param texture The texture handle to release.
 	virtual void ReleaseTexture(TextureHandle texture);
@@ -131,9 +135,9 @@ public:
 	/// @return A handle to the resulting render texture, or zero if the render target is not a render texture.
 	/// @note Should render the current layer to the target specified using the given blend mode.
 	/// @note Should apply attached filters and mask image, and then clear these attachments.
-	/// @note Render texture targets should be dimensioned and extracted from the bounds of the active scissor.
+	/// @note Render texture targets should be extracted from the bounds of the active scissor.
 	/// @note Affected by transform: No. Affected by scissor: Yes. Affected by clip mask: Yes.
-	virtual TextureHandle PopLayer(RenderTarget render_target, BlendMode blend_mode);
+	virtual void PopLayer(RenderTarget render_target, BlendMode blend_mode, TextureHandle render_texture, const FilterHandleList& filters);
 
 	/// Called by RmlUi when...
 	virtual CompiledShaderHandle CompileShader(const String& name, const Dictionary& parameters);
@@ -144,8 +148,6 @@ public:
 
 	/// Called by RmlUi when...
 	virtual CompiledFilterHandle CompileFilter(const String& name, const Dictionary& parameters);
-	/// Attach filter to be applied on the next call to PopLayer.
-	virtual void AttachFilter(CompiledFilterHandle filter);
 	/// Called by RmlUi when...
 	virtual void ReleaseCompiledFilter(CompiledFilterHandle filter);
 

@@ -68,10 +68,9 @@ void DecoratorBasicFilter::ReleaseElementData(DecoratorDataHandle handle) const
 	GetBasicFilterElementDataPool().DestroyAndDeallocate(element_data);
 }
 
-void DecoratorBasicFilter::RenderElement(Element* /*element*/, DecoratorDataHandle handle) const
+CompiledFilterHandle DecoratorBasicFilter::GetFilterHandle(Element* /*element*/, DecoratorDataHandle handle) const
 {
-	BasicFilterElementData* element_data = reinterpret_cast<BasicFilterElementData*>(handle);
-	element_data->render_interface->AttachFilter(element_data->filter);
+	return reinterpret_cast<BasicFilterElementData*>(handle)->filter;
 }
 
 DecoratorBasicFilterInstancer::DecoratorBasicFilterInstancer(ValueType value_type, const char* default_value) :

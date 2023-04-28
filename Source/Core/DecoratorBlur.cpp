@@ -68,13 +68,12 @@ void DecoratorBlur::ReleaseElementData(DecoratorDataHandle handle) const
 	GetBasicFilterElementDataPool().DestroyAndDeallocate(element_data);
 }
 
-void DecoratorBlur::RenderElement(Element* /*element*/, DecoratorDataHandle handle) const
+CompiledFilterHandle DecoratorBlur::GetFilterHandle(Element* /*element*/, DecoratorDataHandle handle) const
 {
-	BasicFilterElementData* element_data = reinterpret_cast<BasicFilterElementData*>(handle);
-	element_data->render_interface->AttachFilter(element_data->filter);
+	return reinterpret_cast<BasicFilterElementData*>(handle)->filter;
 }
 
-void DecoratorBlur::ModifyScissorRegion(Element* element, Rectanglef& scissor_region) const
+void DecoratorBlur::ExtendInkOverflow(Element* element, Rectanglef& scissor_region) const
 {
 	const float radius = element->ResolveLength(radius_value);
 	const float blur_extent = 1.5f * Math::Max(radius, 1.f);

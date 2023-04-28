@@ -1129,6 +1129,13 @@ bool RenderInterface_GL3::GenerateTexture(Rml::TextureHandle& texture_handle, co
 	return true;
 }
 
+Rml::TextureHandle RenderInterface_GL3::GenerateRenderTexture(Rml::Vector2i texture_dimensions)
+{
+	Rml::TextureHandle texture_handle_result = {};
+	GenerateTexture(texture_handle_result, nullptr, texture_dimensions);
+	return texture_handle_result;
+}
+
 void RenderInterface_GL3::DrawFullscreenQuad(Rml::Vector2f uv_offset, Rml::Vector2f uv_scaling)
 {
 	// Draw a fullscreen quad.
@@ -1722,22 +1729,16 @@ Rml::CompiledFilterHandle RenderInterface_GL3::CompileFilter(const Rml::String& 
 	return {};
 }
 
-void RenderInterface_GL3::AttachFilter(Rml::CompiledFilterHandle filter)
-{
-	attached_filters.push_back(reinterpret_cast<CompiledFilter*>(filter));
-}
-
 void RenderInterface_GL3::ReleaseCompiledFilter(Rml::CompiledFilterHandle filter)
 {
-	RMLUI_ASSERT(attached_filters.empty());
 	delete reinterpret_cast<CompiledFilter*>(filter);
 }
 
-void RenderInterface_GL3::RenderFilters()
+void RenderInterface_GL3::RenderFilters(const Rml::FilterHandleList& filter_handles)
 {
-	for (const CompiledFilter* filter_ptr : attached_filters)
+	for (const Rml::CompiledFilterHandle filter_handle : filter_handles)
 	{
-		const CompiledFilter& filter = *filter_ptr;
+		const CompiledFilter& filter = *reinterpret_cast<const CompiledFilter*>(filter_handle);
 		const FilterType type = filter.type;
 
 		switch (type)
@@ -1834,7 +1835,6 @@ void RenderInterface_GL3::RenderFilters()
 	}
 
 	Gfx::CheckGLError("RenderFilter");
-	attached_filters.clear();
 }
 
 void RenderInterface_GL3::PushLayer(Rml::RenderClear clear_new_layer)
@@ -1849,13 +1849,12 @@ void RenderInterface_GL3::PushLayer(Rml::RenderClear clear_new_layer)
 		glClear(GL_COLOR_BUFFER_BIT);
 }
 
-Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode)
+void RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target, Rml::BlendMode blend_mode, Rml::TextureHandle render_texture,
+	const Rml::FilterHandleList& filters)
 {
 	using Rml::BlendMode;
 	using Rml::RenderTarget;
 	RMLUI_ASSERT(!(has_mask && render_target == RenderTarget::MaskImage));
-
-	Rml::TextureHandle texture_handle_result = {};
 
 	{
 		// Blit stack to filter rendering buffer. Do this regardless of whether we actually have any filters to be applied, because we need to resolve
@@ -1872,7 +1871,7 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 	}
 
 	// Render the filters, the PostprocessPrimary framebuffer is used for both input and output.
-	RenderFilters();
+	RenderFilters(filters);
 
 	// Pop the active layer, thereby activating the beneath layer.
 	render_state.PopLayer();
@@ -1916,7 +1915,7 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 	break;
 	case RenderTarget::RenderTexture:
 	{
-		RMLUI_ASSERT(scissor_state.Valid());
+		RMLUI_ASSERT(scissor_state.Valid() && render_texture);
 		const Rml::Rectanglei initial_scissor_state = scissor_state;
 		EnableScissorRegion(false);
 
@@ -1936,14 +1935,11 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 			GL_COLOR_BUFFER_BIT, GL_NEAREST                 //
 		);
 
-		if (GenerateTexture(texture_handle_result, nullptr, bounds.Size()))
-		{
-			glBindTexture(GL_TEXTURE_2D, (GLuint)texture_handle_result);
+		glBindTexture(GL_TEXTURE_2D, (GLuint)render_texture);
 
-			const Gfx::FramebufferData& texture_source = destination;
-			glBindFramebuffer(GL_READ_FRAMEBUFFER, texture_source.framebuffer);
-			glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, bounds.Width(), bounds.Height());
-		}
+		const Gfx::FramebufferData& texture_source = destination;
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, texture_source.framebuffer);
+		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, bounds.Width(), bounds.Height());
 
 		SetScissor(initial_scissor_state);
 	}
@@ -1954,8 +1950,6 @@ Rml::TextureHandle RenderInterface_GL3::PopLayer(Rml::RenderTarget render_target
 	glBindFramebuffer(GL_FRAMEBUFFER, render_state.GetTopLayer().framebuffer);
 
 	Gfx::CheckGLError("PopLayer");
-
-	return texture_handle_result;
 }
 
 void RenderInterface_GL3::SubmitTransformUniform(Rml::Vector2f translation)

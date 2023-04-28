@@ -77,13 +77,12 @@ void DecoratorDropShadow::ReleaseElementData(DecoratorDataHandle handle) const
 	GetBasicFilterElementDataPool().DestroyAndDeallocate(element_data);
 }
 
-void DecoratorDropShadow::RenderElement(Element* /*element*/, DecoratorDataHandle handle) const
+CompiledFilterHandle DecoratorDropShadow::GetFilterHandle(Element* /*element*/, DecoratorDataHandle handle) const
 {
-	BasicFilterElementData* element_data = reinterpret_cast<BasicFilterElementData*>(handle);
-	element_data->render_interface->AttachFilter(element_data->filter);
+	return reinterpret_cast<BasicFilterElementData*>(handle)->filter;
 }
 
-void DecoratorDropShadow::ModifyScissorRegion(Element* element, Rectanglef& scissor_region) const
+void DecoratorDropShadow::ExtendInkOverflow(Element* element, Rectanglef& scissor_region) const
 {
 	// Expand the scissor region to cover both the native element *and* its offset shadow w/blur.
 

@@ -45,7 +45,7 @@ public:
 	DecoratorDataHandle GenerateElementData(Element* element) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
 
-	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
+	CompiledFilterHandle GetFilterHandle(Element* element, DecoratorDataHandle element_data) const override;
 
 private:
 	String name;

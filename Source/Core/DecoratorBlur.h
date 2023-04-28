@@ -45,9 +45,9 @@ public:
 	DecoratorDataHandle GenerateElementData(Element* element) const override;
 	void ReleaseElementData(DecoratorDataHandle element_data) const override;
 
-	void RenderElement(Element* element, DecoratorDataHandle element_data) const override;
+	CompiledFilterHandle GetFilterHandle(Element* element, DecoratorDataHandle element_data) const override;
 
-	void ModifyScissorRegion(Element* element, Rectanglef& scissor_region) const override;
+	void ExtendInkOverflow(Element* element, Rectanglef& scissor_region) const override;
 
 private:
 	NumericValue radius_value;
