@@ -89,6 +89,7 @@ struct Transition;
 struct TransitionList;
 struct DecoratorDeclarationList;
 struct FilterDeclarationList;
+struct BoxShadow;
 enum class EventId : uint16_t;
 enum class PropertyId : uint8_t;
 enum class MediaQueryId : uint8_t;
@@ -126,6 +127,7 @@ struct FontEffects {
 	FontEffectList list;
 	String value;
 };
+using BoxShadowList = Vector<BoxShadow>;
 
 // Additional smart pointers
 using TransformPtr = SharedPtr<Transform>;
