@@ -44,7 +44,7 @@ struct RMLUICORE_API Vertex {
 	/// Two-dimensional position of the vertex (usually in pixels).
 	Vector2f position;
 	/// RGBA-ordered 8-bit / channel colour.
-	Colourb colour;
+	ColourbPremultiplied colour;
 	/// Texture coordinate for any associated texture.
 	Vector2f tex_coord;
 };
