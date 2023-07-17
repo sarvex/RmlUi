@@ -8,7 +8,7 @@ import shutil
 import re
 
 def Usage(args):
-	print(sys.argv[0] + ' [-h] [-s] [-b] [-a] [-v version]')
+	print(f'{sys.argv[0]} [-h] [-s] [-b] [-a] [-v version]')
 	print('')
 	print(' -h\t: This help screen')
 	print(' -s\t: Include full source code and build files')
@@ -21,13 +21,13 @@ def Usage(args):
 def CheckVSVars():
 	if 'VCINSTALLDIR' in os.environ:
 		return
-		
-	if not 'VS90COMNTOOLS' in os.environ:
+
+	if 'VS90COMNTOOLS' not in os.environ:
 		print("Unable to find VS9 install - check your VS90COMNTOOLS environment variable")
 		sys.exit()
-		
+
 	path = os.environ['VS90COMNTOOLS']
-	subprocess.call('"' + path + 'vsvars32.bat" > NUL && ' + ' '.join(sys.argv))
+	subprocess.call(f'"{path}vsvars32.bat" > NUL && ' + ' '.join(sys.argv))
 	sys.exit()
 	
 def ProcessOptions(args):
@@ -65,21 +65,21 @@ def Build(project, configs, defines = {}):
 
 	for name, value in defines.items():
 		os.environ['CL'] = os.environ['CL'] + ' /D' + name + '=' + value
-		
+
 	for config in configs:
 		cmd = '"' + os.environ['VCINSTALLDIR'] + '\\vcpackages\\vcbuild.exe" /rebuild ' + project + '.vcproj "' + config + '|Win32"'
 		ret = subprocess.call(cmd)
 		if ret != 0:
-			print("Failed to build " + project)
+			print(f"Failed to build {project}")
 			sys.exit()
-			
+
 	os.environ['CL'] = old_cl
 	
 def DelTree(path):
 	if not os.path.exists(path):
 		return
-		
-	print('Deleting ' + path + '...')
+
+	print(f'Deleting {path}...')
 	for root, dirs, files in os.walk(path, topdown=False):
 		for name in files:
 			os.remove(os.path.join(root, name))
@@ -90,68 +90,57 @@ def CopyFiles(source_path, destination_path, file_list = [], exclude_directories
 	working_directory = os.getcwd()
 	source_directory = os.path.abspath(os.path.join(working_directory, os.path.normpath(source_path)))
 	destination_directory = os.path.abspath(os.path.join(working_directory, os.path.normpath(destination_path)))
-	print("Copying " + source_directory + " to " + destination_directory + " ...")
-	
+	print(f"Copying {source_directory} to {destination_directory} ...")
+
 	if not os.path.exists(source_directory):
-		print("Warning: Source directory " + source_directory + " doesn't exist.")
+		print(f"Warning: Source directory {source_directory} doesn't exist.")
 		return False
-	
+
 	for root, directories, files in os.walk(source_directory, topdown=True):
 		directories[:] = [d for d in directories if d not in exclude_directories]
-		
+
 		for file in files:
 			# Skip files not in the include list.
 			if len(file_list) > 0:
-				included = False
-				for include in file_list:
-					if re.search(include, file):
-						included = True
-						break;
-
+				included = any(re.search(include, file) for include in file_list)
 				if not included:
 					continue
-			
+
 			# Determine our subdirectory.
 			subdir = root.replace(source_directory, "")
 			if subdir[:1] == os.path.normcase('/'):
 				subdir = subdir[1:]
-			
-			# Skip paths in the exclude list
-			excluded = False
-			for exclude in exclude_files:
-				if re.search(exclude, file):
-					excluded = True
-					break
-					
+
+			excluded = any(re.search(exclude, file) for exclude in exclude_files)
 			if excluded:
 				continue
-			
+
 			# Build up paths
 			source_file = os.path.join(root, file)
 			destination_subdir = destination_directory
 			if preserve_paths:
 				destination_subdir = os.path.join(destination_directory, subdir)
-			
+
 			if not os.path.exists(destination_subdir):
 				os.makedirs(destination_subdir)
 			destination_file = os.path.join(destination_subdir, file)
-			
+
 			# Copy files
 			try:
 				shutil.copy(source_file, destination_file)
 			except:
-				print("Failed copying " + source_file + " to " + destination_file)
+				print(f"Failed copying {source_file} to {destination_file}")
 				traceback.print_exc()
-					
+
 	return True
 	
 def Archive(archive_name, path):
 	cwd = os.getcwd()
-	os.chdir(path + '/..')
-	file_name = archive_name + '.zip'
+	os.chdir(f'{path}/..')
+	file_name = f'{archive_name}.zip'
 	if os.path.exists(file_name):
 		os.unlink(file_name)
-	os.system('7z a ' + file_name + ' ' + path[path.rfind('/')+1:])
+	os.system(f'7z a {file_name} ' + path[path.rfind('/')+1:])
 	os.chdir(cwd)
 	
 def main():

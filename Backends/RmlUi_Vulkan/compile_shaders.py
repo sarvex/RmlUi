@@ -43,21 +43,20 @@ with open(out_path,'w') as result_file:
 		if file.endswith(".vert") or file.endswith(".frag"):
 			shader_path = os.path.join(current_dir, file)
 			variable_name = os.path.splitext(file)[0]
-			
-			print("Compiling '{}' to SPIR-V using glslc.".format(file))
-			
+
+			print(f"Compiling '{file}' to SPIR-V using glslc.")
+
 			subprocess.run(["glslc", shader_path, "-o", temp_spirv_path], check = True)
-			
-			print("Success, writing output to variable '{}' in {}".format(variable_name, out_file))
-		
-			i = 0
-			result_file.write('\nalignas(uint32_t) static const unsigned char {}[] = {{'.format(variable_name))
-			for b in open(temp_spirv_path, 'rb').read():
+
+			print(f"Success, writing output to variable '{variable_name}' in {out_file}")
+
+			result_file.write(
+				f'\nalignas(uint32_t) static const unsigned char {variable_name}[] = {{'
+			)
+			for i, b in enumerate(open(temp_spirv_path, 'rb').read()):
 				if i % 20 == 0:
 					result_file.write('\n\t')
 				result_file.write('0x%02X,' % b)
-				i += 1
-				
 			result_file.write('\n};\n')
-			
+
 			os.remove(temp_spirv_path)

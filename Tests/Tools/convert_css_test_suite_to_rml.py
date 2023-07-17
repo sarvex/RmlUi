@@ -98,42 +98,41 @@ html_color_mapping = {
 def border_format(side: str, type: str, content: str):
 	# Side: (empty)/-top/-right/-bottom/-left
 	# Type: (empty)/-width/-style/-color
-	
+
 	content = content.replace("thick", "5px")
 	content = content.replace("medium", "3px")
 	content = content.replace("thin", "1px")
 
 	if type == "-width":
-		return "border" + side + type + ": " + content
+		return f"border{side}{type}: {content}"
 	if type == "-color":
 		color = content.strip()
 		if color in html_color_mapping:
 			color = html_color_mapping[color]
-		return "border" + side + type + ": " + color
+		return f"border{side}{type}: {color}"
 
 	# Convert style to width. This is not perfect, but seems to be the most used case.
 	if type == "-style":
 		content = content.replace("none", "0px").replace("hidden", "0px")
 		# We may want to only match "solid" here, and cancel the test if it contains any other styles which are unsupported.
 		content = re.sub(r'\b[a-z]+\b', '3px', content, flags = re.IGNORECASE)
-		return "border" + side + "-width: " + content
+		return f"border{side}-width: {content}"
 
 	# Next are the shorthand properties, they should contain max a single size, a single style, and a single color.
 	width = re.search(r'\b([0-9]+(\.[0-9]+)?[a-z]+|0)\b', content, flags = re.IGNORECASE)
 	if width:
-		width = width.group(1)
+		width = width[1]
 
 	style_pattern = r'none|solid|hidden|dotted|dashed|double|groove|ridge|inset|outset|sold'
-	style = re.search(style_pattern, content, flags = re.IGNORECASE)
-	if style:
-		style = style.group(0)
-		if style == "none" or style == "hidden":
+	if style := re.search(style_pattern, content, flags=re.IGNORECASE):
+		style = style[0]
+		if style in ["none", "hidden"]:
 			width = "0px"
 
 	content = re.sub(style_pattern, "", content)
 	color = re.search(r'\b([a-z]+|#[0-9a-f]+)\b', content)
 	if color:
-		color = color.group(1)
+		color = color[1]
 		if color in html_color_mapping:
 			color = html_color_mapping[color]
 	else:
@@ -141,7 +140,7 @@ def border_format(side: str, type: str, content: str):
 
 	width = width or "3px"
 
-	return "border" + side + ": " + width + " " + color
+	return f"border{side}: {width} {color}"
 
 
 def border_find_replace(line: str):
@@ -185,13 +184,11 @@ reference_links = []
 def process_file(in_file):
 	
 	in_path = os.path.join(in_dir, in_file)
-	out_file = os.path.splitext(in_file)[0] + '.rml'
+	out_file = f'{os.path.splitext(in_file)[0]}.rml'
 	out_path = os.path.join(out_dir, out_file)
-	
-	f = open(in_path, 'r', encoding="utf8")
-	lines = f.readlines()
-	f.close()
 
+	with open(in_path, 'r', encoding="utf8") as f:
+		lines = f.readlines()
 	data = ''
 	reference_link = ''
 	in_style = False
@@ -201,7 +198,7 @@ def process_file(in_file):
 			in_style = True
 		if re.search(r'</style', line, flags = re.IGNORECASE):
 			in_style = False
-		
+
 		if in_style:
 			line = re.sub(r'(^|[^<])html', r'\1body', line, flags = re.IGNORECASE)
 			line = re.sub(r'<!--', r'/*', line, flags = re.IGNORECASE)
@@ -213,9 +210,10 @@ def process_file(in_file):
 			]
 
 		for reference_link_search in reference_link_search_candidates:
-			reference_link_match = re.search(reference_link_search, line, flags = re.IGNORECASE)
-			if reference_link_match:
-				reference_link = reference_link_match[2] + '.xht'
+			if reference_link_match := re.search(
+				reference_link_search, line, flags=re.IGNORECASE
+			):
+				reference_link = f'{reference_link_match[2]}.xht'
 				line = re.sub(reference_link_search, r'\1.rml\3', line, flags = re.IGNORECASE)
 				break
 
@@ -250,7 +248,7 @@ def process_file(in_file):
 		line = re.sub(r'table-layout:[^;}]*[;}]', r'', line, flags = re.IGNORECASE)
 
 		if re.search(r'background:[^;}\"]*fixed', line, flags = re.IGNORECASE):
-			print("File '{}' skipped since it uses unsupported background.".format(in_file))
+			print(f"File '{in_file}' skipped since it uses unsupported background.")
 			return False
 		line = re.sub(r'background:(\s*([a-z]+|#[0-9a-f]+)\s*[;}\"])', r'background-color:\1', line, flags = re.IGNORECASE)
 		prev_end = 0
@@ -260,9 +258,11 @@ def process_file(in_file):
 			delimiter = match.group(2)
 			if color in html_color_mapping:
 				color = html_color_mapping[color]
-			new_line += line[prev_end:match.start()] + 'background-color: ' + color + delimiter
+			new_line += (
+				f'{line[prev_end:match.start()]}background-color: {color}{delimiter}'
+			)
 			prev_end = match.end()
-			
+
 		new_line += line[prev_end:]
 		line = new_line
 
@@ -272,7 +272,7 @@ def process_file(in_file):
 			num = match.group(1)
 			unit = match.group(2)
 			den = match.group(3)
-			calc_result = "{}{}".format(float(num) / float(den), unit)
+			calc_result = f"{float(num) / float(den)}{unit}"
 			new_line += line[prev_end:match.start()] + calc_result
 			prev_end = match.end()
 		new_line += line[prev_end:]
@@ -280,49 +280,47 @@ def process_file(in_file):
 
 		line = border_find_replace(line)
 
-		if in_style and not '<' in line:
+		if in_style and '<' not in line:
 			line = line.replace('&gt;', '>')
 		flags_match = re.search(r'<meta.*name="flags" content="([^"]*)" ?/>', line, flags = re.IGNORECASE) or re.search(r'<meta.*content="([^"]*)".*name="flags".*?/>', line, flags = re.IGNORECASE)
 		if flags_match and flags_match[1] != '' and flags_match[1] != 'interactive':
-			print("File '{}' skipped due to flags '{}'".format(in_file, flags_match[1]))
+			print(f"File '{in_file}' skipped due to flags '{flags_match[1]}'")
 			return False
 		if re.search(r'display:[^;]*(inline-table|table-caption|table-header-group|table-footer-group|run-in|list-item|inline-flex)', line, flags = re.IGNORECASE):
-			print("File '{}' skipped since it uses unsupported display modes.".format(in_file))
+			print(f"File '{in_file}' skipped since it uses unsupported display modes.")
 			return False
 		if re.search(r'visibility:[^;]*collapse|z-index:\s*[0-9\.]+%', line, flags = re.IGNORECASE):
-			print("File '{}' skipped since it uses unsupported visibility.".format(in_file))
+			print(f"File '{in_file}' skipped since it uses unsupported visibility.")
 			return False
 		if re.search(r'data:|support/|<img|<iframe', line, flags = re.IGNORECASE):
-			print("File '{}' skipped since it uses data or images.".format(in_file))
+			print(f"File '{in_file}' skipped since it uses data or images.")
 			return False
 		if re.search(r'<script>', line, flags = re.IGNORECASE):
-			print("File '{}' skipped since it uses scripts.".format(in_file))
+			print(f"File '{in_file}' skipped since it uses scripts.")
 			return False
 		if in_style and re.search(r':before|:after|@media|\s\+\s', line, flags = re.IGNORECASE):
-			print("File '{}' skipped since it uses unsupported CSS selectors.".format(in_file))
+			print(f"File '{in_file}' skipped since it uses unsupported CSS selectors.")
 			return False
 		if re.search(r'(: ?inherit ?;)|(!\s*important)|[0-9\.]+(ch|ex)[\s;}]', line, flags = re.IGNORECASE):
-			print("File '{}' skipped since it uses unsupported CSS values.".format(in_file))
+			print(f"File '{in_file}' skipped since it uses unsupported CSS values.")
 			return False
 		if re.search(r'@font-face|font:|ahem', line, flags = re.IGNORECASE):
-			print("File '{}' skipped since it uses special fonts.".format(in_file))
+			print(f"File '{in_file}' skipped since it uses special fonts.")
 			return False
 		if re.search(r'\b((direction:[^;]*[;"])|(content:[^;]*[;"])|(outline:[^;]*[;"])|(quote:[^;]*[;"])|(border-spacing:[^;]*[;"])|(border-collapse:[^;]*[;"])|(background:[^;]*[;"]))', line, flags = re.IGNORECASE)\
 			or re.search(r'\b((font-variant:[^;]*[;"])|(font-kerning:[^;]*[;"])|(font-feature-settings:[^;]*[;"])|(background-image:[^;]*[;"])|(caption-side:[^;]*[;"])|(clip:[^;]*[;"])|(page-break-inside:[^;]*[;"])|(word-spacing:[^;]*[;"]))', line, flags = re.IGNORECASE)\
 			or re.search(r'\b((writing-mode:[^;]*[;"])|(text-orientation:[^;]*[;"])|(text-indent:[^;]*[;"])|(page-break-after:[^;]*[;"])|(page-break-before:[^;]*[;"])|(column[^:]*:[^;]*[;"])|(empty-cells:[^;]*[;"]))', line, flags = re.IGNORECASE)\
 			or re.search(r'\b((aspect-ratio:[^;]*[;"])|(flex-basis:[^;]*[;"])|(order:[^;]*[;"]))', line, flags = re.IGNORECASE):
-			print("File '{}' skipped since it uses unsupported CSS properties.".format(in_file))
+			print(f"File '{in_file}' skipped since it uses unsupported CSS properties.")
 			return False
 		data += line
 
-	f = open(out_path, 'w', encoding="utf8")
-	f.write(data)
-	f.close()
-
+	with open(out_path, 'w', encoding="utf8") as f:
+		f.write(data)
 	if reference_link:
 		reference_links.append(reference_link)
-	
-	print("File '{}' processed successfully!".format(in_file))
+
+	print(f"File '{in_file}' processed successfully!")
 
 	return True
 
@@ -337,7 +335,9 @@ def should_block(name):
 
 	for file_block_filter in file_block_filters:
 		if file_block_filter in name:
-			print("File '{}' skipped due to unsupported feature '{}'".format(name, file_block_filter))
+			print(
+				f"File '{name}' skipped due to unsupported feature '{file_block_filter}'"
+			)
 			return True
 	return False
 
@@ -348,20 +348,14 @@ total_files = len(in_dir_list)
 
 in_dir_list = [ name for name in in_dir_list if name.endswith(".xht") and not should_block(name) ]
 
-processed_files = 0
-processed_reference_files = 0
-
-for in_file in in_dir_list:
-	if process_file(in_file):
-		processed_files += 1
-
+processed_files = sum(1 for in_file in in_dir_list if process_file(in_file))
 final_reference_links = reference_links[:]
 total_reference_files = len(final_reference_links)
 reference_links.clear()
 
-for in_ref_file in final_reference_links:
-	if process_file(in_ref_file):
-		processed_reference_files += 1
-
-print('\nDone!\n\nTotal test files: {}\nSkipped test files: {}\nParsed test files: {}\n\nTotal reference files: {}\nSkipped reference files: {}\nIgnored alternate references: {}\nParsed reference files: {}'\
-	.format(total_files, total_files - processed_files, processed_files, total_reference_files, total_reference_files - processed_reference_files, len(reference_links), processed_reference_files ))
+processed_reference_files = sum(
+	1 for in_ref_file in final_reference_links if process_file(in_ref_file)
+)
+print(
+	f'\nDone!\n\nTotal test files: {total_files}\nSkipped test files: {total_files - processed_files}\nParsed test files: {processed_files}\n\nTotal reference files: {total_reference_files}\nSkipped reference files: {total_reference_files - processed_reference_files}\nIgnored alternate references: {len(reference_links)}\nParsed reference files: {processed_reference_files}'
+)
